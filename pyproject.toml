@@ -11,6 +11,7 @@ dependencies = [
     "expression (>=5.6.0,<6.0.0)",
     "pydantic (>=2.11.2,<3.0.0)",
     "pydantic-settings (>=2.8.1,<3.0.0)",
+    "patchright (>=1.51.3,<2.0.0)",
 ]
 
 [project.optional-dependencies]

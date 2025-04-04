@@ -19,7 +19,6 @@ R = TypeVar('R')
 logger = logging.getLogger(__name__)
 
 
-@curry
 def branch(input_value: T, 
            predicate: Callable[[T], bool], 
            true_action: Action[S], 
@@ -76,7 +75,6 @@ def branch(input_value: T,
     )
 
 
-@curry
 def loop_until(action: Action[T],
                condition: Callable[[T], bool],
                max_iterations: int = 10,
@@ -105,7 +103,7 @@ def loop_until(action: Action[T],
     async def execute_loop(driver: BrowserDriver) -> Result[T, Exception]:
         try:
             iterations = 0
-            last_result = None
+            last_result: Optional[T] = None
             
             while iterations < max_iterations:
                 action_result = await action.execute(driver)
@@ -113,11 +111,12 @@ def loop_until(action: Action[T],
                 if action_result.is_error():
                     return action_result
                     
-                result_value = action_result.value
-                last_result = result_value
+                result_value = action_result.default_value(None)
+                if result_value is not None:
+                    last_result = result_value
                 
-                if condition(result_value):
-                    return Ok(result_value)
+                    if condition(result_value):
+                        return Ok(result_value)
                     
                 iterations += 1
                 if iterations < max_iterations:
@@ -126,7 +125,11 @@ def loop_until(action: Action[T],
                 else:
                     logger.debug(f"Reached max iterations ({max_iterations})")
             
-            return Ok(last_result)
+            # If we finished the loop and still have no result, we need a fallback
+            if last_result is not None:
+                return Ok(last_result)
+            # Return error if no valid result was obtained
+            return Error(Exception("No valid result in loop_until"))
         except Exception as e:
             return Error(e)
     
@@ -136,9 +139,7 @@ def loop_until(action: Action[T],
         description=f"Loop action until condition is met (max {max_iterations} times)"
     )
 
-# ------------ Enhanced Retry ------------
 
-@curry
 def retry_with_backoff(action: Action[T], 
                        max_attempts: int = 3,
                        initial_delay_ms: int = 1000,
@@ -161,18 +162,20 @@ def retry_with_backoff(action: Action[T],
     """
     async def execute_retry(driver: BrowserDriver) -> Result[T, Exception]:
         try:
-            last_error = None
-            delay = initial_delay_ms
+            last_error: Optional[Exception] = None
+            delay: float = float(initial_delay_ms)
             
             for attempt in range(max_attempts):
                 try:
                     result = await action.execute(driver)
                     if result.is_ok():
-                        return Ok(result.value)
+                        # Use unwrapping method instead of direct value access
+                        value = result.value if hasattr(result, 'value') else cast(T, result.default_value(None))
+                        return Ok(value)
                     
-                    last_error = result.error()
+                    last_error = Exception(str(result)) if result.is_error() else Exception("Unknown error")
                     # Check if we should retry this specific error
-                    if should_retry and not should_retry(last_error):
+                    if should_retry and last_error and not should_retry(last_error):
                         return Error(last_error)
                         
                 except Exception as e:
@@ -184,11 +187,11 @@ def retry_with_backoff(action: Action[T],
                 # If not the last attempt, wait before retrying
                 if attempt < max_attempts - 1:
                     # Calculate backoff with optional jitter
-                    current_delay = delay
+                    current_delay: float = delay
                     if jitter:
                         # Add random jitter between 0.8x and 1.2x
                         jitter_factor = random.uniform(0.8, 1.2)
-                        current_delay = current_delay * jitter_factor
+                        current_delay = delay * jitter_factor
                     
                     logger.info(f"Retry {attempt+1}/{max_attempts} failed, waiting {current_delay:.0f}ms")
                     await asyncio.sleep(current_delay / 1000)
@@ -207,9 +210,7 @@ def retry_with_backoff(action: Action[T],
         description=f"Retry {action.name} with exponential backoff"
     )
 
-# ------------ Timeout ------------
 
-@curry
 def with_timeout(action: Action[T], 
                  timeout_ms: int,
                  on_timeout: Optional[Callable[[], T]] = None) -> Action[T]:
@@ -251,8 +252,8 @@ def with_timeout(action: Action[T],
                     except Exception as e:
                         return Error(e)
                 else:
-                    # Propagate timeout error
-                    return Error(TimeoutError(f"Action timed out after {timeout_ms}ms"))
+                    # No default value, return timeout error
+                    return Error(Exception(f"Action timed out after {timeout_ms}ms"))
         except Exception as e:
             return Error(e)
     
@@ -262,36 +263,32 @@ def with_timeout(action: Action[T],
         description=f"Execute {action.name} with {timeout_ms}ms timeout"
     )
 
-# ------------ Tap (Side Effects) ------------
 
-@curry
 def tap(side_effect_action: Action[Any]) -> Callable[[T], Action[T]]:
     """
-    Execute an action for side effects without changing the pipeline value.
+    Create a tap function that executes a side effect action but passes
+    the original value through unchanged.
     
     Args:
-        side_effect_action: Action to execute for side effects
-    
+        side_effect_action: Action to execute as a side effect
+        
     Returns:
-        A function that takes an input value and returns an Action that preserves that value
+        A function that takes an input value and returns an Action that will
+        execute the side effect but return the original input value
 
     Example:
     ```
-        # Execute an action for side effects
-        result = await get_element("#login-button") >> tap(log_action())
-    ``` 
+        # Log a value but continue with original value
+        workflow = get_text(".message") >> tap(log_to_console()) >> process()
+    ```
     """
     def tap_with_value(input_value: T) -> Action[T]:
         async def execute_tap(driver: BrowserDriver) -> Result[T, Exception]:
             try:
                 # Execute the side effect action
-                side_effect_result = await side_effect_action.execute(driver)
+                await side_effect_action.execute(driver)
                 
-                # Ignore the side effect result, just check for errors
-                if side_effect_result.is_error():
-                    return Error(side_effect_result.error())
-                    
-                # Return the original input value
+                # Return the original input value regardless of the side effect result
                 return Ok(input_value)
             except Exception as e:
                 return Error(e)
@@ -299,7 +296,7 @@ def tap(side_effect_action: Action[Any]) -> Callable[[T], Action[T]]:
         return create_action(
             name=f"tap({side_effect_action.name})",
             execute_fn=execute_tap,
-            description=f"Execute {side_effect_action.name} as side effect"
+            description=f"Execute {side_effect_action.name} as side effect and pass through original value"
         )
     
     return tap_with_value

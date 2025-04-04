@@ -124,10 +124,9 @@ pydantic = ["pydantic (>=2.6.2,<3.0.0)"]
 name = "greenlet"
 version = "3.1.1"
 description = "Lightweight in-process concurrent programming"
-optional = true
+optional = false
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"patchright\" or extra == \"all\""
 files = [
     {file = "greenlet-3.1.1-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:0bbae94a29c9e5c7e4a2b7f0aae5c17e8e90acbfd3bf6270eeba60c39fce3563"},
     {file = "greenlet-3.1.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0fde093fb93f35ca72a556cf72c92ea3ebfda3d79fc35bb19fbe685853869a83"},
@@ -299,20 +298,19 @@ files = [
 
 [[package]]
 name = "patchright"
-version = "1.51.0"
+version = "1.51.3"
 description = "Undetected Python version of the Playwright testing and automation library."
-optional = true
+optional = false
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"patchright\" or extra == \"all\""
 files = [
-    {file = "patchright-1.51.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:955cbf74013842c0223dc302a59eededb44a487d3e6943f2e2beadeb9ccd6188"},
-    {file = "patchright-1.51.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:f5f33997fb8134452e3d77e5e6b9129e9cf0fb67dc57208c48afc501e50c3232"},
-    {file = "patchright-1.51.0-py3-none-macosx_11_0_universal2.whl", hash = "sha256:c15030924c11c15ac984c8e410d93840c9d4492261d7491df96d2e909d4cfb5d"},
-    {file = "patchright-1.51.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:d55132875ced6d488ab72c38e83740d8a5cd367ada1746c9ea673a8b37d3d60a"},
-    {file = "patchright-1.51.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:61bdbd8dc59597829662dcf43db61d0b97fc45877c35971cef5df80f59cdc160"},
-    {file = "patchright-1.51.0-py3-none-win32.whl", hash = "sha256:4895496780f2502e17f7551445a50fec956dba031b4186893e64bc94795170f1"},
-    {file = "patchright-1.51.0-py3-none-win_amd64.whl", hash = "sha256:4444c59606f06b036207aece73c06dc3bbfd40eb262c91645113e2f5e473fa0a"},
+    {file = "patchright-1.51.3-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:a363d0fbe426e8934f9d27276777d072f102bb990e10f976a320360c5b20214f"},
+    {file = "patchright-1.51.3-py3-none-macosx_11_0_arm64.whl", hash = "sha256:6db73035997b39b5696bc888a5822b2ee1e63078d23a693861be2087e8b81d79"},
+    {file = "patchright-1.51.3-py3-none-macosx_11_0_universal2.whl", hash = "sha256:8b9ab3a9a83bd1a0dd47cc2de74f2064bac25e689b106e6d852951d588fa5c82"},
+    {file = "patchright-1.51.3-py3-none-manylinux1_x86_64.whl", hash = "sha256:6a5259077e9b0b5c8668fe26c9c50725a2691739f2d5d761bc9ff96b8d3e03f5"},
+    {file = "patchright-1.51.3-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:33d9ec53bdc0c88e869b88beefca5e2a3576693370c4db0235c733b184d7df92"},
+    {file = "patchright-1.51.3-py3-none-win32.whl", hash = "sha256:b0e21d719df80656cfa9066de73b2e4ab4cfddc634829bfa2f6d6c82bc05f3f3"},
+    {file = "patchright-1.51.3-py3-none-win_amd64.whl", hash = "sha256:a64c5c05f724e6097b227142e56cf2e46ce6cd549cdf8f7708c074024b486761"},
 ]
 
 [package.dependencies]
@@ -494,10 +492,9 @@ yaml = ["pyyaml (>=6.0.1)"]
 name = "pyee"
 version = "12.1.1"
 description = "A rough port of Node.js's EventEmitter to Python with a few tricks of its own"
-optional = true
+optional = false
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"patchright\" or extra == \"all\""
 files = [
     {file = "pyee-12.1.1-py3-none-any.whl", hash = "sha256:18a19c650556bb6b32b406d7f017c8f513aceed1ef7ca618fb65de7bd2d347ef"},
     {file = "pyee-12.1.1.tar.gz", hash = "sha256:bbc33c09e2ff827f74191e3e5bbc6be7da02f627b7ec30d86f5ce1a6fb2424a3"},
@@ -617,4 +614,4 @@ patchright = ["patchright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "bbde8c725555788715bdf81df9067abc5e7c209c1e85eb61098eb6270140b3ed"
+content-hash = "2f8f997517914a3899c7d5823192f9a27cea1917756769e8c0288492b7993f64"

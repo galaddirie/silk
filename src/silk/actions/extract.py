@@ -1,4 +1,4 @@
-from typing import Optional, Any, List, Union, Dict, TypeVar, Generic
+from typing import Optional, Any, List, Union, Dict, TypeVar, Generic, Callable, Awaitable
 from expression.core import Result, Ok, Error
 from expression import pipe
 from expression.collections import Block
@@ -25,10 +25,12 @@ class ExtractText(Action[str]):
         try:
             if isinstance(self.selector, SelectorGroup):
                 return await self.selector.execute(
-                    lambda sel: _find_element_and_extract(driver, sel, lambda el: el.get_text())
+                    lambda sel: _find_element_and_extract[str](
+                        driver, sel, lambda el: el.get_text()
+                    )
                 )
             else:
-                return await _find_element_and_extract(
+                return await _find_element_and_extract[str](
                     driver, self.selector, lambda el: el.get_text()
                 )
         except Exception as e:
@@ -51,12 +53,12 @@ class ExtractAttribute(Action[Optional[str]]):
         try:
             if isinstance(self.selector, SelectorGroup):
                 return await self.selector.execute(
-                    lambda sel: _find_element_and_extract(
+                    lambda sel: _find_element_and_extract[Optional[str]](
                         driver, sel, lambda el: el.get_attribute(self.attribute)
                     )
                 )
             else:
-                return await _find_element_and_extract(
+                return await _find_element_and_extract[Optional[str]](
                     driver, self.selector, lambda el: el.get_attribute(self.attribute)
                 )
         except Exception as e:
@@ -82,42 +84,23 @@ class ExtractMultiple(Action[Block[T]], Generic[T]):
     async def execute(self, driver: BrowserDriver) -> Result[Block[T], Exception]:
         try:
             if isinstance(self.selector, Selector):
-                # Try CSS first if possible
-                css_option = self.selector.to_css()
-                
-                if css_option.is_some():
-                    elements = await driver.query_selector_all(css_option.unwrap())
-                    if elements:
-                        # Use Block instead of list for immutability
-                        results = Block.empty()
-                        for el in elements:
-                            extracted = await self.extract_fn(el)
-                            results = results.cons(extracted)
-                        # Reverse because cons adds at the beginning
-                        return Ok(pipe(results, Block.reverse))
-                
-                # Fall back to XPath
-                xpath = self.selector.to_xpath()
-                elements = await driver.query_selector_all(xpath)
-                
+
+                elements = await driver.query_selector_all(self.selector.value)
                 if elements:
-                    # Use Block instead of list for immutability
                     results = Block.empty()
                     for el in elements:
                         extracted = await self.extract_fn(el)
                         results = results.cons(extracted)
-                    # Reverse because cons adds at the beginning
                     return Ok(pipe(results, Block.reverse))
+                
+                
                 else:
                     return Ok(Block.empty())
             else:
-                # For SelectorGroup, use the first successful selector
                 for selector in self.selector.selectors:
                     result = await self._extract_with_selector(driver, selector)
                     if result.is_ok() and len(result.unwrap()) > 0:
                         return result
-                
-                # If no selector matched elements, return empty Block
                 return Ok(Block.empty())
         except Exception as e:
             return Error(e)
@@ -126,32 +109,14 @@ class ExtractMultiple(Action[Block[T]], Generic[T]):
         self, driver: BrowserDriver, selector: Selector
     ) -> Result[Block[T], Exception]:
         try:
-            # Try CSS first if possible
-            css_option = selector.to_css()
-            
-            if css_option.is_some():
-                elements = await driver.query_selector_all(css_option.unwrap())
-                if elements:
-                    # Use Block for functional immutability
+            elements = await driver.query_selector_all(selector.value)
+            if elements:
                     results = pipe(
                         elements,
-                        lambda els: Block.of_seq([]),  # Start with empty Block
+                        lambda els: Block.of_seq([]),
                         lambda block: self._extract_all_elements(block, elements)
                     )
-                    return Ok(results)
-            
-            # Fall back to XPath
-            xpath = selector.to_xpath()
-            elements = await driver.query_selector_all(xpath)
-            
-            if elements:
-                # Use Block instead of list for immutability
-                results = Block.empty()
-                for el in elements:
-                    extracted = await self.extract_fn(el)
-                    results = results.cons(extracted)
-                # Reverse because cons adds at the beginning
-                return Ok(pipe(results, Block.reverse))
+                    return Ok(results)  
             else:
                 return Ok(Block.empty())
         except Exception as e:
@@ -163,7 +128,7 @@ class ExtractMultiple(Action[Block[T]], Generic[T]):
         for el in elements:
             extracted = await self.extract_fn(el)
             results = results.cons(extracted)
-        return pipe(results, Block.reverse)
+            
+        return pipe(results, Block.sort(reverse=True))
 
 
-# Helper function for element extraction

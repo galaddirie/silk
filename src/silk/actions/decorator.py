@@ -1,10 +1,12 @@
-from silk.actions.base import create_action
+from silk.actions.base import create_action, Action
 from silk.browser.driver import BrowserDriver
 from expression.core import Result, Ok, Error
 
 from functools import wraps
 import inspect
-from typing import Any, Optional    
+from typing import Any, Optional, TypeVar, Callable, Union, cast, Type, Dict, List
+
+T = TypeVar('T')
 
 def action(name: Optional[str] = None, description: Optional[str] = None):
     """
@@ -27,13 +29,13 @@ def action(name: Optional[str] = None, description: Optional[str] = None):
             await element.click()
             return "clicked"
     """
-    def decorator(func):
+    def decorator(func: Callable) -> Callable[..., Action[Any]]:
         is_async = inspect.iscoroutinefunction(func)
         action_name = name or func.__name__
         action_description = description or func.__doc__
         
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Action[Any]:
             # Create a closure over the args and kwargs
             async def execute_fn(driver: BrowserDriver) -> Result[Any, Exception]:
                 try:

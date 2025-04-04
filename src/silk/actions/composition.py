@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Callable, Any, Dict, List, Optional, Protocol, Awaitable, Union, overload, cast
+from typing import TypeVar, Generic, Callable, Any, Dict, List, Optional, Protocol, Awaitable, Union, overload, cast, Literal
 from expression import pipe as expression_pipe, curry
 from expression.core import Result, Some, Nothing, Error, Ok
 from expression.collections import Block
@@ -14,7 +14,6 @@ S = TypeVar('S')
 R = TypeVar('R')
 
 
-@curry
 def sequence(*actions: Action[Any]) -> Action[Block[Any]]:
     """
     Combines multiple actions into a single action that executes them in sequence.
@@ -46,11 +45,11 @@ def sequence(*actions: Action[Any]) -> Action[Block[Any]]:
             if result.is_error():
                 return Error(result.error)
             
-            # Cons is the immutable way to add an element to a Block (creates a new Block)
-            results = results.cons(result.value)
+            values = results.cons(result.default_value(None))
+
+        return Ok(values.sort(reverse=True))
         
-        # Block's elements are added in reverse order when using cons, so we need to reverse
-        return Ok(expression_pipe(results, Block.reverse))
+        
     
     action_names = " >> ".join(a.name for a in action_list)
     return create_action(
@@ -60,7 +59,6 @@ def sequence(*actions: Action[Any]) -> Action[Block[Any]]:
     )
 
 
-@curry
 def parallel(*actions: Action[Any]) -> Action[Block[Any]]:
     """
     Execute multiple actions in parallel and collect their results into a Block.
@@ -86,28 +84,26 @@ def parallel(*actions: Action[Any]) -> Action[Block[Any]]:
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # Process results using functional patterns
-        # Find first error if any
-        error_result = expression_pipe(
-            results,
-            Block.of_seq,
-            Block.try_find(lambda r: isinstance(r, Exception) or 
-                          (isinstance(r, Result) and r.is_error()))
-        )
+        # Create a Block from results
+        results_block = Block.of_seq(results)
         
-        if error_result is not Nothing:
-            error = error_result.value
-            if isinstance(error, Exception):
-                return Error(error)
-            return Error(error.error())
+        # Find first error if any
+        for result in results_block:
+            if isinstance(result, Exception):
+                return Error(result)
+            if isinstance(result, Result) and result.is_error():
+                return Error(result.error)
         
         # Map successful results to values
-        values = expression_pipe(
-            results,
-            Block.of_seq,
-            Block.map(lambda r: r.value if isinstance(r, Result) else r)
-        )
+        values = Block.empty()
+        for result in results_block:
+            if isinstance(result, Result):
+                values = values.cons(result.default_value(None))
+            else:
+                values = values.cons(result)
         
-        return Ok(values)
+        # Reverse to maintain original order
+        return Ok(values.sort(reverse=True))
     
     action_names = " & ".join(a.name for a in action_list)
     return create_action(
@@ -117,7 +113,6 @@ def parallel(*actions: Action[Any]) -> Action[Block[Any]]:
     )
 
 
-@curry
 def pipe(*actions: Action[Any]) -> Action[Any]:
     """
     Create a pipeline of actions where each action receives the result of the previous action.
@@ -151,7 +146,7 @@ def pipe(*actions: Action[Any]) -> Action[Any]:
             if result.is_error():
                 return result
             
-            value = result.value
+            value = result.default_value(None)
             
             # Chain remaining actions using railway pattern
             for action in action_list[1:]:
@@ -160,7 +155,7 @@ def pipe(*actions: Action[Any]) -> Action[Any]:
                 result = await next_action.execute(driver)
                 if result.is_error():
                     return result
-                value = result.value
+                value = result.default_value(None)
             
             return Ok(value)
         except Exception as e:
@@ -174,7 +169,6 @@ def pipe(*actions: Action[Any]) -> Action[Any]:
     )
 
 
-@curry
 def fallback(*actions: Action[T]) -> Action[T]:
     """
     Try actions in sequence until one succeeds.

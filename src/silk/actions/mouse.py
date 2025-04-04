@@ -27,6 +27,9 @@ class MouseMove(Action[None]):
         offset_y: The y offset to move to
     """
 
+    coordinates: Optional[Tuple[int, int]] = None
+    selector: Optional[Union[Selector, SelectorGroup]] = None
+
     def __init__(
         self,
         target: Union[Selector, SelectorGroup, Tuple[int, int]],
@@ -75,18 +78,7 @@ class MouseMove(Action[None]):
         self, driver: BrowserDriver, selector: Selector
     ) -> Result[None, Exception]:
         try:
-            # Try CSS first if possible
-            css_option = selector.to_css()
-
-            element = None
-            if css_option.is_some():
-                element = await driver.query_selector(css_option.unwrap())
-
-            # Fall back to XPath if CSS didn't work
-            if not element:
-                xpath = selector.to_xpath()
-                element = await driver.query_selector(xpath)
-
+            element = await driver.query_selector(selector.value)
             if element:
                 await driver.mouse_move_to_element(
                     element, self.offset_x, self.offset_y

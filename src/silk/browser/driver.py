@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List, Protocol, Callable, TypeVar, Generic, Awaitable
 from pydantic import BaseModel, Field
 from expression import pipe, curry, compose
-from expression.core import Result, Option
+from expression.core import Result, Option, Error
 from expression.collections import seq
 from pathlib import Path
 import asyncio
@@ -113,6 +113,56 @@ class BrowserDriver(ABC, Generic[T]):
         """Wait for navigation to complete"""
         pass
     
+    @abstractmethod
+    async def mouse_move(self, x: int, y: int) -> Result[None, Exception]:
+        """Move the mouse to the specified coordinates"""
+        pass
+    
+    @abstractmethod
+    async def mouse_move_to_element(self, element: T, offset_x: int = 0, offset_y: int = 0) -> Result[None, Exception]:
+        """Move the mouse to the specified element with optional offset"""
+        pass
+    
+    @abstractmethod
+    async def mouse_down(self, button: str = "left") -> Result[None, Exception]:
+        """Press a mouse button"""
+        pass
+    
+    @abstractmethod
+    async def mouse_up(self, button: str = "left") -> Result[None, Exception]:
+        """Release a mouse button"""
+        pass
+    
+    @abstractmethod
+    async def mouse_click(self, button: str = "left", click_count: int = 1, delay_between_ms: Optional[int] = None) -> Result[None, Exception]:
+        """Click a mouse button"""
+        pass
+    
+    @abstractmethod
+    async def mouse_double_click(self, button: str = "left") -> Result[None, Exception]:
+        """Double click a mouse button"""
+        pass
+    
+    @abstractmethod
+    async def press(self, key: str) -> Result[None, Exception]:
+        """Press a key or key combination"""
+        pass
+    
+    @abstractmethod
+    async def key_down(self, key: str) -> Result[None, Exception]:
+        """Press and hold a key"""
+        pass
+    
+    @abstractmethod
+    async def key_up(self, key: str) -> Result[None, Exception]:
+        """Release a key"""
+        pass
+    
+    @abstractmethod
+    async def type(self, text: str, delay: Optional[float] = None) -> Result[None, Exception]:
+        """Type a sequence of characters with optional delay between keystrokes"""
+        pass
+    
     def pipe(self, f: Callable[['BrowserDriver[T]'], S]) -> S:
         """Pipe the browser driver through a function"""
         return f(self)
@@ -129,12 +179,20 @@ class BrowserDriver(ABC, Generic[T]):
         Returns:
             Result containing the text or an exception
         """
-        return await pipe(
-            await self.query_selector(selector),
-            lambda result: result.bind(
-                lambda element: element.get_text() if element else Result.failure(Exception(f"Element not found: {selector}"))
-            )
-        )
+        result = await self.query_selector(selector)
+        if result.is_error():
+            return Error(Exception(f"Failed to query selector: {selector}"))
+            
+        # Cast to avoid type errors
+        element: Optional[ElementHandle] = None
+        if result.is_ok():
+            value = getattr(result, 'value', None)
+            element = value
+            
+        if not element:
+            return Error(Exception(f"Element not found: {selector}"))
+            
+        return await element.get_text()
     
     async def click_selector(self, selector: str) -> Result[None, Exception]:
         """
@@ -146,12 +204,20 @@ class BrowserDriver(ABC, Generic[T]):
         Returns:
             Result indicating success or failure
         """
-        return await pipe(
-            await self.query_selector(selector),
-            lambda result: result.bind(
-                lambda element: element.click() if element else Result.failure(Exception(f"Element not found: {selector}"))
-            )
-        )
+        result = await self.query_selector(selector)
+        if result.is_error():
+            return Error(Exception(f"Failed to query selector: {selector}"))
+            
+        # Cast to avoid type errors
+        element: Optional[ElementHandle] = None
+        if result.is_ok():
+            value = getattr(result, 'value', None)
+            element = value
+            
+        if not element:
+            return Error(Exception(f"Element not found: {selector}"))
+            
+        return await element.click()
     
     async def type_in_selector(self, selector: str, text: str) -> Result[None, Exception]:
         """
@@ -164,12 +230,20 @@ class BrowserDriver(ABC, Generic[T]):
         Returns:
             Result indicating success or failure
         """
-        return await pipe(
-            await self.query_selector(selector),
-            lambda result: result.bind(
-                lambda element: element.type(text) if element else Result.failure(Exception(f"Element not found: {selector}"))
-            )
-        )
+        result = await self.query_selector(selector)
+        if result.is_error():
+            return Error(Exception(f"Failed to query selector: {selector}"))
+            
+        # Cast to avoid type errors
+        element: Optional[ElementHandle] = None
+        if result.is_ok():
+            value = getattr(result, 'value', None)
+            element = value
+            
+        if not element:
+            return Error(Exception(f"Element not found: {selector}"))
+            
+        return await element.type(text)
     
     async def with_timeout(self, action: Callable[['BrowserDriver[T]'], Awaitable[Result[R, Exception]]], 
                          timeout_ms: int) -> Result[R, Exception]:
@@ -188,9 +262,13 @@ class BrowserDriver(ABC, Generic[T]):
                 action(self),
                 timeout=timeout_ms / 1000
             )
-            return result
+            if isinstance(result, Result):
+                return result
+            else:
+                # This should not happen if the action function is correctly typed
+                return Error(Exception(f"Action did not return a Result: {result}"))
         except asyncio.TimeoutError:
-            return Result.failure(Exception(f"Operation timed out after {timeout_ms}ms"))
+            return Error(Exception(f"Operation timed out after {timeout_ms}ms"))
         except Exception as e:
-            return Result.failure(e)
+            return Error(e)
 

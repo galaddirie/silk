@@ -1,16 +1,17 @@
 """
 Driver factory module for creating browser driver instances based on available dependencies.
 """
-from typing import Dict, Type, Optional, Any, Callable
+from typing import Dict, Type, Optional, Any, Callable, TypeVar, cast
 from importlib import import_module
 from silk.browser.driver import BrowserDriver, BrowserOptions
 
+T = TypeVar('T')
 
 class DriverFactory:
     """Factory for creating browser driver instances"""
     
     @staticmethod
-    def create_driver(driver_type: str, options: Optional[BrowserOptions] = None) -> BrowserDriver:
+    def create_driver(driver_type: str, options: Optional[BrowserOptions] = None) -> BrowserDriver[Any]:
         """
         Create a browser driver instance of the specified type.
         
@@ -41,7 +42,7 @@ class DriverFactory:
         try:
             module = import_module(module_name)
             driver_class = getattr(module, class_name)
-            return driver_class(options)
+            return cast(BrowserDriver[Any], driver_class(options))
         except ImportError as e:
             package_names = {
                 'patchright': 'patchright',
@@ -56,6 +57,6 @@ class DriverFactory:
             ) from e
 
 
-def create_driver(driver_type: str, options: Optional[BrowserOptions] = None) -> BrowserDriver:
+def create_driver(driver_type: str, options: Optional[BrowserOptions] = None) -> BrowserDriver[Any]:
     """Shorthand function to create a browser driver instance"""
     return DriverFactory.create_driver(driver_type, options) 

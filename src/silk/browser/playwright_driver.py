@@ -3,8 +3,9 @@ from pathlib import Path
 import asyncio
 from patchright.async_api import async_playwright, Browser, Page, ElementHandle as PlaywrightElement
 
+from expression.core import Result, Ok, Error
 from silk.browser.driver import BrowserDriver, BrowserOptions, ElementHandle
-
+from silk.actions.decorator import action
 
 class PlaywrightElementHandle(ElementHandle):
     """Implementation of ElementHandle for Playwright"""
@@ -12,20 +13,37 @@ class PlaywrightElementHandle(ElementHandle):
     def __init__(self, element: PlaywrightElement):
         self.element = element
     
-    async def click(self) -> None:
-        await self.element.click()
+    async def click(self) -> Result[None, Exception]:
+        try:
+            await self.element.click()
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
     
-    async def type(self, text: str) -> None:
-        await self.element.type(text)
+    async def type(self, text: str) -> Result[None, Exception]:
+        try:
+            await self.element.type(text)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
     
-    async def get_text(self) -> str:
-        return await self.element.text_content() or ""
+    async def get_text(self) -> Result[str, Exception]:
+        try:
+            return Ok(await self.element.text_content() or "")
+        except Exception as e:
+            return Error(e)
     
-    async def get_attribute(self, name: str) -> Optional[str]:
-        return await self.element.get_attribute(name)
+    async def get_attribute(self, name: str) -> Result[Optional[str], Exception]:
+        try:
+            return Ok(await self.element.get_attribute(name))
+        except Exception as e:
+            return Error(e)
     
-    async def is_visible(self) -> bool:
-        return await self.element.is_visible()
+    async def is_visible(self) -> Result[bool, Exception]:
+        try:
+            return Ok(await self.element.is_visible())
+        except Exception as e:
+            return Error(e)
 
 
 class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
@@ -37,115 +55,290 @@ class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
     
-    async def launch(self) -> None:
-        self.playwright = await async_playwright().start()
-        
-        # Configure browser launch options
-        browser_type = self.playwright.chromium
-        launch_options = {
-            "headless": self.options.headless
-        }
-        
-        if self.options.proxy:
-            launch_options["proxy"] = {"server": self.options.proxy}
-        
-        # Add extra arguments if any
-        if self.options.extra_args:
-            launch_options.update(self.options.extra_args)
-        
-        self.browser = await browser_type.launch(**launch_options)
-        self.page = await self.browser.new_page()
-        
-        # Configure page
-        await self.page.set_viewport_size({
-            "width": self.options.viewport_width,
-            "height": self.options.viewport_height
-        })
-        
-        if self.options.user_agent:
-            await self.page.set_extra_http_headers({"User-Agent": self.options.user_agent})
-        
-        # Set cookies if any
-        if self.options.cookies:
-            await self.page.context.add_cookies(self.options.cookies)
-        
-        # Set default timeout
-        self.page.set_default_timeout(self.options.timeout)
-    
-    async def close(self) -> None:
-        if self.browser:
-            await self.browser.close()
-        
-        if self.playwright:
-            await self.playwright.stop()
-    
-    async def goto(self, url: str) -> None:
-        if not self.page:
-            raise Exception("Browser not launched")
-        
-        await self.page.goto(url, wait_until="networkidle")
-    
-    async def current_url(self) -> str:
-        if not self.page:
-            raise Exception("Browser not launched")
-        
-        return self.page.url
-    
-    async def get_page_source(self) -> str:
-        if not self.page:
-            raise Exception("Browser not launched")
-        
-        return await self.page.content()
-    
-    async def take_screenshot(self, path: Path) -> None:
-        if not self.page:
-            raise Exception("Browser not launched")
-        
-        await self.page.screenshot(path=str(path))
-    
-    async def query_selector(self, selector: str) -> Optional[PlaywrightElementHandle]:
-        if not self.page:
-            raise Exception("Browser not launched")
-        
-        element = await self.page.query_selector(selector)
-        if element:
-            return PlaywrightElementHandle(element)
-        return None
-    
-    async def query_selector_all(self, selector: str) -> List[PlaywrightElementHandle]:
-        if not self.page:
-            raise Exception("Browser not launched")
-        
-        elements = await self.page.query_selector_all(selector)
-        return [PlaywrightElementHandle(element) for element in elements]
-    
-    async def execute_script(self, script: str, *args: Any) -> Any:
-        if not self.page:
-            raise Exception("Browser not launched")
-        
-        return await self.page.evaluate(script, *args)
-    
-    async def wait_for_selector(self, selector: str, timeout: Optional[int] = None) -> Optional[PlaywrightElementHandle]:
-        if not self.page:
-            raise Exception("Browser not launched")
-        
+    async def launch(self) -> Result[None, Exception]:
         try:
-            element = await self.page.wait_for_selector(
-                selector, 
+            self.playwright = await async_playwright().start()
+            
+            if self.playwright is None:
+                return Error(Exception("Failed to initialize playwright"))
+                
+            # Configure browser launch options
+            browser_type = self.playwright.chromium
+            launch_options = {
+                "headless": self.options.headless
+            }
+            
+            if self.options.proxy:
+                launch_options["proxy"] = {"server": self.options.proxy}
+            
+            # Add extra arguments if any
+            if self.options.extra_args:
+                launch_options.update(self.options.extra_args)
+            
+            self.browser = await browser_type.launch(**launch_options)
+            
+            if self.browser is None:
+                return Error(Exception("Failed to launch browser"))
+                
+            self.page = await self.browser.new_page()
+            
+            if self.page is None:
+                return Error(Exception("Failed to create new page"))
+                
+            # Configure page
+            await self.page.set_viewport_size({
+                "width": self.options.viewport_width,
+                "height": self.options.viewport_height
+            })
+            
+            if self.options.user_agent:
+                await self.page.set_extra_http_headers({"User-Agent": self.options.user_agent})
+            
+            # Set cookies if any
+            if self.options.cookies:
+                await self.page.context.add_cookies(self.options.cookies)
+            
+            # Set default timeout
+            self.page.set_default_timeout(self.options.timeout)
+            
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def close(self) -> Result[None, Exception]:
+        try:
+            if self.browser:
+                await self.browser.close()
+            
+            if self.playwright:
+                await self.playwright.stop()
+                
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def goto(self, url: str) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            await self.page.goto(url, wait_until="networkidle")
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def current_url(self) -> Result[str, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            return Ok(self.page.url)
+        except Exception as e:
+            return Error(e)
+    
+    async def get_page_source(self) -> Result[str, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            return Ok(await self.page.content())
+        except Exception as e:
+            return Error(e)
+    
+    async def take_screenshot(self, path: Path) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            await self.page.screenshot(path=str(path))
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def query_selector(self, selector: str) -> Result[Optional[PlaywrightElementHandle], Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            element = await self.page.query_selector(selector)
+            if element:
+                return Ok(PlaywrightElementHandle(element))
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def query_selector_all(self, selector: str) -> Result[List[PlaywrightElementHandle], Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            elements = await self.page.query_selector_all(selector)
+            return Ok([PlaywrightElementHandle(element) for element in elements])
+        except Exception as e:
+            return Error(e)
+    
+    async def execute_script(self, script: str, *args: Any) -> Result[Any, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            result = await self.page.evaluate(script, *args)
+            return Ok(result)
+        except Exception as e:
+            return Error(e)
+    
+    async def wait_for_selector(self, selector: str, timeout: Optional[int] = None) -> Result[Optional[PlaywrightElementHandle], Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            try:
+                element = await self.page.wait_for_selector(
+                    selector, 
+                    timeout=timeout or self.options.timeout
+                )
+                if element:
+                    return Ok(PlaywrightElementHandle(element))
+                return Ok(None)
+            except Exception:
+                # If selector times out, return None instead of raising an error
+                return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def wait_for_navigation(self, timeout: Optional[int] = None) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            await self.page.wait_for_load_state(
+                "networkidle", 
                 timeout=timeout or self.options.timeout
             )
-            if element:
-                return PlaywrightElementHandle(element)
-        except:
-            pass
-        
-        return None
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+            
+    async def mouse_move(self, x: int, y: int) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            await self.page.mouse.move(x, y)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
     
-    async def wait_for_navigation(self, timeout: Optional[int] = None) -> None:
-        if not self.page:
-            raise Exception("Browser not launched")
-        
-        await self.page.wait_for_load_state(
-            "networkidle", 
-            timeout=timeout or self.options.timeout
-        )
+    async def mouse_move_to_element(self, element: PlaywrightElementHandle, offset_x: int = 0, offset_y: int = 0) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            # Get element position
+            bbox = await element.element.bounding_box()
+            if not bbox:
+                return Error(Exception("Failed to get element bounding box"))
+                
+            # Calculate center of element and add offset
+            x = bbox["x"] + bbox["width"] / 2 + offset_x
+            y = bbox["y"] + bbox["height"] / 2 + offset_y
+            
+            # Move to the calculated position
+            await self.page.mouse.move(x, y)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def mouse_down(self, button: str = "left") -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            await self.page.mouse.down(button=button)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def mouse_up(self, button: str = "left") -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            await self.page.mouse.up(button=button)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def mouse_click(self, button: str = "left", click_count: int = 1, delay_between_ms: Optional[int] = None) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            # Use Playwright's click method with options
+            click_options = {
+                "button": button,
+                "clickCount": click_count
+            }
+            
+            if delay_between_ms is not None:
+                click_options["delay"] = delay_between_ms
+                
+            await self.page.mouse.click(0, 0, **click_options)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def mouse_double_click(self, button: str = "left") -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            # Double click is just a click with clickCount=2
+            await self.page.mouse.click(0, 0, button=button, clickCount=2)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def press(self, key: str) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            await self.page.keyboard.press(key)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def key_down(self, key: str) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            await self.page.keyboard.down(key)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def key_up(self, key: str) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            await self.page.keyboard.up(key)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+    
+    async def type(self, text: str, delay: Optional[float] = None) -> Result[None, Exception]:
+        try:
+            if not self.page:
+                return Error(Exception("Browser not launched"))
+            
+            options = {}
+            if delay is not None:
+                options["delay"] = delay
+                
+            await self.page.keyboard.type(text, **options)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)

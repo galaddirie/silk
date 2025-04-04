@@ -1,9 +1,9 @@
 # selectors/selector.py
 from enum import Enum, auto
-from typing import Optional, List, Generic, TypeVar, Callable, Union, Tuple
+from typing import Optional, List, Generic, TypeVar, Callable, Union, Tuple, Awaitable
 from pydantic import BaseModel, Field
 from expression import pipe
-from expression.core import Option, Result, curry
+from expression.core import Option, Result, curry, Error
 import re
 
 T = TypeVar('T')
@@ -26,6 +26,7 @@ class Selector(BaseModel):
     
     type: SelectorType
     value: str
+    timeout: Optional[int] = Field(default=None)
     
     def get_type(self) -> SelectorType:
         return self.type
@@ -58,20 +59,7 @@ class SelectorGroup(BaseModel, Generic[T]):
     """
     
     name: str
-    selectors: List[Selector] = Field(..., min_items=1)
-    
-    @classmethod
-    def __init__(cls, name: str, **kwargs):
-        """
-        Initialize a selector group.
-        
-        Args:
-            selectors: List of Selector objects
-            
-        Note:
-            To create a group with mixed selector types, use the create_mixed method.
-        """
-        super().__init__(name=name, **kwargs)
+    selectors: List[Selector] = Field(default_factory=list)
     
     @classmethod
     def create_mixed(cls, name: str, *selectors: Union[Selector, str, Tuple[str, str]]) -> 'SelectorGroup[T]':
@@ -96,13 +84,17 @@ class SelectorGroup(BaseModel, Generic[T]):
             elif isinstance(selector, str):
                 processed_selectors.append(Selector(type=SelectorType.CSS, value=selector))
             elif isinstance(selector, tuple) and len(selector) == 2:
-                processed_selectors.append(Selector(type=selector[1], value=selector[0]))
+                selector_value, selector_type = selector
+                if isinstance(selector_type, str):
+                    selector_type = SelectorType(selector_type)
+                processed_selectors.append(Selector(type=selector_type, value=selector_value))
         
         return cls(
+            name=name,
             selectors=processed_selectors,
         )
 
-    async def execute(self, find_element: Callable[[Selector], Result[T, Exception]]) -> Result[T, Exception]:
+    async def execute(self, find_element: Callable[[Selector], Awaitable[Result[T, Exception]]]) -> Result[T, Exception]:
         """
         Try selectors in order until one succeeds
         
@@ -117,7 +109,7 @@ class SelectorGroup(BaseModel, Generic[T]):
             if result.is_ok():
                 return result
         
-        return Result.failure(Exception(f"All selectors in group '{self.name}' failed"))
+        return Error(Exception(f"All selectors in group '{self.name}' failed"))
     
     @classmethod
     def create(cls, name: str, *selectors: Selector) -> 'SelectorGroup[T]':
