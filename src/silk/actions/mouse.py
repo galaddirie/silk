@@ -60,7 +60,8 @@ class MouseMove(Action[None]):
                 # Move to absolute coordinates
                 await driver.mouse_move(self.coordinates[0], self.coordinates[1])
                 return Ok(None)
-
+            if self.selector is None:
+                return Error(Exception("Selector is None"))
             # Move to element
             if isinstance(self.selector, SelectorGroup):
                 result = await self.selector.execute(
@@ -70,6 +71,7 @@ class MouseMove(Action[None]):
                     return result
                 return Ok(None)
             else:
+                
                 return await self._move_to_element(driver, self.selector)
         except Exception as e:
             return Error(e)

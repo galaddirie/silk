@@ -1,4 +1,4 @@
-from typing import Optional, Any, List, Union, Dict, TypeVar, Generic, Callable, Awaitable
+from typing import Optional, Any, List, Union, Dict, TypeVar, Generic, Callable, Awaitable, Sequence
 from expression.core import Result, Ok, Error
 from expression import pipe
 from expression.collections import Block
@@ -25,12 +25,12 @@ class ExtractText(Action[str]):
         try:
             if isinstance(self.selector, SelectorGroup):
                 return await self.selector.execute(
-                    lambda sel: _find_element_and_extract[str](
+                    lambda sel: _find_element_and_extract(
                         driver, sel, lambda el: el.get_text()
                     )
                 )
             else:
-                return await _find_element_and_extract[str](
+                return await _find_element_and_extract(
                     driver, self.selector, lambda el: el.get_text()
                 )
         except Exception as e:
@@ -53,12 +53,12 @@ class ExtractAttribute(Action[Optional[str]]):
         try:
             if isinstance(self.selector, SelectorGroup):
                 return await self.selector.execute(
-                    lambda sel: _find_element_and_extract[Optional[str]](
+                    lambda sel: _find_element_and_extract(
                         driver, sel, lambda el: el.get_attribute(self.attribute)
                     )
                 )
             else:
-                return await _find_element_and_extract[Optional[str]](
+                return await _find_element_and_extract(
                     driver, self.selector, lambda el: el.get_attribute(self.attribute)
                 )
         except Exception as e:
@@ -91,7 +91,7 @@ class ExtractMultiple(Action[Block[T]], Generic[T]):
                     for el in elements:
                         extracted = await self.extract_fn(el)
                         results = results.cons(extracted)
-                    return Ok(pipe(results, Block.reverse))
+                    return Ok(results.sort(reverse=True))
                 
                 
                 else:
@@ -99,8 +99,10 @@ class ExtractMultiple(Action[Block[T]], Generic[T]):
             else:
                 for selector in self.selector.selectors:
                     result = await self._extract_with_selector(driver, selector)
-                    if result.is_ok() and len(result.unwrap()) > 0:
-                        return result
+                    if result.is_ok():
+                        value = result.default_value(Block.empty())
+                        if value and len(value) > 0:
+                            return result
                 return Ok(Block.empty())
         except Exception as e:
             return Error(e)
@@ -110,25 +112,21 @@ class ExtractMultiple(Action[Block[T]], Generic[T]):
     ) -> Result[Block[T], Exception]:
         try:
             elements = await driver.query_selector_all(selector.value)
-            if elements:
-                    results = pipe(
-                        elements,
-                        lambda els: Block.of_seq([]),
-                        lambda block: self._extract_all_elements(block, elements)
-                    )
-                    return Ok(results)  
+            if elements and isinstance(elements, Sequence):
+                results = await self._extract_all_elements(Block.empty(), elements)
+                return Ok(results)
             else:
                 return Ok(Block.empty())
         except Exception as e:
             return Error(e)
             
-    async def _extract_all_elements(self, block: Block, elements) -> Block[T]:
+    async def _extract_all_elements(self, block: Block, elements: Sequence[Any]) -> Block[T]:
         """Helper method to extract from all elements and build a Block"""
-        results = Block.empty()
+        results: Block[T] = Block.empty()
         for el in elements:
             extracted = await self.extract_fn(el)
             results = results.cons(extracted)
             
-        return pipe(results, Block.sort(reverse=True))
+        return results.sort(reverse=True)
 
 

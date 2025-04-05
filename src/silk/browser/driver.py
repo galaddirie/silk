@@ -1,6 +1,6 @@
 # browser/driver.py
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, List, Protocol, Callable, TypeVar, Generic, Awaitable
+from typing import Optional, Dict, Any, List, Protocol, Callable, TypeVar, Generic, Awaitable, Literal
 from pydantic import BaseModel, Field
 from expression import pipe, curry, compose
 from expression.core import Result, Option, Error
@@ -124,22 +124,22 @@ class BrowserDriver(ABC, Generic[T]):
         pass
     
     @abstractmethod
-    async def mouse_down(self, button: str = "left") -> Result[None, Exception]:
+    async def mouse_down(self, button: Literal["left", "right", "middle"] = "left") -> Result[None, Exception]:
         """Press a mouse button"""
         pass
     
     @abstractmethod
-    async def mouse_up(self, button: str = "left") -> Result[None, Exception]:
+    async def mouse_up(self, button: Literal["left", "right", "middle"] = "left") -> Result[None, Exception]:
         """Release a mouse button"""
         pass
     
     @abstractmethod
-    async def mouse_click(self, button: str = "left", click_count: int = 1, delay_between_ms: Optional[int] = None) -> Result[None, Exception]:
+    async def mouse_click(self, button: Literal["left", "right", "middle"] = "left", click_count: int = 1, delay_between_ms: Optional[int] = None) -> Result[None, Exception]:
         """Click a mouse button"""
         pass
     
     @abstractmethod
-    async def mouse_double_click(self, button: str = "left") -> Result[None, Exception]:
+    async def mouse_double_click(self, button: Literal["left", "right", "middle"] = "left") -> Result[None, Exception]:
         """Double click a mouse button"""
         pass
     

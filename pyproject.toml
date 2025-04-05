@@ -6,7 +6,7 @@ authors = [
     {name = "Galad Dirie",email = "hello@galad.ca"}
 ]
 readme = "README.md"
-requires-python = ">=3.13,<4.0"
+requires-python = ">=3.10,<4.0"
 dependencies = [
     "expression (>=5.6.0,<6.0.0)",
     "pydantic (>=2.11.2,<3.0.0)",

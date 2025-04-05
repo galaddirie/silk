@@ -8,7 +8,7 @@ from typing import Any, Optional, TypeVar, Callable, Union, cast, Type, Dict, Li
 
 T = TypeVar('T')
 
-def action(name: Optional[str] = None, description: Optional[str] = None):
+def action(name: Optional[str] = None, description: Optional[str] = None) -> Callable[[Callable], Callable[..., Action[Any]]]:
     """
     Decorator to convert a function into an Action.
     

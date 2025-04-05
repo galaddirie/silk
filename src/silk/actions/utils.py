@@ -1,4 +1,4 @@
-from typing import Any, Callable, TypeVar, Generic
+from typing import Any, Callable, TypeVar, Generic, Awaitable
 from expression.core import Result, Ok, Error
 from expression import pipe, Option
 
@@ -31,7 +31,7 @@ async def _find_element_and_perform(
 async def _find_element_and_extract(
     driver: BrowserDriver,
     selector: Selector,
-    extract_fn: Callable[[Any], T]
+    extract_fn: Callable[[Any], Awaitable[T]]
 ) -> Result[T, Exception]:
     try:
           

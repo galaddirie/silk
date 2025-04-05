@@ -1,7 +1,7 @@
-from typing import Optional, List, Any, Dict, cast
+from typing import Optional, List, Any, Dict, cast, Literal, Union, Mapping
 from pathlib import Path
 import asyncio
-from patchright.async_api import async_playwright, Browser, Page, ElementHandle as PlaywrightElement
+from patchright.async_api import async_playwright, Browser, Page, ElementHandle as PlaywrightElement, Playwright, ProxySettings
 
 from expression.core import Result, Ok, Error
 from silk.browser.driver import BrowserDriver, BrowserOptions, ElementHandle
@@ -51,7 +51,7 @@ class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
     
     def __init__(self, options: BrowserOptions):
         super().__init__(options)
-        self.playwright = None
+        self.playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
     
@@ -64,12 +64,14 @@ class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
                 
             # Configure browser launch options
             browser_type = self.playwright.chromium
-            launch_options = {
+            launch_options: Dict[str, Any] = {
                 "headless": self.options.headless
             }
             
             if self.options.proxy:
-                launch_options["proxy"] = {"server": self.options.proxy}
+                # Create a proper ProxySettings object
+                proxy_settings: ProxySettings = {"server": self.options.proxy}
+                launch_options["proxy"] = proxy_settings
             
             # Add extra arguments if any
             if self.options.extra_args:
@@ -91,12 +93,15 @@ class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
                 "height": self.options.viewport_height
             })
             
-            if self.options.user_agent:
-                await self.page.set_extra_http_headers({"User-Agent": self.options.user_agent})
+            # Set user agent if it exists in extra_args
+            user_agent = self.options.extra_args.get("user_agent")
+            if user_agent and isinstance(user_agent, str):
+                await self.page.set_extra_http_headers({"User-Agent": user_agent})
             
-            # Set cookies if any
-            if self.options.cookies:
-                await self.page.context.add_cookies(self.options.cookies)
+            # Set cookies if they exist in extra_args
+            cookies = self.options.extra_args.get("cookies")
+            if cookies and isinstance(cookies, list):
+                await self.page.context.add_cookies(cookies)
             
             # Set default timeout
             self.page.set_default_timeout(self.options.timeout)
@@ -249,7 +254,7 @@ class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
         except Exception as e:
             return Error(e)
     
-    async def mouse_down(self, button: str = "left") -> Result[None, Exception]:
+    async def mouse_down(self, button: Literal["left", "right", "middle"] = "left") -> Result[None, Exception]:
         try:
             if not self.page:
                 return Error(Exception("Browser not launched"))
@@ -259,7 +264,7 @@ class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
         except Exception as e:
             return Error(e)
     
-    async def mouse_up(self, button: str = "left") -> Result[None, Exception]:
+    async def mouse_up(self, button: Literal["left", "right", "middle"] = "left") -> Result[None, Exception]:
         try:
             if not self.page:
                 return Error(Exception("Browser not launched"))
@@ -269,32 +274,32 @@ class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
         except Exception as e:
             return Error(e)
     
-    async def mouse_click(self, button: str = "left", click_count: int = 1, delay_between_ms: Optional[int] = None) -> Result[None, Exception]:
+    async def mouse_click(self, button: Literal["left", "right", "middle"] = "left", click_count: int = 1, delay_between_ms: Optional[int] = None) -> Result[None, Exception]:
         try:
             if not self.page:
                 return Error(Exception("Browser not launched"))
             
             # Use Playwright's click method with options
-            click_options = {
+            click_options: Dict[str, Any] = {
                 "button": button,
-                "clickCount": click_count
+                "click_count": click_count
             }
             
             if delay_between_ms is not None:
-                click_options["delay"] = delay_between_ms
+                click_options["delay"] = float(delay_between_ms)
                 
             await self.page.mouse.click(0, 0, **click_options)
             return Ok(None)
         except Exception as e:
             return Error(e)
     
-    async def mouse_double_click(self, button: str = "left") -> Result[None, Exception]:
+    async def mouse_double_click(self, button: Literal["left", "right", "middle"] = "left") -> Result[None, Exception]:
         try:
             if not self.page:
                 return Error(Exception("Browser not launched"))
             
-            # Double click is just a click with clickCount=2
-            await self.page.mouse.click(0, 0, button=button, clickCount=2)
+            # Double click is just a click with click_count=2
+            await self.page.mouse.click(0, 0, button=button, click_count=2)
             return Ok(None)
         except Exception as e:
             return Error(e)
