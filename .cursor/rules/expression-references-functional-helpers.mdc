@@ -1,0 +1,249 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Misc
+
+```
+Misc
+flip(fn: Callable[[_A, _B], _TResult]) → Callable[[_B, _A], _TResult]
+Flips the arguments for a function taking two arguments.
+
+Example
+
+fn(a, b) == flip(fn)(b, a)
+fst(value: tuple[_TSource, Any]) → _TSource
+Return first argument of the tuple.
+
+identity(value: _A) → _A
+Identity function.
+
+Returns value given as argument.
+
+snd(value: tuple[Any, _TSource]) → _TSource
+Return second argument of the tuple.
+
+```
+#Pipe
+
+```
+
+Pipe module.
+
+Contains pipe function including necessary overloads to get the type-hints right.
+
+Example
+
+from expression import pipe
+
+v = 1
+fn = lambda x: x + 1
+gn = lambda x: x * 2
+
+assert pipe(v, fn, gn) == gn(fn(v))
+class PipeMixin
+A pipe mixin class that enabled a class to use pipe fluently.
+
+pipe(*args: Any) → Any
+Pipe the left side object through the given functions.
+
+pipe(value: Any, *fns: Callable[[Any], Any]) → Any
+Functional pipe (|>).
+
+Allows the use of function argument on the left side of the function.
+
+Example
+
+pipe(x, fn) == fn(x)  # Same as x |> fn
+pipe(x, fn, gn) == gn(fn(x))  # Same as x |> fn |> gn
+
+starpipe(args: Any, /, *fns: Callable[[...], Any]) → Any
+Functional pipe_n (||>, ||>, |||>, etc).
+
+Allows the use of function arguments on the left side of the function. Calls the function with tuple arguments unpacked.
+
+Example
+
+starpipe((x, y), fn) == fn(x, y)  # Same as (x, y) ||> fn
+starpipe((x, y), fn, gn) == gn(*fn(x))  # Same as (x, y) ||> fn |||> gn
+starpipe((x, y), fn, gn, hn) == hn(*gn(*fn(x)))  # Same as (x, y) ||> fn |||> gn ||> hn
+
+```
+# Pipeline
+
+```
+Option
+pipeline() → Callable[[_A], Option[_A]]
+pipeline(__fn: Callable[[_A], Option[_B]]) → Callable[[_A], Option[_B]]
+pipeline(__fn1: Callable[[_A], Option[_B]], __fn2: Callable[[_B], Option[_C]]) → Callable[[_A], Option[_C]]
+pipeline(__fn1: Callable[[_A], Option[_B]], __fn2: Callable[[_B], Option[_C]], __fn3: Callable[[_C], Option[_D]]) → Callable[[_A], Option[_D]]
+pipeline(__fn1: Callable[[_A], Option[_B]], __fn2: Callable[[_B], Option[_C]], __fn3: Callable[[_C], Option[_D]], __fn4: Callable[[_D], Option[_E]]) → Callable[[_A], Option[_E]]
+pipeline(__fn1: Callable[[_A], Option[_B]], __fn2: Callable[[_B], Option[_C]], __fn3: Callable[[_C], Option[_D]], __fn4: Callable[[_D], Option[_E]], __fn5: Callable[[_E], Option[_F]]) → Callable[[_A], Option[_F]]
+pipeline(__fn1: Callable[[_A], Option[_B]], __fn2: Callable[[_B], Option[_C]], __fn3: Callable[[_C], Option[_D]], __fn4: Callable[[_D], Option[_E]], __fn5: Callable[[_E], Option[_F]], __fn6: Callable[[_F], Option[_G]]) → Callable[[_A], Option[_G]]
+Pipeline multiple option returning functions left to right.
+
+A pipeline kleisli (>=>) composes zero or more functions into a functional composition. The functions are composed left to right. A composition of zero functions gives back the identity function.
+
+pipeline()(x) == Some(x)
+pipeline(f)(x) == f(x)
+pipeline(f, g)(x) == f(x).bind(g)
+pipeline(f, g, h)(x) == f(x).bind(g).bind(h)
+
+Returns
+:
+The composed functions.
+
+Result
+pipeline() → Callable[[Any], Result[Any, Any]]
+pipeline(__fn: Callable[[_A], Result[_B, _TError]]) → Callable[[_A], Result[_B, _TError]]
+pipeline(__fn1: Callable[[_A], Result[_B, _TError]], __fn2: Callable[[_B], Result[_C, _TError]]) → Callable[[_A], Result[_C, _TError]]
+pipeline(__fn1: Callable[[_A], Result[_B, _TError]], __fn2: Callable[[_B], Result[_C, _TError]], __fn3: Callable[[_C], Result[_D, _TError]]) → Callable[[_A], Result[_D, _TError]]
+pipeline(__fn1: Callable[[_A], Result[_B, _TError]], __fn2: Callable[[_B], Result[_C, _TError]], __fn3: Callable[[_C], Result[_D, _TError]], __fn4: Callable[[_D], Result[_E, _TError]]) → Callable[[_A], Result[_E, _TError]]
+pipeline(__fn1: Callable[[_A], Result[_B, _TError]], __fn2: Callable[[_B], Result[_C, _TError]], __fn3: Callable[[_C], Result[_D, _TError]], __fn4: Callable[[_D], Result[_E, _TError]], __fn5: Callable[[_E], Result[_F, _TError]]) → Callable[[_A], Result[_F, _TError]]
+pipeline(__fn1: Callable[[_A], Result[_B, _TError]], __fn2: Callable[[_B], Result[_C, _TError]], __fn3: Callable[[_C], Result[_D, _TError]], __fn4: Callable[[_D], Result[_E, _TError]], __fn5: Callable[[_E], Result[_F, _TError]], __fn6: Callable[[_F], Result[_G, _TError]]) → Callable[[_A], Result[_G, _TError]]
+Pipeline multiple result returning functions left to right.
+
+A pipeline kleisli (>=>) composes zero or more functions into a functional composition. The functions are composed left to right. A composition of zero functions gives back the identity function.
+
+pipeline()(x) == Ok(x)
+pipeline(f)(x) == f(x)
+pipeline(f, g)(x) == f(x).bind(g)
+pipeline(f, g, h)(x) == f(x).bind(g).bind(h)
+
+Returns
+:
+The composed functions.
+
+```
+
+
+# Compose
+
+``` 
+Compose
+compose() → Callable[[_A], _A]
+compose(__fn1: Callable[[_A], _B]) → Callable[[_A], _B]
+compose(__fn1: Callable[[_A], _B], __fn2: Callable[[_B], _C]) → Callable[[_A], _C]
+compose(__fn1: Callable[[_A], _B], __fn2: Callable[[_B], _C], __fn3: Callable[[_C], _D]) → Callable[[_A], _D]
+compose(fn1: Callable[[_A], _B], fn2: Callable[[_B], _C], fn3: Callable[[_C], _D], fn4: Callable[[_D], _E], /) → Callable[[_A], _E]
+compose(fn1: Callable[[_A], _B], fn2: Callable[[_B], _C], fn3: Callable[[_C], _D], fn4: Callable[[_D], _E], fn5: Callable[[_E], _F], /) → Callable[[_A], _F]
+compose(fn1: Callable[[_A], _B], fn2: Callable[[_B], _C], fn3: Callable[[_C], _D], fn4: Callable[[_D], _E], fn5: Callable[[_E], _F], fn6: Callable[[_F], _G], /) → Callable[[_A], _G]
+compose(fn1: Callable[[_A], _B], fn2: Callable[[_B], _C], fn3: Callable[[_C], _D], fn4: Callable[[_D], _E], fn5: Callable[[_E], _F], fn6: Callable[[_F], _G], fn7: Callable[[_G], _H], /) → Callable[[_A], _H]
+compose(fn1: Callable[[_A], _B], fn2: Callable[[_B], _C], fn3: Callable[[_C], _D], fn4: Callable[[_D], _E], fn5: Callable[[_E], _F], fn6: Callable[[_F], _G], fn7: Callable[[_G], _H], fn8: Callable[[_H], _T], /) → Callable[[_A], _T]
+compose(fn1: Callable[[_A], _B], fn2: Callable[[_B], _C], fn3: Callable[[_C], _D], fn4: Callable[[_D], _E], fn5: Callable[[_E], _F], fn6: Callable[[_F], _G], fn7: Callable[[_G], _H], fn8: Callable[[_H], _T], fn9: Callable[[_T], _J], /) → Callable[[_A], _J]
+Compose multiple functions left to right.
+
+Composes zero or more functions into a functional composition. The functions are composed left to right. A composition of zero functions gives back the identity function.
+
+x = 42
+f = lambda a: a * 10
+g = lambda b: b + 3
+h = lambda c: c / 2
+compose()(x) == x
+compose(f)(x) == f(x)
+compose(f, g)(x) == g(f(x))
+compose(f, g, h)(x) == h(g(f(x)))
+
+Returns
+:
+The composed function.
+
+```
+
+# Curry
+
+```
+Curry
+curry(num_args: Literal[0]) → Callable[[Callable[[_P], _B]], Callable[[_P], _B]]
+curry(num_args: Literal[1]) → Callable[[Callable[[Concatenate[_A, _P]], _B]], Callable[[_A], Callable[[_P], _B]]]
+curry(num_args: Literal[2]) → Callable[[Callable[[Concatenate[_A, _B, _P]], _C]], Callable[[_A], Callable[[_B], Callable[[_P], _C]]]]
+curry(num_args: Literal[3]) → Callable[[Callable[[Concatenate[_A, _B, _C, _P]], _D]], Callable[[_A], Callable[[_B], Callable[[_C], Callable[[_P], _D]]]]]
+curry(num_args: Literal[4]) → Callable[[Callable[[Concatenate[_A, _B, _C, _D, _P]], _E]], Callable[[_A], Callable[[_B], Callable[[_C], Callable[[_D], Callable[[_P], _E]]]]]]
+A curry decorator.
+
+Makes a function curried.
+
+Parameters
+:
+num_args – The number of args to curry from the start of the
+
+function
+
+Example
+
+@curry(1)
+def add(a: int, b: int) -> int:
+   return a + b
+
+assert add(3)(4) == 7
+curry_flip(num_args: Literal[0]) → Callable[[Callable[[_P], _A]], Callable[[_P], _A]]
+curry_flip(num_args: Literal[1]) → Callable[[Callable[[Concatenate[_A, _P]], _B]], Callable[[_P], Callable[[_A], _B]]]
+curry_flip(num_args: Literal[2]) → Callable[[Callable[[Concatenate[_A, _B, _P]], _C]], Callable[[_P], Callable[[_A], Callable[[_B], _C]]]]
+curry_flip(num_args: Literal[3]) → Callable[[Callable[[Concatenate[_A, _B, _C, _P]], _D]], Callable[[_P], Callable[[_A], Callable[[_B], Callable[[_C], _D]]]]]
+curry_flip(num_args: Literal[4]) → Callable[[Callable[[Concatenate[_A, _B, _C, _D, _P]], _E]], Callable[[_P], Callable[[_A], Callable[[_B], Callable[[_C], Callable[[_D], _E]]]]]]
+A flipped curry decorator.
+
+Makes a function curried, but flips the curried arguments to become the last arguments. This is very nice when having e.g optional arguments after a source argument that will be piped.
+
+Parameters
+:
+num_args – The number of args to curry from the start of the
+
+function
+
+Example
+
+@curry_flip(1)
+def map(source: List[int], mapper: Callable[[int], int]):
+   return [mapper(x) for x in source]
+
+ys = pipe(xs, map(lambda x: x * 10))
+```
+
+
+Mailbox
+```
+Mailbox
+class AsyncReplyChannel(fn: Callable[[_Reply], None])
+class MailboxProcessor(cancellation_token: CancellationToken | None)
+post(msg: _Msg) → None
+Post a message synchronously to the mailbox processor.
+
+This method is not asynchronous since it’s very fast to execute. It simply adds the message to the message queue of the mailbox processor and returns.
+
+Parameters
+:
+msg – Message to post.
+
+Returns
+:
+None
+
+post_and_async_reply(build_message: Callable[[AsyncReplyChannel[_Reply]], _Msg]) → Awaitable[_Reply]
+Post with async reply.
+
+Post a message asynchronously to the mailbox processor and wait for the reply.
+
+Parameters
+:
+build_message – A function that takes a reply channel
+
+send ((AsyncReplyChannel[Reply]) and returns a message to)
+
+the (to the mailbox processor. The message should contain)
+
+tuple. (reply channel as e.g a)
+
+Returns
+:
+The reply from mailbox processor.
+
+async receive() → _Msg
+Receive message from mailbox.
+
+Returns
+:
+An asynchronous computation which will consume the first message in arrival order. No thread is blocked while waiting for further messages. Raises a TimeoutException if the timeout is exceeded.
+
+```
