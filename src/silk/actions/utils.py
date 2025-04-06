@@ -3,7 +3,7 @@ from expression.core import Result, Ok, Error
 from expression import pipe, Option
 
 from silk.actions.base import Action
-from silk.browser import BrowserDriver
+from silk.browsers import BrowserDriver
 from silk.selectors import Selector, SelectorGroup
 
 T = TypeVar('T')

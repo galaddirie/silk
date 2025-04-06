@@ -4,8 +4,8 @@ Browser automation module for silk.
 This module provides a unified interface for browser automation 
 using different browser drivers.
 """
-from silk.browser.driver import BrowserDriver, BrowserOptions, ElementHandle
-from silk.browser.driver_factory import create_driver, DriverFactory
+from silk.browsers.driver import BrowserDriver, BrowserOptions, ElementHandle
+from silk.browsers.driver_factory import create_driver, DriverFactory
 
 __all__ = [
     'BrowserDriver',

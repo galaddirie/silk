@@ -4,8 +4,8 @@ import asyncio
 from patchright.async_api import async_playwright, Browser, Page, ElementHandle as PlaywrightElement, Playwright, ProxySettings
 
 from expression.core import Result, Ok, Error
-from silk.browser.driver import BrowserDriver, BrowserOptions, ElementHandle
-from silk.actions.decorator import action
+from silk.browsers.driver import BrowserDriver, BrowserOptions, ElementHandle
+from silk.actions.decorators import action
 
 class PlaywrightElementHandle(ElementHandle):
     """Implementation of ElementHandle for Playwright"""
@@ -20,9 +20,9 @@ class PlaywrightElementHandle(ElementHandle):
         except Exception as e:
             return Error(e)
     
-    async def type(self, text: str) -> Result[None, Exception]:
+    async def fill(self, text: str, delay: Optional[float] = None) -> Result[None, Exception]:
         try:
-            await self.element.type(text)
+            await self.element.fill(text)
             return Ok(None)
         except Exception as e:
             return Error(e)
@@ -172,7 +172,7 @@ class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
         except Exception as e:
             return Error(e)
     
-    async def query_selector_all(self, selector: str) -> Result[List[PlaywrightElementHandle], Exception]:
+    async def query_selector_all(self, selector: str) -> Result[List[ElementHandle], Exception]:
         try:
             if not self.page:
                 return Error(Exception("Browser not launched"))
@@ -334,7 +334,7 @@ class PlaywrightDriver(BrowserDriver[PlaywrightElementHandle]):
         except Exception as e:
             return Error(e)
     
-    async def type(self, text: str, delay: Optional[float] = None) -> Result[None, Exception]:
+    async def fill(self, text: str, delay: Optional[float] = None) -> Result[None, Exception]:
         try:
             if not self.page:
                 return Error(Exception("Browser not launched"))

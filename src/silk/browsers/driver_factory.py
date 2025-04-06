@@ -3,7 +3,7 @@ Driver factory module for creating browser driver instances based on available d
 """
 from typing import Dict, Type, Optional, Any, Callable, TypeVar, cast
 from importlib import import_module
-from silk.browser.driver import BrowserDriver, BrowserOptions
+from silk.browsers.driver import BrowserDriver, BrowserOptions
 
 T = TypeVar('T')
 

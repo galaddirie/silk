@@ -6,7 +6,8 @@ from expression.collections import Block
 import asyncio
 from functools import reduce
 
-from silk.browser.driver import BrowserDriver
+from silk.browsers.driver import BrowserDriver
+from silk.models.browser import ActionContext
 from silk.actions.base import Action, create_action
 
 T = TypeVar('T')
@@ -21,8 +22,10 @@ def sequence(*actions: Action[Any]) -> Action[Block[Any]]:
     Unlike 'compose', this function collects and returns ALL results as a Block.
     
     Example:
+    ```python
         result = await sequence(action1, action2, action3)(driver)
         # result is Ok(Block[result1, result2, result3])
+    ```
     
     Args:
         *actions: Actions to combine
@@ -34,29 +37,30 @@ def sequence(*actions: Action[Any]) -> Action[Block[Any]]:
     if not action_list:
         raise ValueError("Cannot create a sequence with no actions")
     
-    async def execute_sequence(driver: BrowserDriver) -> Result[Block[Any], Exception]:
-        # Start with empty immutable Block
-        results = Block.empty()
-        
-        for action in action_list:
-            result = await action.execute(driver)
+    class SequenceAction(Action[Block[Any]]):
+        async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[Block[Any], Exception]:
+            # Use provided context or create a new one
+            ctx = context or ActionContext()
             
-            # Use monadic bind to handle railway-oriented programming
-            if result.is_error():
-                return Error(result.error)
+            # Start with empty immutable Block
+            results = Block.empty()
             
-            values = results.cons(result.default_value(None))
-
-        return Ok(values.sort(reverse=True))
-        
-        
+            for action in action_list:
+                try:
+                    result = await action.execute(driver, ctx)
+                    
+                    # Use monadic bind to handle railway-oriented programming
+                    if result.is_error():
+                        return Error(result.error)
+                    
+                    value = result.value if hasattr(result, 'value') else None
+                    results = results.cons(value)
+                except Exception as e:
+                    return Error(e)
+            
+            return Ok(results.sort(reverse=True))
     
-    action_names = " >> ".join(a.name for a in action_list)
-    return create_action(
-        name=f"sequence({action_names})",
-        execute_fn=execute_sequence,
-        description=f"Sequence of actions (all results): {action_names}"
-    )
+    return SequenceAction()
 
 
 def parallel(*actions: Action[Any]) -> Action[Block[Any]]:
@@ -66,8 +70,10 @@ def parallel(*actions: Action[Any]) -> Action[Block[Any]]:
     If any action fails, the whole operation fails with that error.
     
     Example:
+    ```python
         result = await parallel(action1, action2, action3)(driver)
         # result is Ok(Block[result1, result2, result3])
+    ```
     
     Args:
         *actions: Actions to execute in parallel
@@ -79,41 +85,47 @@ def parallel(*actions: Action[Any]) -> Action[Block[Any]]:
     if not action_list:
         raise ValueError("Cannot create a parallel execution with no actions")
     
-    async def execute_parallel(driver: BrowserDriver) -> Result[Block[Any], Exception]:
-        tasks = [action.execute(driver) for action in action_list]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Process results using functional patterns
-        # Create a Block from results
-        results_block = Block.of_seq(results)
-        
-        # Find first error if any
-        for result in results_block:
-            if isinstance(result, Exception):
-                return Error(result)
-            if isinstance(result, Result) and result.is_error():
-                return Error(result.error)
-        
-        # Map successful results to values
-        values = Block.empty()
-        for result in results_block:
-            if isinstance(result, Result):
-                values = values.cons(result.default_value(None))
-            else:
-                values = values.cons(result)
-        
-        # Reverse to maintain original order
-        return Ok(values.sort(reverse=True))
+    class ParallelAction(Action[Block[Any]]):
+        async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[Block[Any], Exception]:
+            # Use provided context or create a new one
+            ctx = context or ActionContext()
+            
+            # Create a task for each action with the same context
+            tasks = [action.execute(driver, ctx) for action in action_list]
+            
+            try:
+                # Gather results in parallel
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Process results using functional patterns
+                # Create a Block from results
+                results_block = Block.of_seq(results)
+                
+                # Find first error if any
+                for result in results_block:
+                    if isinstance(result, Exception):
+                        return Error(result)
+                    if isinstance(result, Result) and hasattr(result, 'error') and result.is_error():
+                        return Error(result.error)
+                
+                # Map successful results to values
+                values = Block.empty()
+                for result in results_block:
+                    if isinstance(result, Result):
+                        value = result.value if hasattr(result, 'value') else None
+                        values = values.cons(value)
+                    else:
+                        values = values.cons(result)
+                
+                # Reverse to maintain original order
+                return Ok(values.sort(reverse=True))
+            except Exception as e:
+                return Error(e)
     
-    action_names = " & ".join(a.name for a in action_list)
-    return create_action(
-        name=f"parallel({action_names})",
-        execute_fn=execute_parallel,
-        description=f"Parallel actions: {action_names}"
-    )
+    return ParallelAction()
 
 
-def pipe(*actions: Action[Any]) -> Action[Any]:
+def pipe(*actions: Union[Action[Any], Callable[[Any], Action[Any]]]) -> Action[Any]:
     """
     Create a pipeline of actions where each action receives the result of the previous action.
     
@@ -121,14 +133,16 @@ def pipe(*actions: Action[Any]) -> Action[Any]:
     of the previous action, instead of just executing in sequence.
     
     Example:
+    ```python
         result = await pipe(
             extract_text(selector),      # Returns "42"
             lambda val: multiply(val, 2) # Uses "42" as input, returns 84
         )(driver)
         # result is Ok(84)
+    ```
     
     Args:
-        *actions: Actions to pipe together
+        *actions: Actions to pipe together. Can be Action objects or callables that take a value and return an Action.
         
     Returns:
         A new Action that executes the actions in a pipeline
@@ -137,36 +151,51 @@ def pipe(*actions: Action[Any]) -> Action[Any]:
     if not action_list:
         raise ValueError("Cannot create a pipeline with no actions")
     if len(action_list) == 1:
-        return action_list[0]
+        # If we only have one action, just return it (no need to create a wrapper)
+        first_action = action_list[0]
+        if callable(first_action) and not isinstance(first_action, Action):
+            raise ValueError("First item in pipe must be an Action, not a callable")
+        return first_action
     
-    async def execute_pipeline(driver: BrowserDriver) -> Result[Any, Exception]:
-        try:
-            # Start with first action
-            result = await action_list[0].execute(driver)
-            if result.is_error():
-                return result
+    class PipelineAction(Action[Any]):
+        async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[Any, Exception]:
+            # Use provided context or create a new one
+            ctx = context or ActionContext()
             
-            value = result.default_value(None)
-            
-            # Chain remaining actions using railway pattern
-            for action in action_list[1:]:
-                # Handle both Actions and callables that return Actions
-                next_action = action(value) if callable(action) and not isinstance(action, Action) else action
-                result = await next_action.execute(driver)
+            try:
+                # Start with first action (must be an Action, not a callable)
+                first_action = action_list[0]
+                if callable(first_action) and not isinstance(first_action, Action):
+                    return Error(Exception("First item in pipe must be an Action, not a callable"))
+                
+                result = await first_action.execute(driver, ctx)
                 if result.is_error():
                     return result
-                value = result.default_value(None)
-            
-            return Ok(value)
-        except Exception as e:
-            return Error(e)
+                
+                value = result.value if hasattr(result, 'value') else None
+                
+                # Chain remaining actions using railway pattern
+                for action in action_list[1:]:
+                    try:
+                        # Handle both Actions and callables that return Actions
+                        next_action = action(value) if callable(action) and not isinstance(action, Action) else action
+                        
+                        if not isinstance(next_action, Action):
+                            return Error(Exception(f"Expected an Action but got {type(next_action)}: {next_action}"))
+                        
+                        result = await next_action.execute(driver, ctx)
+                        if result.is_error():
+                            return result
+                        
+                        value = result.value if hasattr(result, 'value') else None
+                    except Exception as e:
+                        return Error(e)
+                
+                return Ok(value)
+            except Exception as e:
+                return Error(e)
     
-    action_names = " |> ".join(a.name for a in action_list)
-    return create_action(
-        name=f"pipe({action_names})",
-        execute_fn=execute_pipeline,
-        description=f"Pipeline of actions (values flow through): {action_names}"
-    )
+    return PipelineAction()
 
 
 def fallback(*actions: Action[T]) -> Action[T]:
@@ -176,11 +205,13 @@ def fallback(*actions: Action[T]) -> Action[T]:
     This is equivalent to the '|' operator between Actions.
     
     Example:
+    ```python
         result = await fallback(
             action_might_fail, 
             backup_action
         )(driver)
         # Returns result of first action that succeeds
+    ```
     
     Args:
         *actions: Actions to try in order
@@ -194,29 +225,44 @@ def fallback(*actions: Action[T]) -> Action[T]:
     if len(action_list) == 1:
         return action_list[0]
     
-    async def execute_fallback(driver: BrowserDriver) -> Result[T, Exception]:
-        # Use fold to accumulate the result or the last error
-        # Initial state is a Error with a default message
-        initial_error = Error(Exception("No actions to try"))
-        
-        # Sequentially try each action, returning the first success or last error
-        result = initial_error
-        for action in action_list:
-            try:
-                result = await action.execute(driver)
-                if result.is_ok():
-                    return result
-            except Exception as e:
-                result = Error(e)
-        
-        return result
+    class FallbackAction(Action[T]):
+        async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[T, Exception]:
+            # Use provided context or create a new one
+            ctx = context or ActionContext()
+            
+            # Use a new context for each attempt that tracks which fallback we're on
+            last_error = None
+            
+            # Sequentially try each action, returning the first success or last error
+            for index, action in enumerate(action_list):
+                try:
+                    # Create a child context for each fallback attempt
+                    fallback_context = ActionContext(
+                        retry_count=0,
+                        max_retries=ctx.max_retries,
+                        retry_delay_ms=ctx.retry_delay_ms,
+                        timeout_ms=ctx.timeout_ms,
+                        parent_context=ctx,
+                        metadata={
+                            **ctx.metadata,
+                            "fallback_index": index,
+                            "fallback_total": len(action_list)
+                        }
+                    )
+                    
+                    result = await action.execute(driver, fallback_context)
+                    if result.is_ok():
+                        return result
+                    
+                    # Store the error for potential reporting
+                    last_error = result.error if hasattr(result, 'error') else None
+                except Exception as e:
+                    last_error = e
+            
+            # If we got here, all actions failed
+            return Error(last_error or Exception("All fallback actions failed"))
     
-    action_names = " | ".join(a.name for a in action_list)
-    return create_action(
-        name=f"fallback({action_names})",
-        execute_fn=execute_fallback,
-        description=f"Fallback actions (try until success): {action_names}"
-    )
+    return FallbackAction()
 
 
 def compose(*actions: Action[Any]) -> Action[Any]:
@@ -227,8 +273,10 @@ def compose(*actions: Action[Any]) -> Action[Any]:
     This is equivalent to chaining actions with the '>>' operator.
     
     Example:
+    ```python
         result = await compose(action1, action2, action3)(driver)
         # result is Ok(result3) - only the last action's result
+    ```
     
     Args:
         *actions: Actions to compose into a single action
@@ -236,11 +284,77 @@ def compose(*actions: Action[Any]) -> Action[Any]:
     Returns:
         A single Action that executes actions in sequence and returns the last result
     """
-    # Handle edge cases
-    if not actions:
+    action_list = list(actions)
+    if not action_list:
         raise ValueError("Cannot compose zero actions")
-    if len(action_list := list(actions)) == 1:
+    if len(action_list) == 1:
         return action_list[0]
     
-    # Use reduce to combine actions with the >> operator
-    return reduce(lambda acc, action: acc >> action, action_list) 
+    class ComposeAction(Action[Any]):
+        async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[Any, Exception]:
+            ctx = context or ActionContext()
+            
+            try:
+                # Execute each action in sequence, returning the last result
+                result = None
+                
+                for action in action_list:
+                    result = await action.execute(driver, ctx)
+                    if result.is_error():
+                        return result
+                
+                return result
+            except Exception as e:
+                return Error(e)
+    
+    return ComposeAction()
+
+
+def retry(action: Action[T], max_attempts: int = 3, delay_ms: int = 1000) -> Action[T]:
+    """
+    Create a new action that retries the original action until it succeeds.
+    
+    This is a convenience function that wraps the Action.retry() method.
+    
+    Example:
+    ```python
+        result = await retry(
+            action_that_might_fail,
+            max_attempts=3,
+            delay_ms=500
+        )(driver)
+    ```
+    
+    Args:
+        action: Action to retry
+        max_attempts: Maximum number of attempts
+        delay_ms: Delay between attempts in milliseconds
+        
+    Returns:
+        A new Action with retry logic
+    """
+    return action.retry(max_attempts, delay_ms)
+
+
+def with_timeout(action: Action[T], timeout_ms: int) -> Action[T]:
+    """
+    Create a new action that times out after the specified duration.
+    
+    This is a convenience function that wraps the Action.with_timeout() method.
+    
+    Example:
+    ```python
+        result = await with_timeout(
+            action_that_might_hang,
+            timeout_ms=5000
+        )(driver)
+    ```
+    
+    Args:
+        action: Action to execute with timeout
+        timeout_ms: Timeout in milliseconds
+        
+    Returns:
+        A new Action with timeout logic
+    """
+    return action.with_timeout(timeout_ms)
