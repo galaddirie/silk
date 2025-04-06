@@ -66,19 +66,6 @@ logger = logging.getLogger(__name__)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 class BrowserPage:
     """
     Represents a single page (tab) in a browser context
