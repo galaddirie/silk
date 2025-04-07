@@ -100,18 +100,6 @@ extract_text(name_selector) & extract_text(price_selector) & extract_text(descri
 extract_text(primary_selector) | extract_text(fallback_selector)
 ```
 
-## Architecture
-
-Silk consists of several interconnected components:
-
-1. **Browser Driver**: Abstract interface for browser automation
-2. **Selectors**: CSS, XPath, and other selection strategies with fallback mechanisms
-3. **Actions**: Pure functions wrapped as composable objects with railway-oriented result handling
-4. **Combinators**: Functions like `sequence_actions`, `parallel_actions`, and `fallback_actions`
-5. **Engine**: Orchestration of browser instances and pipeline execution
-
-
-
 
 ## License
 
