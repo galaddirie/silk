@@ -40,19 +40,19 @@ You can install Silk with your preferred browser driver:
 
 ```bash
 # Base installation (no drivers)
-pip install silk
+pip install silk-scraper
 
 # With Playwright support
-pip install silk[playwright]
+pip install silk-scraper[playwright]
 
 # With Selenium support
-pip install silk[selenium]
+pip install silk-scraper[selenium]
 
 # With Puppeteer support
-pip install silk[puppeteer]
+pip install silk-scraper[puppeteer]
 
 # With all drivers
-pip install silk[all]
+pip install silk-scraper[all]
 ```
 
 ## Quick Start
