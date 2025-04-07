@@ -4,13 +4,21 @@ Playwright implementation of the browser driver and element handle for Silk.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, cast, Sequence, Mapping, Pattern
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from expression.core import Error, Ok, Result
 from playwright.async_api import Browser
 from playwright.async_api import BrowserContext as PlaywrightContext
 from playwright.async_api import ElementHandle as PlaywrightNativeElement
-from playwright.async_api import Page, Playwright, JSHandle
+from playwright.async_api import Page, Playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
@@ -35,7 +43,8 @@ logger = logging.getLogger(__name__)
 ContextEntry = Tuple[str, PlaywrightContext]
 PageEntry = Tuple[str, Page]
 
-# TODO for ease of access all methods should accept both context and page, 
+
+# TODO for ease of access all methods should accept both context and page,
 # this avoids situations where some automation libraries need a page and others need a context
 # ex we have pages[0]  instead of getting the page via page_id
 class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
@@ -189,9 +198,9 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
             parent_element = cast(PlaywrightNativeElement, parent)
             return Ok(
                 PlaywrightElementHandle(
-                    driver=cast(PlaywrightDriver, self.driver), 
-                    page_id=self.page_id, 
-                    element_ref=parent_element
+                    driver=cast(PlaywrightDriver, self.driver),
+                    page_id=self.page_id,
+                    element_ref=parent_element,
                 )
             )
         except Exception as e:
@@ -399,7 +408,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             # Create the context
             if not self.browser:
                 return Error(Exception("Browser is not initialized"))
-                
+
             context = await self.browser.new_context(**context_options)
 
             # Set default timeout
@@ -699,7 +708,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             if options and options.wait_until:
                 wait_until = options.wait_until
-            
+
             # Set timeout
             timeout = None
             if options and options.timeout is not None:
@@ -792,7 +801,10 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
                 # Set position_offset if provided
                 position_offset = getattr(options, "position_offset", None)
                 if position_offset is not None:
-                    click_options["position"] = {"x": position_offset[0], "y": position_offset[1]}
+                    click_options["position"] = {
+                        "x": position_offset[0],
+                        "y": position_offset[1],
+                    }
 
             # Double-click the element
             await page.dblclick(selector, **click_options)
@@ -852,13 +864,10 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
             # Note: Playwright's fill() only accepts one optional parameter: force (boolean)
-            force = False
             timeout = None
 
-            if options:
-                # Set timeout if provided
-                if options.timeout is not None:
-                    timeout = options.timeout
+            if options and options.timeout is not None:
+                timeout = options.timeout
 
             # Fill the element
             await page.fill(selector, text, timeout=timeout)
