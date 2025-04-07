@@ -22,4 +22,4 @@ jobs:
         poetry install
     - name: Run mypy
       run: |
-        poetry run mypy src/silk
+        poetry run mypy -p silk
