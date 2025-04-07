@@ -78,7 +78,7 @@ class BrowserPage:
             logger.error(f"Error closing page: {e}")
             return Error(e)
 
-    async def query_selector(self, selector: str) -> Result[ElementHandle, Exception]:
+    async def query_selector(self, selector: str) -> Result['ElementHandle', Exception]:
         result = await self.driver.query_selector(self.id, selector)
         if result.is_error():
             return Error(result.error)
@@ -87,7 +87,7 @@ class BrowserPage:
             return Error(Exception("No value returned from query_selector"))
         return Ok(value)
     
-    async def query_selector_all(self, selector: str) -> Result[List[ElementHandle], Exception]:
+    async def query_selector_all(self, selector: str) -> Result[List['ElementHandle'], Exception]:
         result = await self.driver.query_selector_all(self.id, selector)
         if result.is_error():
             return Error(result.error)
@@ -101,7 +101,7 @@ class BrowserPage:
     
     async def wait_for_selector(
         self, selector: str, options: Optional['WaitOptions'] = None
-    ) -> Result[ElementHandle, Exception]:
+    ) -> Result['ElementHandle', Exception]:
         result = await self.driver.wait_for_selector(self.id, selector, options)
         if result.is_error():
             return Error(result.error)
