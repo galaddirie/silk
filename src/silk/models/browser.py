@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 from enum import Enum, auto
 from pathlib import Path
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from expression.core import Result, Ok, Error, Option, Some, Nothing
 import asyncio
 import logging
@@ -97,7 +97,8 @@ class ActionContext:
         
         return Ok(driver)
     
-    def derive(self, **kwargs) -> 'ActionContext':
+    # todo add interface for derived context
+    def derive(self, **kwargs: Any) -> 'ActionContext':
         """Create a new context derived from this one with some values changed"""
         new_context = ActionContext(
             browser_manager=kwargs.get('browser_manager', self.browser_manager),
@@ -242,21 +243,12 @@ class BrowserOptions(BaseModel):
     browser_args: List[str] = Field(default_factory=list)
     extra_args: Dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("navigation_timeout", mode="before")
-    def set_navigation_timeout(
-        cls, v: Optional[int], info: Dict[str, Any]
-    ) -> Optional[int]:
-        """Set default navigation timeout if not provided"""
-        if v is None:
-            return info.data.get("timeout")
-        return v
-
-    @field_validator("wait_timeout", mode="before")
-    def set_wait_timeout(cls, v: Optional[int], info: Dict[str, Any]) -> Optional[int]:
-        """Set default wait timeout if not provided"""
-        if v is None:
-            return info.data.get("timeout")
-        return v
-
-
-
+    # Replace the original field_validator functions with a model_validator
+    @model_validator(mode='after')
+    def set_default_timeouts(self) -> 'BrowserOptions':
+        """Set default timeouts if not provided"""
+        if self.navigation_timeout is None:
+            self.navigation_timeout = self.timeout
+        if self.wait_timeout is None:
+            self.wait_timeout = self.timeout
+        return self

@@ -79,10 +79,22 @@ class BrowserPage:
             return Error(e)
 
     async def query_selector(self, selector: str) -> Result[ElementHandle, Exception]:
-        return await self.driver.query_selector(self.id, selector)
+        result = await self.driver.query_selector(self.id, selector)
+        if result.is_error():
+            return Error(result.error)
+        value = result.default_value(None)
+        if value is None:
+            return Error(Exception("No value returned from query_selector"))
+        return Ok(value)
     
     async def query_selector_all(self, selector: str) -> Result[List[ElementHandle], Exception]:
-        return await self.driver.query_selector_all(self.id, selector)
+        result = await self.driver.query_selector_all(self.id, selector)
+        if result.is_error():
+            return Error(result.error)
+        values = result.default_value([])
+        if values is None:
+            return Error(Exception("No values returned from query_selector_all"))
+        return Ok(values)
     
     async def execute_script(self, script: str, *args: Any) -> Result[Any, Exception]:
         return await self.driver.execute_script(self.id, script, *args)
@@ -90,8 +102,13 @@ class BrowserPage:
     async def wait_for_selector(
         self, selector: str, options: Optional['WaitOptions'] = None
     ) -> Result[ElementHandle, Exception]:
-        
-        return await self.driver.wait_for_selector(self.id, selector, options)
+        result = await self.driver.wait_for_selector(self.id, selector, options)
+        if result.is_error():
+            return Error(result.error)
+        value = result.default_value(None)
+        if value is None:
+            return Error(Exception("No value returned from wait_for_selector"))
+        return Ok(value)
     
     async def wait_for_navigation(
         self, options: Optional['NavigationOptions'] = None
