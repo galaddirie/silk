@@ -339,21 +339,49 @@ Silk provides intuitive operators for composable scraping:
 
 ```python
 # Navigate to a page, then extract the title
-navigate(url) >> extract_text(title_selector)
+Navigate(url) >> Click(title_selector)
 ```
 
 ### Parallel Operations (`&`)
 
 ```python
 # Extract name, price, and description in parallel
-extract_text(name_selector) & extract_text(price_selector) & extract_text(description_selector)
+# Each action is executed in a new context when using the & operator
+Navigate(url) & Navigate(url2) & Navigate(url3)
+```
+
+```python
+# Combining parallel and sequential operations
+# Each parallel branch can contain its own chain of sequential actions
+(
+    # First website: Get product details
+    (Navigate("https://site1.com/product") 
+     >> Wait(1000)
+     >> GetText(".product-name"))
+    &
+    # Second website: Search and extract first result
+    (Navigate("https://site2.com") 
+     >> Fill("#search-input", "smartphone")
+     >> Click("#search-button")
+     >> Wait(2000)
+     >> GetText(".first-result .name"))
+    &
+    # Third website: Login and get account info
+    (Navigate("https://site3.com/login")
+     >> Fill("#username", "user@example.com")
+     >> Fill("#password", "password123")
+     >> Click(".login-button")
+     >> Wait(1500)
+     >> GetText(".account-info"))
+)
+# Results are collected as a Block of 3 items, one from each parallel branch
 ```
 
 ### Fallback Operations (`|`)
 
 ```python
 # Try to extract with one selector, fall back to another if it fails
-extract_text(primary_selector) | extract_text(fallback_selector)
+GetText(primary_selector) | GetText(fallback_selector)
 ```
 
 ## API Reference
