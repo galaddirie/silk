@@ -172,7 +172,7 @@ def transform(func: Callable[[T], S]) -> Callable[[T], Action[S]]:
     ```python
         @transform
         def extract_prices(html):
-            return re.findall(r'\$\d+.\d+', html)
+            return re.findall(r'\d+.\d+', html)
             
         # Usage: get_html() >> extract_prices
     ```

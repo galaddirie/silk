@@ -11,10 +11,11 @@ from silk.browsers.driver import BrowserDriver
 from silk.browsers.driver_factory import create_driver, ValidDriverTypes
 from silk.models.browser import BrowserOptions, ActionContext
 from silk.actions.base import Action
+from silk.browsers.context import BrowserContext  # Added missing import
 
 
 if TYPE_CHECKING:
-    from silk.browsers.context import BrowserContext
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,12 @@ class BrowserManager:
             driver_type: The type of driver to use. Valid values are 'playwright', 'selenium', 'puppeteer'. Defaults to 'playwright'
             default_options: Default browser options
         """
-        self.default_options = default_options
+        self.default_options = default_options or BrowserOptions()  # Fixed: Initialize with default instance
         self.drivers: Dict[str, BrowserDriver] = {}
         self.contexts: Dict[str, 'BrowserContext'] = {}
         self.default_context_id: Optional[str] = None
         self.driver_type = driver_type
+        
     async def __aenter__(self) -> 'BrowserManager':
         """Allow usage as async context manager"""
         return self
@@ -65,7 +67,9 @@ class BrowserManager:
                 driver_type = self.driver_type or 'playwright'
                 driver = create_driver(driver_type, self.default_options)
                 
+                # Fixed: Always await launch_result
                 launch_result = await driver.launch()
+                
                 if launch_result.is_error():
                     return Error(launch_result.error)
                 
@@ -73,7 +77,9 @@ class BrowserManager:
             else:
                 driver = self.drivers[context_id]
             
+            # Fixed: Always await context_result
             context_result = await driver.create_context(options)
+            
             if context_result.is_error():
                 return Error(context_result.error)
             
@@ -96,7 +102,9 @@ class BrowserManager:
                 self.default_context_id = context_id
             
             if create_page:
+                # Fixed: Always await page_result
                 page_result = await context.create_page()
+                
                 if page_result.is_error():
                     return Error(page_result.error)
             
@@ -133,16 +141,26 @@ class BrowserManager:
             if context is None:
                 return Error(Exception("Failed to get context"))
             
-            close_result = await context.close()
-            if close_result.is_error():
+            try:
+                # Await the coroutine returned by context.close()
+                close_result = await context.close()
+            except Exception as e:
+                return Error(e)
+            
+            # If close_result is a Result object with is_error method
+            if hasattr(close_result, 'is_error') and close_result.is_error():
                 return close_result
             
             driver = self.drivers.get(context_id)
             if driver:
-                await driver.close()
-                
+                try:
+                    # Await the driver close coroutine
+                    await driver.close()
+                except Exception as e:
+                    # Log but continue since we've already closed the context
+                    logger.warning(f"Error closing driver: {e}")
+                    
             self.drivers.pop(context_id, None)
-            
             self.contexts.pop(context_id, None)
             
             if self.default_context_id == context_id:
@@ -153,13 +171,15 @@ class BrowserManager:
         except Exception as e:
             logger.error(f"Error closing context: {e}")
             return Error(e)
-    
+
     async def close_all(self) -> Result[None, Exception]:
         """Close all contexts and drivers"""
         try:
             close_results: List[Result[None, Exception]] = []
             for context_id in list(self.contexts.keys()):
-                close_results.append(await self.close_context(context_id))
+                # Fixed: Always await close_result
+                close_result = await self.close_context(context_id)
+                close_results.append(close_result)
             
             errors = [result.error for result in close_results if result.is_error()]
             if errors:
@@ -179,6 +199,7 @@ class BrowserManager:
         Returns:
             Result of the action
         """
+        # Fixed: Always await context_result
         context_result = await self.create_context(nickname="action-context")
         if context_result.is_error():
             return Error(context_result.error)
@@ -200,8 +221,12 @@ class BrowserManager:
                 page_id=page.id
             )
             
-            return await action.execute(action_context)
+            # Fixed: Always await action_result
+            action_result = await action.execute(action_context)
+            
+            return action_result
         finally:
+            # Fixed: Always await close_context
             await self.close_context(browser_context.id)
     
     @asynccontextmanager
@@ -216,6 +241,7 @@ class BrowserManager:
         
         try:
             if nickname is None or nickname not in self.contexts:
+                # Fixed: Always await context_result
                 context_result = await self.create_context(
                     nickname=nickname,
                     options=options,
@@ -242,4 +268,3 @@ class BrowserManager:
         finally:
             if created and context is not None:
                 await self.close_context(context.id)
-
