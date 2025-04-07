@@ -1,170 +1,85 @@
-"""
-Actions for creating and managing multiple browser contexts and pages.
-"""
-
-from typing import Dict, List, Optional, Any, TypeVar, Union, Generic, cast
-import asyncio
+from typing import Optional, Dict, Any, TypeVar, Generic, Tuple
 import logging
 
 from expression.core import Result, Ok, Error
 
 from silk.models.browser import ActionContext
-from silk.browsers.driver import BrowserDriver
 from silk.actions.base import Action
+from silk.browsers.context import BrowserContext, BrowserPage
 
 T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
-
-class CreateContext(Action[str]):
+class CreateContext(Action[BrowserContext]):
     """
-    Action to create a new browser context
+    Create a new browser context
     
     Args:
-        context_id: Optional ID for the context
-        options: Additional context options
-        create_page: Whether to automatically create a page
-        
-    Returns:
-        The context ID
+        nickname: Optional nickname for the context
+        options: Optional context creation options
+        create_page: Whether to create a default page in the context
     """
     
     def __init__(
-        self,
-        context_id: Optional[str] = None,
+        self, 
+        nickname: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
         create_page: bool = True
     ):
-        self.context_id = context_id
+        self.nickname = nickname
         self.options = options
         self.create_page = create_page
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[str, Exception]:
+    async def execute(self, context: ActionContext) -> Result[BrowserContext, Exception]:
         """Create a new browser context"""
-        ctx = context or ActionContext()
+        if not context.browser_manager:
+            return Error(Exception("Browser manager is required"))
         
         try:
-            # Get the browser manager from the driver
-            browser_manager = getattr(driver, "browser_manager", None)
-            if not browser_manager:
-                return Error(Exception("Driver does not support browser manager"))
-            
-            # Create the context
-            result = await browser_manager.create_context(
-                context_id=self.context_id,
+            return await context.browser_manager.create_context(
+                nickname=self.nickname,
                 options=self.options,
                 create_page=self.create_page
             )
-            
-            if result.is_error():
-                return Error(result.error)
-            
-            # Store new context ID in action context for subsequent actions
-            if ctx:
-                ctx.browser_context_id = result.value.id
-                
-                # Store default page ID if one was created
-                if self.create_page and result.value.default_page_id:
-                    ctx.page_id = result.value.default_page_id
-            
-            return Ok(result.value.id)
         except Exception as e:
             logger.error(f"Error creating context: {e}")
             return Error(e)
 
 
-class CreatePage(Action[str]):
-    """
-    Action to create a new page in a context
-    
-    Args:
-        page_id: Optional ID for the page
-        context_id: Optional context ID (uses current context if not specified)
-        
-    Returns:
-        The page ID
-    """
-    
-    def __init__(
-        self,
-        page_id: Optional[str] = None,
-        context_id: Optional[str] = None
-    ):
-        self.page_id = page_id
-        self.context_id = context_id
-    
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[str, Exception]:
-        """Create a new page in a context"""
-        ctx = context or ActionContext()
-        
-        try:
-            # Get the browser manager from the driver
-            browser_manager = getattr(driver, "browser_manager", None)
-            if not browser_manager:
-                return Error(Exception("Driver does not support browser manager"))
-            
-            # Get the browser context
-            context_id = self.context_id or ctx.browser_context_id
-            context_result = browser_manager.get_context(context_id)
-            
-            if context_result.is_error():
-                return Error(context_result.error)
-            
-            browser_context = context_result.value
-            
-            # Create the page
-            page_result = await browser_context.create_page(self.page_id)
-            
-            if page_result.is_error():
-                return Error(page_result.error)
-            
-            # Set as current page in action context
-            if ctx:
-                ctx.page_id = page_result.value.id
-                
-                # Ensure context ID is also set
-                if not ctx.browser_context_id:
-                    ctx.browser_context_id = browser_context.id
-            
-            return Ok(page_result.value.id)
-        except Exception as e:
-            logger.error(f"Error creating page: {e}")
-            return Error(e)
-
-
 class SwitchContext(Action[None]):
     """
-    Action to switch the current browser context
+    Switch the active context in the current ActionContext
     
     Args:
-        context_id: ID of the context to switch to
+        context_id_or_nickname: ID or nickname of the context to switch to
     """
     
-    def __init__(self, context_id: str):
-        self.context_id = context_id
+    def __init__(self, context_id_or_nickname: str):
+        self.context_id_or_nickname = context_id_or_nickname
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[None, Exception]:
-        """Switch the current browser context"""
-        ctx = context or ActionContext()
+    async def execute(self, context: ActionContext) -> Result[None, Exception]:
+        """Switch to a different context"""
+        if not context.browser_manager:
+            return Error(Exception("Browser manager is required"))
         
         try:
-            # Get the browser manager from the driver
-            browser_manager = getattr(driver, "browser_manager", None)
-            if not browser_manager:
-                return Error(Exception("Driver does not support browser manager"))
-            
-            # Check if the context exists
-            context_result = browser_manager.get_context(self.context_id)
+            # Get the target context
+            context_result = context.browser_manager.get_context(self.context_id_or_nickname)
             if context_result.is_error():
                 return Error(context_result.error)
             
-            # Update the action context
-            if ctx:
-                ctx.browser_context_id = self.context_id
+            # Update the context ID in the ActionContext
+            browser_context = context_result.default_value(None)
+            if browser_context is None:
+                return Error(Exception("Failed to get browser context"))
                 
-                # Clear page ID to use default page in new context
-                browser_context = context_result.value
-                ctx.page_id = browser_context.default_page_id
+            context.context_id = browser_context.id
+            
+            # If the target context has a default page, set that as the active page
+            if browser_context.default_page_id:
+                context.page_id = browser_context.default_page_id
+            else:
+                context.page_id = None
             
             return Ok(None)
         except Exception as e:
@@ -172,54 +87,89 @@ class SwitchContext(Action[None]):
             return Error(e)
 
 
-class SwitchPage(Action[None]):
+class CreatePage(Action[BrowserPage]):
     """
-    Action to switch the current page
+    Create a new page in the current context
     
     Args:
-        page_id: ID of the page to switch to
-        context_id: Optional context ID (uses current context if not specified)
+        nickname: Optional nickname for the page
     """
     
-    def __init__(
-        self,
-        page_id: str,
-        context_id: Optional[str] = None
-    ):
-        self.page_id = page_id
-        self.context_id = context_id
+    def __init__(self, nickname: Optional[str] = None):
+        self.nickname = nickname
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[None, Exception]:
-        """Switch the current page"""
-        ctx = context or ActionContext()
+    async def execute(self, context: ActionContext) -> Result[BrowserPage, Exception]:
+        """Create a new page"""
+        if not context.browser_manager or not context.context_id:
+            return Error(Exception("Browser manager and context ID are required"))
         
         try:
-            # Get the browser manager from the driver
-            browser_manager = getattr(driver, "browser_manager", None)
-            if not browser_manager:
-                return Error(Exception("Driver does not support browser manager"))
-            
-            # Get the browser context
-            context_id = self.context_id or ctx.browser_context_id
-            context_result = browser_manager.get_context(context_id)
-            
+            # Get the current context
+            context_result = context.browser_manager.get_context(context.context_id)
             if context_result.is_error():
                 return Error(context_result.error)
             
-            browser_context = context_result.value
+            browser_context = context_result.default_value(None)
+            if browser_context is None:
+                return Error(Exception("Failed to get browser context"))
             
-            # Check if the page exists
-            page_result = browser_context.get_page(self.page_id)
+            # Create a new page
+            page_result = await browser_context.create_page(nickname=self.nickname)
             if page_result.is_error():
                 return Error(page_result.error)
             
-            # Update the action context
-            if ctx:
-                ctx.page_id = self.page_id
+            # Set this as the active page
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to create page"))
                 
-                # Ensure context ID is also set
-                if not ctx.browser_context_id:
-                    ctx.browser_context_id = browser_context.id
+            context.page_id = page.id
+            
+            return page_result
+        except Exception as e:
+            logger.error(f"Error creating page: {e}")
+            return Error(e)
+
+
+class SwitchPage(Action[None]):
+    """
+    Switch the active page in the current context
+    
+    Args:
+        page_id_or_nickname: ID or nickname of the page to switch to
+    """
+    
+    def __init__(self, page_id_or_nickname: str):
+        self.page_id_or_nickname = page_id_or_nickname
+    
+    async def execute(self, context: ActionContext) -> Result[None, Exception]:
+        """Switch to a different page"""
+        if not context.browser_manager or not context.context_id:
+            return Error(Exception("Browser manager and context ID are required"))
+        
+        try:
+            # Get the current context
+            context_result = context.browser_manager.get_context(context.context_id)
+            if context_result.is_error():
+                return Error(context_result.error)
+            
+            browser_context = context_result.default_value(None)
+            if browser_context is None:
+                return Error(Exception("Failed to get browser context"))
+            
+            # Find the page
+            page_result = browser_context.get_page(self.page_id_or_nickname)
+            if page_result.is_error():
+                # If page isn't found in current context, we just return the error
+                # since we don't have a way to look up pages by nickname across contexts
+                return Error(page_result.error)
+            
+            # Set this as the active page
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+                
+            context.page_id = page.id
             
             return Ok(None)
         except Exception as e:
@@ -227,105 +177,96 @@ class SwitchPage(Action[None]):
             return Error(e)
 
 
-class WithPage(Generic[T], Action[T]):
+class CloseContext(Action[None]):
     """
-    Action to execute another action in a specific page
+    Close a context and all its pages
     
     Args:
-        action: The action to execute
-        page_id: ID of the page to use
-        context_id: Optional context ID (uses current context if not specified)
-        
-    Returns:
-        The result of the action
+        context_id_or_nickname: ID or nickname of the context to close,
+                              or None to close the current context
     """
     
-    def __init__(
-        self,
-        action: Action[T],
-        page_id: str,
-        context_id: Optional[str] = None
-    ):
-        self.action = action
-        self.page_id = page_id
-        self.context_id = context_id
+    def __init__(self, context_id_or_nickname: Optional[str] = None):
+        self.context_id_or_nickname = context_id_or_nickname
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[T, Exception]:
-        """Execute an action in a specific page"""
-        ctx = context or ActionContext()
+    async def execute(self, context: ActionContext) -> Result[None, Exception]:
+        """Close a context"""
+        if not context.browser_manager:
+            return Error(Exception("Browser manager is required"))
         
         try:
-            # Create a new action context with the target page and context
-            new_ctx = ActionContext(
-                retry_count=ctx.retry_count,
-                max_retries=ctx.max_retries,
-                retry_delay_ms=ctx.retry_delay_ms,
-                timeout_ms=ctx.timeout_ms,
-                parent_context=ctx,
-                metadata=ctx.metadata.copy(),
-                browser_context_id=self.context_id or ctx.browser_context_id,
-                page_id=self.page_id
-            )
+            # Use current context if none specified
+            target_context_id = self.context_id_or_nickname or context.context_id
+            if not target_context_id:
+                return Error(Exception("No context specified to close"))
             
-            # Execute the action with the new context
-            return await self.action.execute(driver, new_ctx)
+            # Close the context
+            close_result = await context.browser_manager.close_context(target_context_id)
+            if close_result.is_error():
+                return Error(close_result.error)
+            
+            # If we closed the current context, reset context_id and page_id
+            if context.context_id == target_context_id:
+                context.context_id = None
+                context.page_id = None
+            
+            return Ok(None)
         except Exception as e:
-            logger.error(f"Error executing action in page {self.page_id}: {e}")
+            logger.error(f"Error closing context: {e}")
             return Error(e)
 
 
-class WithContext(Generic[T], Action[T]):
+class ClosePage(Action[None]):
     """
-    Action to execute another action in a specific browser context
+    Close a page
     
     Args:
-        action: The action to execute
-        context_id: ID of the context to use
-        
-    Returns:
-        The result of the action
+        page_id_or_nickname: ID or nickname of the page to close,
+                           or None to close the current page
     """
     
-    def __init__(
-        self,
-        action: Action[T],
-        context_id: str
-    ):
-        self.action = action
-        self.context_id = context_id
+    def __init__(self, page_id_or_nickname: Optional[str] = None):
+        self.page_id_or_nickname = page_id_or_nickname
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[T, Exception]:
-        """Execute an action in a specific browser context"""
-        ctx = context or ActionContext()
+    async def execute(self, context: ActionContext) -> Result[None, Exception]:
+        """Close a page"""
+        if not context.browser_manager or not context.context_id:
+            return Error(Exception("Browser manager and context ID are required"))
         
         try:
-            # Get the browser manager to find default page
-            browser_manager = getattr(driver, "browser_manager", None)
-            if not browser_manager:
-                return Error(Exception("Driver does not support browser manager"))
-                
-            # Get default page ID from context
-            context_result = browser_manager.get_context(self.context_id)
+            # Get the current context
+            context_result = context.browser_manager.get_context(context.context_id)
             if context_result.is_error():
                 return Error(context_result.error)
-                
-            browser_context = context_result.value
             
-            # Create a new action context with the target context
-            new_ctx = ActionContext(
-                retry_count=ctx.retry_count,
-                max_retries=ctx.max_retries,
-                retry_delay_ms=ctx.retry_delay_ms,
-                timeout_ms=ctx.timeout_ms,
-                parent_context=ctx,
-                metadata=ctx.metadata.copy(),
-                browser_context_id=self.context_id,
-                page_id=browser_context.default_page_id
-            )
+            browser_context = context_result.default_value(None)
+            if browser_context is None:
+                return Error(Exception("Failed to get browser context"))
             
-            # Execute the action with the new context
-            return await self.action.execute(driver, new_ctx)
+            # Use current page if none specified
+            target_page_id = self.page_id_or_nickname or context.page_id
+            if not target_page_id:
+                return Error(Exception("No page specified to close"))
+            
+            # Get the page
+            page_result = browser_context.get_page(target_page_id)
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+            
+            # Close the page
+            close_result = await page.close()
+            if close_result.is_error():
+                return Error(close_result.error)
+            
+            # If we closed the current page, reset page_id
+            if context.page_id == page.id:
+                context.page_id = browser_context.default_page_id
+            
+            return Ok(None)
         except Exception as e:
-            logger.error(f"Error executing action in context {self.context_id}: {e}")
+            logger.error(f"Error closing page: {e}")
             return Error(e)
-

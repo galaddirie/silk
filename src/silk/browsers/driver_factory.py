@@ -59,6 +59,6 @@ class DriverFactory:
             ) from e
 
 
-def create_driver(driver_type: str, options: Optional[BrowserOptions] = None) -> BrowserDriver[Any]:
+def create_driver(driver_type: ValidDriverTypes, options: Optional[BrowserOptions] = None) -> BrowserDriver[Any]:
     """Shorthand function to create a browser driver instance"""
     return DriverFactory.create_driver(driver_type, options) 

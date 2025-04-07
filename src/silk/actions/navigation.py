@@ -2,19 +2,18 @@
 Navigation actions for browser movement, waiting for elements, and capturing screenshots.
 """
 
-from typing import Optional, Union, Tuple, List, Dict, Any, Callable
+from typing import Optional, Union, Tuple, List, Dict, Any, Callable, cast, Literal
 from pathlib import Path
 from expression.core import Result, Ok, Error
 import logging
 import asyncio
 
-from silk.browsers.driver import BrowserDriver
 from silk.models.browser import (
     NavigationOptions, WaitOptions, 
     WaitStateLiteral, NavigationWaitLiteral, ActionContext
 )
 from silk.actions.base import Action
-from silk.selectors.selector import Selector, SelectorGroup
+from silk.selectors.selector import Selector, SelectorGroup, SelectorType
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +35,22 @@ class Navigate(Action[None]):
         self.url = url
         self.options = options or NavigationOptions()
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[None, Exception]:
+    async def execute(self, context: ActionContext) -> Result[None, Exception]:
         """Navigate to the specified URL"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug(f"Navigating to {self.url}")
-            return await driver.goto(self.url, self.options)
+            
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+            
+            # Navigate to the URL
+            return await page.goto(self.url, self.options)
         except Exception as e:
             logger.error(f"Error navigating to {self.url}: {e}")
             return Error(e)
@@ -62,25 +70,22 @@ class GoBack(Action[None]):
     ):
         self.options = options or NavigationOptions()
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[None, Exception]:
+    async def execute(self, context: ActionContext) -> Result[None, Exception]:
         """Navigate back in browser history"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug(f"Navigating back in history")
             
-            # Execute JavaScript for more reliable navigation
-            script = """
-                window.history.back();
-                return true;
-            """
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
             
-            result = await driver.execute_script(script)
-            if result.is_error():
-                return result
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
             
-            # Wait for navigation to complete
-            return await driver.wait_for_navigation(self.options)
+            # Go back
+            return await page.go_back()
         except Exception as e:
             logger.error(f"Error navigating back: {e}")
             return Error(e)
@@ -100,25 +105,22 @@ class GoForward(Action[None]):
     ):
         self.options = options or NavigationOptions()
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[None, Exception]:
+    async def execute(self, context: ActionContext) -> Result[None, Exception]:
         """Navigate forward in browser history"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug(f"Navigating forward in history")
             
-            # Execute JavaScript for more reliable navigation
-            script = """
-                window.history.forward();
-                return true;
-            """
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
             
-            result = await driver.execute_script(script)
-            if result.is_error():
-                return result
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
             
-            # Wait for navigation to complete
-            return await driver.wait_for_navigation(self.options)
+            # Go forward
+            return await page.go_forward()
         except Exception as e:
             logger.error(f"Error navigating forward: {e}")
             return Error(e)
@@ -138,25 +140,22 @@ class Reload(Action[None]):
     ):
         self.options = options or NavigationOptions()
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[None, Exception]:
+    async def execute(self, context: ActionContext) -> Result[None, Exception]:
         """Reload the current page"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug(f"Reloading page")
             
-            # Execute JavaScript for more reliable reload
-            script = """
-                window.location.reload();
-                return true;
-            """
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
             
-            result = await driver.execute_script(script)
-            if result.is_error():
-                return result
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
             
-            # Wait for navigation to complete
-            return await driver.wait_for_navigation(self.options)
+            # Reload
+            return await page.reload()
         except Exception as e:
             logger.error(f"Error reloading page: {e}")
             return Error(e)
@@ -190,18 +189,25 @@ class WaitForSelector(Action[Any]):
         else:
             self.selector_desc = f"selector group '{selector.name}'"
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[Any, Exception]:
+    async def execute(self, context: ActionContext) -> Result[Any, Exception]:
         """Wait for selector to match an element in the DOM"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug(f"Waiting for selector {self.selector_desc}")
+            
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
             
             if isinstance(self.selector, SelectorGroup):
                 # Try each selector in the group
                 for selector in self.selector.selectors:
                     try:
-                        result = await self._wait_for_selector(driver, selector)
+                        result = await self._wait_for_selector(selector, page)
                         if result.is_ok():
                             return result
                     except Exception:
@@ -212,25 +218,28 @@ class WaitForSelector(Action[Any]):
             else:
                 # Convert string to Selector if needed
                 selector = self.selector if isinstance(self.selector, Selector) else Selector(
-                    type="css", value=self.selector
+                    type=cast(SelectorType, "css"), value=self.selector
                 )
-                return await self._wait_for_selector(driver, selector)
+                return await self._wait_for_selector(selector, page)
                 
         except Exception as e:
             logger.error(f"Error waiting for selector {self.selector_desc}: {e}")
             return Error(e)
     
-    async def _wait_for_selector(self, driver: BrowserDriver, selector: Selector) -> Result[Any, Exception]:
+    async def _wait_for_selector(self, selector: Selector, page: Any) -> Result[Any, Exception]:
         """Helper method to wait for a specific selector"""
         try:
             # Get timeout from options or selector
             timeout = self.options.timeout or selector.timeout
             
-            # Use driver's wait_for_selector method
-            return await driver.wait_for_selector(
-                selector.value, 
-                self._create_driver_options(timeout)
-            )
+            # Create options with the right timeout
+            options = self._create_driver_options(timeout)
+            
+            # Use page's wait_for_selector method
+            element_result = await page.wait_for_selector(selector.value, options)
+            if element_result.is_error():
+                return Error(element_result.error)
+            return Ok(element_result.default_value(None))
         except Exception as e:
             return Error(e)
     
@@ -256,15 +265,23 @@ class WaitForNavigation(Action[None]):
     ):
         self.options = options or NavigationOptions()
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[None, Exception]:
+    async def execute(self, context: ActionContext) -> Result[None, Exception]:
         """Wait for navigation to complete"""
-        ctx = context or ActionContext()
-        
         try:
             wait_until = self.options.wait_until
             logger.debug(f"Waiting for navigation to complete (wait_until={wait_until})")
             
-            return await driver.wait_for_navigation(self.options)
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+            
+            # Wait for navigation
+            return await page.wait_for_navigation(self.options)
         except Exception as e:
             logger.error(f"Error waiting for navigation: {e}")
             return Error(e)
@@ -293,12 +310,19 @@ class WaitForFunction(Action[Any]):
         self.polling = polling
         self.timeout = timeout
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[Any, Exception]:
+    async def execute(self, context: ActionContext) -> Result[Any, Exception]:
         """Wait for function to evaluate to true"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug(f"Waiting for function to return true (timeout={self.timeout}ms)")
+            
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
             
             # Handle both expression and function body formats
             is_expression = not self.function_body.strip().startswith("function") and "{" not in self.function_body
@@ -311,7 +335,7 @@ class WaitForFunction(Action[Any]):
                 script = f"return {self.function_body};"
             
             # First get the function
-            func_result = await driver.execute_script(script)
+            func_result = await page.execute_script(script)
             if func_result.is_error():
                 return func_result
             
@@ -325,12 +349,13 @@ class WaitForFunction(Action[Any]):
                     return Error(Exception(f"Wait for function timed out after {self.timeout}ms"))
                 
                 # Execute the function
-                result = await driver.execute_script("return (arguments[0])();")
+                result = await page.execute_script("return (arguments[0])();")
                 if result.is_error():
                     return result
                 
                 # If result is truthy, we're done
-                if result.value:
+                value = result.default_value(None)
+                if value is not None and value:
                     return result
                 
                 # Wait before polling again
@@ -355,19 +380,27 @@ class Screenshot(Action[Path]):
     def __init__(self, path: Path):
         self.path = path
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[Path, Exception]:
+    async def execute(self, context: ActionContext) -> Result[Path, Exception]:
         """Take a screenshot and save it to the specified path"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug(f"Taking screenshot and saving to {self.path}")
+            
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
             
             # Ensure directory exists
             self.path.parent.mkdir(parents=True, exist_ok=True)
             
-            result = await driver.take_screenshot(self.path)
+            # Take screenshot
+            result = await page.screenshot(self.path)
             if result.is_error():
-                return result
+                return Error(result.error)
             
             return Ok(self.path)
         except Exception as e:
@@ -383,13 +416,26 @@ class GetCurrentUrl(Action[str]):
         The current URL
     """
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[str, Exception]:
+    async def execute(self, context: ActionContext) -> Result[str, Exception]:
         """Get the current URL"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug("Getting current URL")
-            return await driver.current_url()
+            
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+            
+            # Get URL
+            url_result = await page.current_url()
+            if url_result.is_error():
+                return Error(url_result.error)
+            
+            return Ok(url_result.default_value(""))
         except Exception as e:
             logger.error(f"Error getting current URL: {e}")
             return Error(e)
@@ -403,13 +449,26 @@ class GetPageSource(Action[str]):
         The HTML source of the current page
     """
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[str, Exception]:
+    async def execute(self, context: ActionContext) -> Result[str, Exception]:
         """Get the HTML source of the current page"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug("Getting page source")
-            return await driver.get_page_source()
+            
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+            
+            # Get page source
+            source_result = await page.get_page_source()
+            if source_result.is_error():
+                return Error(source_result.error)
+            
+            return Ok(source_result.default_value(""))
         except Exception as e:
             logger.error(f"Error getting page source: {e}")
             return Error(e)
@@ -431,13 +490,22 @@ class ExecuteScript(Action[Any]):
         self.script = script
         self.args = args
     
-    async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[Any, Exception]:
+    async def execute(self, context: ActionContext) -> Result[Any, Exception]:
         """Execute JavaScript code in the browser"""
-        ctx = context or ActionContext()
-        
         try:
             logger.debug(f"Executing script: {self.script[:50]}...")
-            return await driver.execute_script(self.script, *self.args)
+            
+            # Get the page from context
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+            
+            # Execute script
+            return await page.execute_script(self.script, *self.args)
         except Exception as e:
             logger.error(f"Error executing script: {e}")
             return Error(e)

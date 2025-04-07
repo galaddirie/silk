@@ -16,9 +16,12 @@ from typing import (
     overload,
     ParamSpec,
     TYPE_CHECKING,
+    runtime_checkable,
 )
 if TYPE_CHECKING:
-    from silk.browsers.context import BrowserManager, BrowserPage 
+    from silk.browsers.context import BrowserPage 
+    from silk.browsers.manager import BrowserManager
+    from silk.browsers.driver import BrowserDriver
 
 from enum import Enum, auto
 from pathlib import Path
@@ -42,7 +45,7 @@ NavigationWaitLiteral = Literal["load", "domcontentloaded", "networkidle"]
 
 class ActionContext:
     """
-    Enhanced context for action execution containing references to browser context and page
+    Action context for action execution containing references to browser context and page
     instead of direct driver references.
     """
     
@@ -75,7 +78,7 @@ class ActionContext:
             
         context_result = self.browser_manager.get_context(self.context_id)
         if context_result.is_error():
-            return context_result
+            return Error(context_result.error)
             
         context = context_result.default_value(None)
         if not context:
@@ -174,6 +177,13 @@ class ClickOptions(MouseOptions):
     position_offset: Optional[CoordinateType] = None
 
 
+class KeyPressOptions(MouseOptions):
+    """Options for key press operations"""
+
+    key: str
+    modifiers: List[KeyModifier] = Field(default_factory=list)
+
+
 class TypeOptions(BaseOptions):
     """Options for typing operations"""
 
@@ -249,39 +259,4 @@ class BrowserOptions(BaseModel):
         return v
 
 
-class ElementHandle(Protocol):
-    """Protocol defining the interface for browser element handles"""
 
-    @abstractmethod
-    async def click(
-        self, options: Optional[ClickOptions] = None
-    ) -> Result[None, Exception]:
-        """Click the element"""
-        pass
-
-    @abstractmethod
-    async def fill(
-        self, value: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Fill the element with text"""
-        pass
-
-    @abstractmethod
-    async def get_text(self) -> Result[str, Exception]:
-        """Get the text content of the element"""
-        pass
-
-    @abstractmethod
-    async def get_attribute(self, name: str) -> Result[Optional[str], Exception]:
-        """Get attribute value from the element"""
-        pass
-
-    @abstractmethod
-    async def is_visible(self) -> Result[bool, Exception]:
-        """Check if the element is visible"""
-        pass
-
-    @abstractmethod
-    async def get_bounding_box(self) -> Result[Dict[str, float], Exception]:
-        """Get the element's bounding box (x, y, width, height)"""
-        pass

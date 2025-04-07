@@ -23,11 +23,11 @@ from silk.actions.base import Action
 from silk.actions.control import (
     branch,
     loop_until,
+    retry,
     retry_with_backoff,
     with_timeout,
     tap,
-    log,
-    wait,
+
 )
 from silk.actions.composition import sequence, parallel, pipe, fallback, compose
 

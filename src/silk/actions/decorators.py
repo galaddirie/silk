@@ -1,11 +1,11 @@
 from functools import wraps
 import inspect
 import logging
+import asyncio
 from typing import Any, Optional, TypeVar, Callable, Union, cast, Type, Dict, List, Awaitable, ParamSpec, overload, Generic
 
 from expression.core import Result, Ok, Error
 from silk.actions.base import Action, create_action
-from silk.browsers.driver import BrowserDriver
 from silk.models.browser import ActionContext
 
 T = TypeVar("T")
@@ -38,10 +38,20 @@ def action() -> Callable[[Callable[..., Any]], Callable[..., Action[Any]]]:
         
     Example:
         @action()
-        async def custom_click(driver, selector):
-            element = await driver.query_selector(selector)
-            await element.click()
-            return "clicked"
+        async def custom_click(context, selector):
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return page_result
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+            element_result = await page.query_selector(selector)
+            if element_result.is_error():
+                return element_result
+            element = element_result.default_value(None)
+            if element is None:
+                return Error(Exception("Failed to get element"))
+            return await element.click()
     """
     def decorator(func: Callable[..., Any]) -> Callable[..., Action[Any]]:
         is_async = inspect.iscoroutinefunction(func)
@@ -51,17 +61,16 @@ def action() -> Callable[[Callable[..., Any]], Callable[..., Action[Any]]]:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Action[Any]:
             class DecoratedAction(Action[Any]):
-                async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[Any, Exception]:
-                    ctx = context or ActionContext()
+                async def execute(self, context: ActionContext) -> Result[Any, Exception]:
                     try:
-                        # Only pass context if the function expects it
+                        # Add context as the first argument if the function expects it
                         if has_context_param:
-                            kwargs['context'] = ctx
+                            kwargs['context'] = context
                             
                         if is_async:
-                            result = await func(driver, *args, **kwargs)
+                            result = await func(*args, **kwargs)
                         else:
-                            result = func(driver, *args, **kwargs)
+                            result = func(*args, **kwargs)
                             
                         return wrap_result(result)
                     except Exception as e:
@@ -100,10 +109,9 @@ def unwrap(func: Callable[P, Awaitable[Result[T, Exception]]]) -> Callable[P, Aw
         result = await func(*args, **kwargs)
         
         if result.is_error():
-            raise result.error if hasattr(result, 'error') else Exception(f"Unknown error in {func.__name__}")
+            raise result.error
             
-        # Extract value from Result
-        value = result.value if hasattr(result, 'value') else cast(T, result.default_value(None))
+        value = result.default_value(None)
         
         if value is None:
             raise ValueError(f"Result from {func.__name__} contained None")
@@ -136,10 +144,9 @@ def with_context(func: Callable[[T, ActionContext], S]) -> Callable[[T], Action[
     """
     def wrapper(value: T) -> Action[S]:
         class ContextAwareAction(Action[S]):
-            async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[S, Exception]:
-                ctx = context or ActionContext()
+            async def execute(self, context: ActionContext) -> Result[S, Exception]:
                 try:
-                    result = func(value, ctx)
+                    result = func(value, context)
                     return Ok(result)
                 except Exception as e:
                     return Error(e)
@@ -172,8 +179,7 @@ def transform(func: Callable[[T], S]) -> Callable[[T], Action[S]]:
     """
     def wrapper(value: T) -> Action[S]:
         class TransformAction(Action[S]):
-            async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[S, Exception]:
-                ctx = context or ActionContext()
+            async def execute(self, context: ActionContext) -> Result[S, Exception]:
                 try:
                     result = func(value)
                     return Ok(result)
@@ -185,182 +191,41 @@ def transform(func: Callable[[T], S]) -> Callable[[T], Action[S]]:
     return wrapper
 
 
-def log_result(label: Optional[str] = None, level: str = "info") -> Callable[[Action[T]], Action[T]]:
+def async_action() -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Action[T]]]:
     """
-    Decorator to log the result of an action without affecting the workflow.
+    Decorator to convert an async function into an Action with proper error handling.
     
-    Args:
-        label: Optional label to prepend to the log
-        level: Log level (debug, info, warning, error)
-        
+    Similar to @action() but specifically for async functions that don't return Results.
+    
     Returns:
-        A decorator function that wraps an action with logging
-    
+        A decorator function that converts an async function to an Action
+        
     Example:
-    ```python
-        @log_result("Prices found")
-        def extract_prices():
-            # ... implementation ...
-            
-        # Or inline:
-        get_html() >> log_result("HTML")(extract_prices)
-    ```
+        @async_action()
+        async def wait_and_get_data(seconds, url):
+            await asyncio.sleep(seconds)
+            # This will be automatically wrapped in Result
+            return {"url": url, "timestamp": time.time()}
     """
-    def decorator(action: Action[T]) -> Action[T]:
-        prefix = f"{label}: " if label else ""
-        log_func = getattr(logger, level.lower())
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Action[T]]:
+        sig = inspect.signature(func)
+        has_context_param = 'context' in sig.parameters
         
-        class LogResultAction(Action[T]):
-            async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[T, Exception]:
-                ctx = context or ActionContext()
-                result = await action.execute(driver, ctx)
-                
-                if result.is_ok():
-                    value = result.value if hasattr(result, 'value') else "No value"
-                    log_func(f"{prefix}{value}")
-                else:
-                    error = result.error if hasattr(result, 'error') else "Unknown error"
-                    log_func(f"{prefix}ERROR: {error}")
-                
-                return result
-        
-        return LogResultAction()
-    
-    return decorator
-
-
-def retry_on_exception(exception_types: Union[Type[Exception], List[Type[Exception]]],
-                       max_retries: int = 3,
-                       delay_ms: int = 1000) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
-    """
-    Decorator that retries a function when specific exceptions occur.
-    
-    This is useful for element methods that may fail due to transient issues.
-    
-    Args:
-        exception_types: Exception type(s) that should trigger retry
-        max_retries: Maximum number of retry attempts
-        delay_ms: Delay between retries in milliseconds
-        
-    Returns:
-        A decorator function that adds retry logic to the decorated function
-    
-    Example:
-    ```python
-        @retry_on_exception([StaleElementException, TimeoutException], max_retries=3)
-        async def click_element(element):
-            await element.click()
-    ```
-    """
-    import asyncio
-    
-    # Convert single exception to list
-    if not isinstance(exception_types, list):
-        exception_types = [exception_types]
-    
-    def decorator(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
         @wraps(func)
-        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-            last_exception = None
-            
-            for attempt in range(max_retries):
-                try:
-                    return await func(*args, **kwargs)
-                except Exception as e:
-                    # Only retry if exception type matches
-                    if any(isinstance(e, ex_type) for ex_type in exception_types):
-                        last_exception = e
-                        logger.debug(f"Retry attempt {attempt+1}/{max_retries} for {func.__name__}: {e}")
-                        
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(delay_ms / 1000)
-                    else:
-                        # If exception doesn't match, don't retry
-                        raise
-            
-            # If we get here, all retries failed
-            raise last_exception or Exception(f"All {max_retries} retry attempts failed")
-        
-        return wrapper
-    
-    return decorator
-
-
-def element_action(func: Callable[..., Awaitable[Result[T, Exception]]]) -> Callable[..., Action[T]]:
-    """
-    Decorator for creating an Action from an element method.
-    
-    This is useful for wrapping element methods into Actions for composition.
-    
-    Args:
-        func: An element method that returns a Result
-        
-    Returns:
-        A function that returns an Action
-    
-    Example:
-    ```python
-        @element_action
-        async def get_text(element, selector):
-            el = await element.query_selector(selector)
-            return await el.get_text()
-            
-        # Usage: get_text(element, ".title")
-    ```
-    """
-    @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Action[T]:
-        class ElementAction(Action[T]):
-            async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[T, Exception]:
-                ctx = context or ActionContext()
-                try:
-                    return await func(*args, **kwargs)
-                except Exception as e:
-                    return Error(e)
-        
-        return ElementAction()
-    
-    return wrapper
-
-
-def conditional_action(condition_fn: Callable[[T], bool]) -> Callable[[Action[S]], Callable[[T], Action[S]]]:
-    """
-    Creates a decorator that makes an action execute conditionally based on input.
-    
-    Args:
-        condition_fn: Function that takes a value and returns True/False
-        
-    Returns:
-        A decorator that makes the action execute only if condition is True
-    
-    Example:
-    ```python
-        @conditional_action(lambda text: "login" in text.lower())
-        def handle_login_flow():
-            # Only executed if condition is true
-            ...
-            
-        # Usage: get_page_text() >> handle_login_flow
-    ```
-    """
-    def decorator(action: Action[S]) -> Callable[[T], Action[S]]:
-        def wrapper(value: T) -> Action[S]:
-            class ConditionalAction(Action[S]):
-                async def execute(self, driver: BrowserDriver, context: Optional[ActionContext] = None) -> Result[S, Exception]:
-                    ctx = context or ActionContext()
-                    
+        def wrapper(*args: Any, **kwargs: Any) -> Action[T]:
+            class AsyncAction(Action[T]):
+                async def execute(self, context: ActionContext) -> Result[T, Exception]:
                     try:
-                        # Check if condition is true
-                        if condition_fn(value):
-                            return await action.execute(driver, ctx)
-                        else:
-                            # Skip this action, return None wrapped in Ok
-                            return Ok(cast(S, None))
+                        # Add context as an argument if the function expects it
+                        if has_context_param:
+                            kwargs['context'] = context
+                            
+                        result = await func(*args, **kwargs)
+                        return Ok(result)
                     except Exception as e:
+                        logger.debug(f"Error in async action {func.__name__}: {e}")
                         return Error(e)
             
-            return ConditionalAction()
-        
-        return wrapper
-    
+            return AsyncAction()
+        return wrapper  
     return decorator

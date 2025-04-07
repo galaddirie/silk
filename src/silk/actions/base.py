@@ -13,6 +13,7 @@ from typing import (
     overload,
     cast,
     ParamSpec,
+    TYPE_CHECKING
 )
 from abc import ABC, abstractmethod
 from expression.core import Result, Some, Nothing, Error, Ok
@@ -24,6 +25,9 @@ import logging
 from datetime import datetime
 
 from silk.models.browser import ActionContext
+
+if TYPE_CHECKING:
+    from silk.browsers.manager import BrowserManager
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -99,7 +103,7 @@ class Action(ABC, Generic[T]):
                         return cast(Result[S, Exception], result)
                     
                     # Get the next action using the result value
-                    value = result.value if hasattr(result, 'value') else None
+                    value = result.default_value(None)
                     if value is None:
                         return Error(Exception("No value to chain to"))
                     next_action = f(value)
@@ -258,14 +262,18 @@ class Action(ABC, Generic[T]):
                     context_result1 = await context.browser_manager.create_context()
                     if context_result1.is_error():
                         return Error(context_result1.error)
-                    browser_context1 = context_result1.value
+                    browser_context1 = context_result1.default_value(None)
+                    if browser_context1 is None:
+                        return Error(Exception("Failed to create first context"))
                     first_context_id = browser_context1.id
                     
                     # Get default page for first context
                     page_result1 = browser_context1.get_page()
                     if page_result1.is_error():
                         return Error(page_result1.error)
-                    page1 = page_result1.value
+                    page1 = page_result1.default_value(None)
+                    if page1 is None:
+                        return Error(Exception("Failed to get first page"))
                     
                     # Create action context for first action
                     action_context1 = context.derive(
@@ -278,14 +286,18 @@ class Action(ABC, Generic[T]):
                     context_result2 = await context.browser_manager.create_context()
                     if context_result2.is_error():
                         return Error(context_result2.error)
-                    browser_context2 = context_result2.value
+                    browser_context2 = context_result2.default_value(None)
+                    if browser_context2 is None:
+                        return Error(Exception("Failed to create second context"))
                     second_context_id = browser_context2.id
                     
                     # Get default page for second context
                     page_result2 = browser_context2.get_page()
                     if page_result2.is_error():
                         return Error(page_result2.error)
-                    page2 = page_result2.value
+                    page2 = page_result2.default_value(None)
+                    if page2 is None:
+                        return Error(Exception("Failed to get second page"))
                     
                     # Create action context for second action
                     action_context2 = context.derive(
@@ -294,25 +306,24 @@ class Action(ABC, Generic[T]):
                         metadata={"parallel_execution": "second_action"}
                     )
                     
-                    # Execute both actions in parallel with their separate contexts
                     results = await asyncio.gather(
                         first_action.execute(action_context1),
                         second_action.execute(action_context2),
-                        return_exceptions=True
                     )
                     
-                    # Process the results
-                    if all(isinstance(r, Result) and r.is_ok() for r in results):
-                        return Ok((results[0].value, results[1].value))
+                    if any(isinstance(r, Exception) for r in results):
+                        for r in results:
+                            if isinstance(r, Exception):
+                                return Error(r)
                     
-                    # Find the first error
-                    for r in results:
-                        if isinstance(r, Exception):
-                            return Error(r)
-                        if isinstance(r, Result) and r.is_error():
-                            return Error(r.error)
+                    result1, result2 = results[0], results[1]
                     
-                    # Should not reach here, but just in case
+                    if result1.is_error():
+                        return cast(Result[Tuple[T, S], Exception], Error(result1.error))
+                    if result2.is_error():
+                        return cast(Result[Tuple[T, S], Exception], Error(result2.error))
+                    
+                    
                     return Error(Exception("Unexpected error in parallel execution"))
                 except Exception as e:
                     return Error(e)
@@ -338,15 +349,19 @@ class Action(ABC, Generic[T]):
         # Create a new context for this execution
         context_result = await browser_manager.create_context()
         if context_result.is_error():
-            return context_result
-        browser_context = context_result.value
+            return Error(context_result.error)
+        browser_context = context_result.default_value(None)
+        if browser_context is None:
+            return Error(Exception("Failed to create context"))
         
         try:
             # Get the default page
             page_result = browser_context.get_page()
             if page_result.is_error():
-                return page_result
-            page = page_result.value
+                return Error(page_result.error)
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
             
             # Create an ActionContext
             action_context = ActionContext(
