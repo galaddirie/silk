@@ -1,9 +1,18 @@
-from typing import Dict, Optional, Any, TypeVar, Generic, List, AsyncGenerator, TYPE_CHECKING
-from expression.core import Result, Ok, Error
 import logging
-from contextlib import asynccontextmanager
-import asyncio
 from abc import ABC, abstractmethod
+from contextlib import asynccontextmanager
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncGenerator,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    TypeVar,
+)
+
+from expression.core import Result
 
 if TYPE_CHECKING:
     from silk.browsers.driver import BrowserDriver
@@ -12,6 +21,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
+
 
 # TODO: remove the execute_script methods, these should be handled by the driver or in the implementation of this base class
 class ElementHandle(Generic[T], ABC):
@@ -26,14 +36,14 @@ class ElementHandle(Generic[T], ABC):
     for the specific automation library being used.
     """
 
-    driver: 'BrowserDriver'
+    driver: "BrowserDriver"
     page_id: str
     element_ref: T
     selector: Optional[str]
 
     def __init__(
         self,
-        driver: 'BrowserDriver',
+        driver: "BrowserDriver",
         page_id: str,
         element_ref: T,
         selector: Optional[str] = None,
@@ -221,10 +231,9 @@ class ElementHandle(Generic[T], ABC):
         """
         pass
 
-
     @abstractmethod
     async def fill(
-        self, text: str, options: Optional['TypeOptions'] = None
+        self, text: str, options: Optional["TypeOptions"] = None
     ) -> Result[None, Exception]:
         """
         Fill this element with the given text
@@ -240,7 +249,7 @@ class ElementHandle(Generic[T], ABC):
         pass
 
     async def input(
-        self, text: str, options: Optional['TypeOptions'] = None
+        self, text: str, options: Optional["TypeOptions"] = None
     ) -> "ElementHandle[T]":
         """
         Fill this element with text and return self for chaining

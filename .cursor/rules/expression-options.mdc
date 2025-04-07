@@ -1,11 +1,11 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
-Sometimes we don’t have a value for a given variable. Perhaps the value is not known or available yet. In Python we represent the absence of a value with the special value None. In other languages there is usually a null value. 
+Sometimes we don’t have a value for a given variable. Perhaps the value is not known or available yet. In Python we represent the absence of a value with the special value None. In other languages there is usually a null value.
 
-this doc teaches you about options in the expression library 
+this doc teaches you about options in the expression library
 
 
 """

@@ -1,26 +1,13 @@
-from typing import (
-    TypeVar,
-    Generic,
-    Callable,
-    Any,
-    Dict,
-    List,
-    Optional,
-    Union,
-    cast,
-    overload,
-)
 import asyncio
-import random
 import logging
+import random
 from datetime import datetime
+from typing import Any, Callable, Optional, TypeVar, cast
 
-from expression import pipe, curry, effect
-from expression.core import Result, Ok, Error, Option, Some, Nothing
-from expression.collections import Block
+from expression.core import Error, Ok, Result
 
+from silk.actions.base import Action
 from silk.models.browser import ActionContext
-from silk.actions.base import Action, create_action
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -43,22 +30,11 @@ def branch(
 
     Returns:
         An Action that branches based on the condition result
-
-    Example:
-    ```
-        # Branch based on whether a login button is visible
-        login_flow = branch(
-            condition=is_visible("#login-button"),
-            if_true=Click("#login-button"),
-            if_false=Navigate("/dashboard")
-        )
-    ```
     """
 
     class BranchAction(Action[S]):
         async def execute(self, context: ActionContext) -> Result[S, Exception]:
             try:
-                # Create branch-specific context with metadata
                 branch_ctx = context.derive(
                     metadata={
                         "branch_operation": "condition",
@@ -66,7 +42,6 @@ def branch(
                     }
                 )
 
-                # Execute the condition action
                 condition_result = await condition.execute(branch_ctx)
 
                 if condition_result.is_error():
@@ -74,10 +49,8 @@ def branch(
                         Exception(f"Branch condition failed: {condition_result.error}")
                     )
 
-                # Get the boolean value from the condition result
                 condition_value = condition_result.default_value(False)
 
-                # Create context for the selected branch
                 branch_path_ctx = context.derive(
                     metadata={
                         "branch_path": "true" if condition_value else "false",
@@ -92,7 +65,6 @@ def branch(
                     logger.debug("Branch condition is False, taking if_false path")
                     return await if_false.execute(branch_path_ctx)
                 else:
-                    # Return None when condition is False and no if_false is provided
                     logger.debug("Branch condition is False, no if_false path provided")
                     return Ok(cast(S, None))
             except Exception as e:
@@ -118,15 +90,6 @@ def loop_until(
 
     Returns:
         An Action that loops until the condition is met
-
-    Example:
-    ```
-        # Loop until an element is visible
-        sale_finder = loop_until(
-            condition=is_visible("#sale-alert"),
-            body=Click("#check-sales")
-        )
-    ```
     """
 
     class LoopUntilAction(Action[T]):
@@ -136,7 +99,6 @@ def loop_until(
                 last_body_result: Optional[Result[T, Exception]] = None
 
                 while iterations < max_iterations:
-                    # Create iteration-specific context
                     iter_ctx = context.derive(
                         metadata={
                             "loop_iteration": iterations + 1,
@@ -145,19 +107,15 @@ def loop_until(
                         }
                     )
 
-                    # First execute the body action
                     body_result = await body.execute(iter_ctx)
 
                     if body_result.is_error():
                         return body_result
 
-                    # Store the successful result
                     last_body_result = body_result
 
-                    # Then check the condition
                     condition_result = await condition.execute(iter_ctx)
 
-                    # If condition fails with an error, continue to next iteration
                     if condition_result.is_error():
                         iterations += 1
                         if iterations < max_iterations:
@@ -167,15 +125,12 @@ def loop_until(
                             await asyncio.sleep(delay_ms / 1000)
                         continue
 
-                    # Check actual boolean value
                     condition_value = condition_result.default_value(False)
 
-                    # If condition is True, return the body result
                     if condition_value:
                         logger.debug(
                             f"Loop condition met at iteration {iterations + 1}"
                         )
-                        # Return the last successful body result directly
                         return last_body_result
 
                     iterations += 1
@@ -187,7 +142,6 @@ def loop_until(
                     else:
                         logger.debug(f"Reached max iterations ({max_iterations})")
 
-                # Return error if max iterations reached
                 return Error(
                     Exception(
                         f"Maximum iterations ({max_iterations}) reached in loop_until"
@@ -205,15 +159,6 @@ def retry(action: Action[T], max_attempts: int = 3, delay_ms: int = 1000) -> Act
 
     This is a convenience function that wraps the Action.retry() method.
 
-    Example:
-    ```python
-        result = await retry(
-            action_that_might_fail,
-            max_attempts=3,
-            delay_ms=500
-        ).execute(context)
-    ```
-
     Args:
         action: Action to retry
         max_attempts: Maximum number of attempts
@@ -225,7 +170,6 @@ def retry(action: Action[T], max_attempts: int = 3, delay_ms: int = 1000) -> Act
 
     class RetryAction(Action[T]):
         async def execute(self, context: ActionContext) -> Result[T, Exception]:
-            # Create retry-specific context
             retry_context = context.derive(
                 max_retries=max_attempts, retry_delay_ms=delay_ms
             )
@@ -233,7 +177,6 @@ def retry(action: Action[T], max_attempts: int = 3, delay_ms: int = 1000) -> Act
             last_error = None
 
             for attempt in range(max_attempts):
-                # Update retry count for each attempt
                 attempt_context = retry_context.derive(retry_count=attempt)
 
                 try:
@@ -273,16 +216,6 @@ def retry_with_backoff(
 
     Returns:
         An Action with retry logic
-
-    Example:
-    ```
-        # Retry with backoff, only for network errors
-        robust_action = retry_with_backoff(
-            action=FetchData(),
-            max_attempts=5,
-            should_retry=lambda e: isinstance(e, NetworkError)
-        )
-    ```
     """
 
     class RetryWithBackoffAction(Action[T]):
@@ -292,7 +225,6 @@ def retry_with_backoff(
                 delay: float = float(initial_delay_ms)
 
                 for attempt in range(max_attempts):
-                    # Create attempt-specific context
                     retry_ctx = context.derive(
                         retry_count=attempt,
                         max_retries=max_attempts,
@@ -310,39 +242,31 @@ def retry_with_backoff(
                         if result.is_ok():
                             return result
 
-                        # Handle the error case
                         last_error = result.error
 
-                        # Check if we should retry this specific error
                         if should_retry and not should_retry(last_error):
                             logger.debug(f"Error not eligible for retry: {last_error}")
                             return result
 
                     except Exception as e:
                         last_error = e
-                        # Check if we should retry this specific error
                         if should_retry and not should_retry(e):
                             logger.debug(f"Exception not eligible for retry: {e}")
                             return Error(e)
 
-                    # If not the last attempt, wait before retrying
                     if attempt < max_attempts - 1:
-                        # Calculate backoff with optional jitter
                         current_delay: float = delay
                         if jitter:
-                            # Add random jitter between 0.8x and 1.2x
                             jitter_factor = random.uniform(0.8, 1.2)
                             current_delay = delay * jitter_factor
 
                         logger.info(
-                            f"Retry {attempt+1}/{max_attempts} failed, waiting {current_delay:.0f}ms"
+                            f"Retry {attempt+1}/{max_attempts} failed, waiting {current_delay: .0f}ms"
                         )
                         await asyncio.sleep(current_delay / 1000)
 
-                        # Increase delay for next attempt
                         delay = delay * backoff_factor
 
-                # All retries failed
                 return Error(
                     last_error
                     or Exception(f"Action failed after {max_attempts} retry attempts")
@@ -364,21 +288,11 @@ def with_timeout(action: Action[T], timeout_ms: int) -> Action[T]:
 
     Returns:
         An Action with timeout constraint
-
-    Example:
-    ```
-        # Execute an action with a timeout
-        result = await with_timeout(
-            action=GetElement("#login-button"),
-            timeout_ms=5000
-        )
-    ```
     """
 
     class WithTimeoutAction(Action[T]):
         async def execute(self, context: ActionContext) -> Result[T, Exception]:
             try:
-                # Create timeout-specific context
                 timeout_ctx = context.derive(
                     timeout_ms=timeout_ms,
                     metadata={
@@ -387,11 +301,10 @@ def with_timeout(action: Action[T], timeout_ms: int) -> Action[T]:
                     },
                 )
 
-                # Run the action with a timeout
                 try:
                     result = await asyncio.wait_for(
                         action.execute(timeout_ctx),
-                        timeout=timeout_ms / 1000,  # Convert to seconds
+                        timeout=timeout_ms / 1000,
                     )
                     return result
                 except asyncio.TimeoutError:
@@ -419,21 +332,10 @@ def with_timeout_and_fallback(
 
     Returns:
         An Action with timeout constraint
-
-    Example:
-    ```
-        # Execute an action with a timeout
-        result = await with_timeout_and_fallback(
-            action=GetElement("#login-button"),
-            timeout_ms=5000,
-            on_timeout=lambda: print("Timeout occurred") or None
-        )(driver)
-    ```
     """
 
     class TimeoutAction(Action[T]):
         async def execute(self, context: ActionContext) -> Result[T, Exception]:
-            # Create timeout-specific context
             timeout_ctx = context.derive(
                 timeout_ms=timeout_ms,
                 metadata={
@@ -443,24 +345,21 @@ def with_timeout_and_fallback(
             )
 
             try:
-                # Run the action with a timeout
                 try:
                     result = await asyncio.wait_for(
                         action.execute(timeout_ctx),
-                        timeout=timeout_ms / 1000,  # Convert to seconds
+                        timeout=timeout_ms / 1000,
                     )
                     return result
                 except asyncio.TimeoutError:
                     logger.debug(f"Action timed out after {timeout_ms}ms")
                     if on_timeout:
-                        # Return default value from callback
                         try:
                             default_value = on_timeout()
                             return Ok(default_value)
                         except Exception as e:
                             return Error(Exception(f"Timeout handler failed: {e}"))
                     else:
-                        # No default handler, propagate timeout as error
                         return Error(
                             asyncio.TimeoutError(
                                 f"Action timed out after {timeout_ms}ms"
@@ -483,27 +382,16 @@ def tap(main_action: Action[T], side_effect: Action[Any]) -> Action[T]:
 
     Returns:
         An Action that executes both actions but returns only the main action's result
-
-    Example:
-    ```
-        # Log a value while continuing with main processing
-        workflow = tap(
-            main_action=GetText(".message"),
-            side_effect=LogToConsole()
-        )
-    ```
     """
 
     class TapAction(Action[T]):
         async def execute(self, context: ActionContext) -> Result[T, Exception]:
             try:
-                # Execute the main action with the provided context
                 main_result = await main_action.execute(context)
 
                 if main_result.is_error():
                     return main_result
 
-                # Create a context for the side effect that includes the main result
                 side_ctx = context.derive(
                     metadata={
                         "tap_operation": "side_effect",
@@ -512,14 +400,11 @@ def tap(main_action: Action[T], side_effect: Action[Any]) -> Action[T]:
                     }
                 )
 
-                # Only execute side effect if main action succeeds
-                # We ignore any errors from the side effect
                 try:
                     await side_effect.execute(side_ctx)
                 except Exception as e:
                     logger.debug(f"Side effect action in tap failed: {e}")
 
-                # Return the main action's result regardless of side effect result
                 return main_result
             except Exception as e:
                 return Error(e)

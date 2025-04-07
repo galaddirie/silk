@@ -116,4 +116,3 @@ Silk consists of several interconnected components:
 ## License
 
 Silk is released under the MIT License. See the [LICENSE](LICENSE) file for details.
-

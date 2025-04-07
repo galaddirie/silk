@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
 This doc explains what the expression library is
@@ -16,7 +16,7 @@ to enable you to do practical and productive functional programming in Python
 
 Python is a multi-paradigm programming language that also supports functional
 programming constructs such as functions, higher-order functions, lambdas, and
-in many ways also favors composition over inheritance. 
+in many ways also favors composition over inheritance.
 
 
 # Functional Programming in Python
@@ -459,7 +459,6 @@ Cost of failure increases exponentially the further the bug
 "A Heisenbug is a classification of an unusual software bug that disappears or alters its behavior when an attempt to
 isolate it is made. Due to the unpredictable nature of a Heisenbug, when trying to recreate the bug or using a debugger,
 the error may change or even vanish on a retry."
-``` 
+```
 
 """
-

@@ -1,29 +1,31 @@
 """
 Pytest fixtures for the Silk browser automation framework.
 """
-import os
-import pytest
-import asyncio
-from typing import AsyncGenerator, Dict, List, Any, Optional, Union, Generator
-from unittest.mock import AsyncMock, MagicMock, patch
-from pathlib import Path
-from expression.core import Result, Ok, Error
 
-from silk.browsers.manager import BrowserManager
-from silk.browsers.driver import BrowserDriver
+import asyncio
+import os
+from pathlib import Path
+from typing import AsyncGenerator
+from unittest.mock import MagicMock
+
+import pytest
+from expression.core import Error, Ok
+
 from silk.browsers.context import BrowserContext, BrowserPage
+from silk.browsers.driver import BrowserDriver
 from silk.browsers.element import ElementHandle
-from silk.models.browser import (
-    BrowserOptions, ActionContext, ClickOptions, TypeOptions,
-    MouseMoveOptions, DragOptions, NavigationOptions, WaitOptions
-)
+from silk.browsers.manager import BrowserManager
+from silk.models.browser import ActionContext, BrowserOptions
+
 
 # Helper functions to create awaitable results
 async def async_ok(value):
     return Ok(value)
 
+
 async def async_error(error):
     return Error(error)
+
 
 # Enable async test support
 @pytest.fixture(scope="session")
@@ -39,29 +41,39 @@ def event_loop():
 def mock_element_handle() -> MagicMock:
     """Fixture to create a mock ElementHandle."""
     mock = MagicMock(spec=ElementHandle)
-    
+
     # Mock async methods with awaitable results
     mock.get_text.return_value = async_ok("Mock Text")
     mock.get_inner_text.return_value = async_ok("Mock Inner Text")
     mock.get_html.return_value = async_ok("<div>Mock HTML</div>")
     mock.get_attribute.return_value = async_ok("mock-attribute")
     mock.get_property.return_value = async_ok("mock-property")
-    mock.get_bounding_box.return_value = async_ok({"x": 10, "y": 20, "width": 100, "height": 50})
+    mock.get_bounding_box.return_value = async_ok(
+        {"x": 10, "y": 20, "width": 100, "height": 50}
+    )
     mock.click.return_value = async_ok(None)
     mock.fill.return_value = async_ok(None)
     mock.select.return_value = async_ok(None)
     mock.is_visible.return_value = async_ok(True)
     mock.is_enabled.return_value = async_ok(True)
-    mock.get_parent.return_value = async_ok(None)  # Will be set in specific tests if needed
-    mock.get_children.return_value = async_ok([])  # Will be set in specific tests if needed
-    mock.query_selector.return_value = async_ok(None)  # Will be set in specific tests if needed
-    mock.query_selector_all.return_value = async_ok([])  # Will be set in specific tests if needed
+    mock.get_parent.return_value = async_ok(
+        None
+    )  # Will be set in specific tests if needed
+    mock.get_children.return_value = async_ok(
+        []
+    )  # Will be set in specific tests if needed
+    mock.query_selector.return_value = async_ok(
+        None
+    )  # Will be set in specific tests if needed
+    mock.query_selector_all.return_value = async_ok(
+        []
+    )  # Will be set in specific tests if needed
     mock.scroll_into_view.return_value = async_ok(None)
-    
+
     # Set up non-async methods
     mock.get_selector.return_value = "#mock-selector"
     mock.get_page_id.return_value = "mock-page-id"
-    
+
     return mock
 
 
@@ -69,7 +81,7 @@ def mock_element_handle() -> MagicMock:
 def mock_browser_driver() -> MagicMock:
     """Fixture to create a mock BrowserDriver."""
     mock = MagicMock(spec=BrowserDriver)
-    
+
     # Mock async methods with awaitable Result returns
     mock.launch.return_value = async_ok(None)
     mock.close.return_value = async_ok(None)
@@ -86,7 +98,9 @@ def mock_browser_driver() -> MagicMock:
     mock.go_forward.return_value = async_ok(None)
     mock.query_selector.return_value = async_ok(None)  # Will be set in specific tests
     mock.query_selector_all.return_value = async_ok([])  # Will be set in specific tests
-    mock.wait_for_selector.return_value = async_ok(None)  # Will be set in specific tests
+    mock.wait_for_selector.return_value = async_ok(
+        None
+    )  # Will be set in specific tests
     mock.wait_for_navigation.return_value = async_ok(None)
     mock.click.return_value = async_ok(None)
     mock.double_click.return_value = async_ok(None)
@@ -105,12 +119,16 @@ def mock_browser_driver() -> MagicMock:
     mock.key_up.return_value = async_ok(None)
     mock.get_element_text.return_value = async_ok("Mock Element Text")
     mock.get_element_attribute.return_value = async_ok("mock-element-attribute")
-    mock.get_element_bounding_box.return_value = async_ok({"x": 10, "y": 20, "width": 100, "height": 50})
+    mock.get_element_bounding_box.return_value = async_ok(
+        {"x": 10, "y": 20, "width": 100, "height": 50}
+    )
     mock.click_element.return_value = async_ok(None)
     mock.get_element_html.return_value = async_ok("<div>Mock Element HTML</div>")
     mock.get_element_inner_text.return_value = async_ok("Mock Element Inner Text")
-    mock.extract_table.return_value = async_ok([{"header1": "value1", "header2": "value2"}])
-    
+    mock.extract_table.return_value = async_ok(
+        [{"header1": "value1", "header2": "value2"}]
+    )
+
     return mock
 
 
@@ -134,7 +152,7 @@ async def mock_browser_page(mock_browser_driver) -> MagicMock:
     mock.context_id = "mock-context-id"
     mock.driver = mock_browser_driver
     mock.page_ref = "mock-page-ref"
-    
+
     # Mock the async methods with awaitable results
     mock.goto.return_value = async_ok(None)
     mock.current_url.return_value = async_ok("https://example.com")
@@ -154,7 +172,7 @@ async def mock_browser_page(mock_browser_driver) -> MagicMock:
     mock.double_click.return_value = async_ok(None)
     mock.type.return_value = async_ok(None)
     mock.select.return_value = async_ok(None)
-    
+
     return mock
 
 
@@ -168,7 +186,7 @@ async def mock_browser_context(mock_browser_driver, mock_browser_page) -> MagicM
     mock.context_ref = "mock-context-ref"
     mock.pages = {"mock-page-id": mock_browser_page}
     mock.default_page_id = "mock-page-id"
-    
+
     # Mock the async methods with awaitable results
     mock.create_page.return_value = async_ok(mock_browser_page)
     mock.get_page.return_value = Ok(mock_browser_page)  # This one is not async
@@ -182,7 +200,7 @@ async def mock_browser_context(mock_browser_driver, mock_browser_page) -> MagicM
     mock.key_down.return_value = async_ok(None)
     mock.key_up.return_value = async_ok(None)
     mock.close.return_value = async_ok(None)
-    
+
     return mock
 
 
@@ -194,25 +212,25 @@ async def mock_browser_manager(mock_browser_driver, mock_browser_context) -> Mag
     mock.drivers = {"mock-context-id": mock_browser_driver}
     mock.contexts = {"mock-context-id": mock_browser_context}
     mock.default_context_id = "mock-context-id"
-    
+
     # Mock the async methods with awaitable results
     mock.create_context.return_value = async_ok(mock_browser_context)
     mock.get_context.return_value = Ok(mock_browser_context)  # This one is not async
     mock.close_context.return_value = async_ok(None)
     mock.close_all.return_value = async_ok(None)
-    
+
     # Special handling for execute_action as it needs to call the action
     async def async_execute_action(action):
         return await action.execute(
             ActionContext(
                 browser_manager=mock,
                 context_id="mock-context-id",
-                page_id="mock-page-id"
+                page_id="mock-page-id",
             )
         )
-    
+
     mock.execute_action.side_effect = async_execute_action
-    
+
     return mock
 
 
@@ -279,10 +297,10 @@ async def real_browser_manager() -> AsyncGenerator[BrowserManager, None]:
     """
     Create a real BrowserManager for integration tests.
     """
-    # todo use a flag/marker instead of an environment variable 
+    # todo use a flag/marker instead of an environment variable
     if not os.environ.get("INTEGRATION_TESTS"):
         pytest.skip("Skipping integration test. Set INTEGRATION_TESTS=1 to run.")
-        
+
     # Create a real browser manager with default options
     manager = BrowserManager(
         driver_type="playwright",
@@ -291,9 +309,9 @@ async def real_browser_manager() -> AsyncGenerator[BrowserManager, None]:
             timeout=10000,
             viewport_width=1280,
             viewport_height=720,
-        )
+        ),
     )
-    
+
     try:
         yield manager
     finally:
@@ -303,16 +321,18 @@ async def real_browser_manager() -> AsyncGenerator[BrowserManager, None]:
 
 # Create a helper fixture for real browser context
 @pytest.fixture
-async def real_browser_context(real_browser_manager) -> AsyncGenerator[BrowserContext, None]:
+async def real_browser_context(
+    real_browser_manager,
+) -> AsyncGenerator[BrowserContext, None]:
     """Create a real browser context for integration tests."""
     context_result = await real_browser_manager.create_context()
     if context_result.is_error():
         pytest.fail(f"Failed to create browser context: {context_result.error}")
-    
+
     context = context_result.default_value(None)
     if context is None:
         pytest.fail("Failed to create browser context")
-    
+
     try:
         yield context
     finally:
@@ -326,11 +346,11 @@ async def real_browser_page(real_browser_context) -> AsyncGenerator[BrowserPage,
     page_result = await real_browser_context.create_page()
     if page_result.is_error():
         pytest.fail(f"Failed to create browser page: {page_result.error}")
-    
+
     page = page_result.default_value(None)
     if page is None:
         pytest.fail("Failed to create browser page")
-    
+
     try:
         yield page
     finally:

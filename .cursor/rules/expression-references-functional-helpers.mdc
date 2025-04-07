@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
 # Misc
@@ -120,7 +120,7 @@ The composed functions.
 
 # Compose
 
-``` 
+```
 Compose
 compose() → Callable[[_A], _A]
 compose(__fn1: Callable[[_A], _B]) → Callable[[_A], _B]

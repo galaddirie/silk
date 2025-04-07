@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
 # Typed Array
@@ -322,7 +322,7 @@ The result list.
 # Map
 
 
-``` 
+```
 
 class Map(_Map__tree: Option[MapTreeLeaf[_Key, _Value]] | None = None)
 The immutable map class.
@@ -509,7 +509,7 @@ Partially applied try_pick function that takes the input map and returns the fir
 ```
 
 
-# Block 
+# Block
 
 ```
 

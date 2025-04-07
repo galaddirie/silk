@@ -1,34 +1,25 @@
-from abc import ABC, abstractmethod
 from typing import (
+    TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
     Dict,
-    Generic,
     List,
     Literal,
     Optional,
-    Protocol,
+    ParamSpec,
     Tuple,
     TypeVar,
-    Union,
-    cast,
-    overload,
-    ParamSpec,
-    TYPE_CHECKING,
-    runtime_checkable,
 )
+
 if TYPE_CHECKING:
-    from silk.browsers.context import BrowserPage 
+    from silk.browsers.context import BrowserPage
     from silk.browsers.manager import BrowserManager
     from silk.browsers.driver import BrowserDriver
 
-from enum import Enum, auto
-from pathlib import Path
-from pydantic import BaseModel, Field, field_validator, model_validator
-from expression.core import Result, Ok, Error, Option, Some, Nothing
-import asyncio
 import logging
+from enum import Enum
+
+from expression.core import Error, Ok, Result
+from pydantic import BaseModel, Field, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -48,18 +39,18 @@ class ActionContext:
     Action context for action execution containing references to browser context and page
     instead of direct driver references.
     """
-    
+
     def __init__(
         self,
-        browser_manager: Optional['BrowserManager'] = None,
+        browser_manager: Optional["BrowserManager"] = None,
         context_id: Optional[str] = None,
         page_id: Optional[str] = None,
         retry_count: int = 0,
         max_retries: int = 0,
         retry_delay_ms: int = 0,
         timeout_ms: int = 0,
-        parent_context: Optional['ActionContext'] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        parent_context: Optional["ActionContext"] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         self.browser_manager = browser_manager
         self.context_id = context_id
@@ -70,50 +61,58 @@ class ActionContext:
         self.timeout_ms = timeout_ms
         self.parent_context = parent_context
         self.metadata = metadata or {}
-        
-    async def get_page(self) -> Result['BrowserPage', Exception]:
+
+    async def get_page(self) -> Result["BrowserPage", Exception]:
         """Get the browser page for this context"""
         if not self.browser_manager or not self.context_id or not self.page_id:
-            return Error(Exception("ActionContext missing required browser_manager, context_id, or page_id"))
-            
+            return Error(
+                Exception(
+                    "ActionContext missing required browser_manager, context_id, or page_id"
+                )
+            )
+
         context_result = self.browser_manager.get_context(self.context_id)
         if context_result.is_error():
             return Error(context_result.error)
-            
+
         context = context_result.default_value(None)
         if not context:
             return Error(Exception("No context found"))
-        
+
         return context.get_page(self.page_id)
-    
-    async def get_driver(self) -> Result['BrowserDriver', Exception]:
+
+    async def get_driver(self) -> Result["BrowserDriver", Exception]:
         """Get the underlying driver (for specific use cases only)"""
         if not self.browser_manager or not self.context_id:
-            return Error(Exception("ActionContext missing required browser_manager or context_id"))
-        
+            return Error(
+                Exception(
+                    "ActionContext missing required browser_manager or context_id"
+                )
+            )
+
         driver = self.browser_manager.drivers.get(self.context_id)
         if not driver:
             return Error(Exception(f"No driver found for context ID {self.context_id}"))
-        
+
         return Ok(driver)
-    
+
     # todo add interface for derived context
-    def derive(self, **kwargs: Any) -> 'ActionContext':
+    def derive(self, **kwargs: Any) -> "ActionContext":
         """Create a new context derived from this one with some values changed"""
         new_context = ActionContext(
-            browser_manager=kwargs.get('browser_manager', self.browser_manager),
-            context_id=kwargs.get('context_id', self.context_id),
-            page_id=kwargs.get('page_id', self.page_id),
-            retry_count=kwargs.get('retry_count', self.retry_count),
-            max_retries=kwargs.get('max_retries', self.max_retries),
-            retry_delay_ms=kwargs.get('retry_delay_ms', self.retry_delay_ms),
-            timeout_ms=kwargs.get('timeout_ms', self.timeout_ms),
-            parent_context=kwargs.get('parent_context', self),
-            metadata={**self.metadata, **(kwargs.get('metadata', {}))}
+            browser_manager=kwargs.get("browser_manager", self.browser_manager),
+            context_id=kwargs.get("context_id", self.context_id),
+            page_id=kwargs.get("page_id", self.page_id),
+            retry_count=kwargs.get("retry_count", self.retry_count),
+            max_retries=kwargs.get("max_retries", self.max_retries),
+            retry_delay_ms=kwargs.get("retry_delay_ms", self.retry_delay_ms),
+            timeout_ms=kwargs.get("timeout_ms", self.timeout_ms),
+            parent_context=kwargs.get("parent_context", self),
+            metadata={**self.metadata, **(kwargs.get("metadata", {}))},
         )
         return new_context
-    
-    
+
+
 class MouseButton(Enum):
     """Enum representing mouse buttons for mouse actions"""
 
@@ -243,9 +242,8 @@ class BrowserOptions(BaseModel):
     browser_args: List[str] = Field(default_factory=list)
     extra_args: Dict[str, Any] = Field(default_factory=dict)
 
-    # Replace the original field_validator functions with a model_validator
-    @model_validator(mode='after')
-    def set_default_timeouts(self) -> 'BrowserOptions':
+    @model_validator(mode="after")
+    def set_default_timeouts(self) -> "BrowserOptions":
         """Set default timeouts if not provided"""
         if self.navigation_timeout is None:
             self.navigation_timeout = self.timeout

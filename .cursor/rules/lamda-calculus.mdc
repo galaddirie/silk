@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
 
@@ -104,5 +104,3 @@ You usually do not need to know about lambda calculus. But look out for point-fr
 programming which may both simplify or over complicate your code. Lambda calculus is a
 must-have knowledge when dealing with compilers and expression trees (ASTs).
 """
-
-
