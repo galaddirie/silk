@@ -11,7 +11,7 @@ T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
 
-class CreateContext(Action[BrowserContext]):
+class CreateContext(Action[ActionContext]):
     """
     Create a new browser context
 
@@ -31,19 +31,26 @@ class CreateContext(Action[BrowserContext]):
         self.options = options
         self.create_page = create_page
 
-    async def execute(
-        self, context: ActionContext
-    ) -> Result[BrowserContext, Exception]:
-        """Create a new browser context"""
+    async def execute(self, context: ActionContext) -> Result[ActionContext, Exception]:
+        """Create a new browser context and return the updated ActionContext"""
         if not context.browser_manager:
             return Error(Exception("Browser manager is required"))
 
         try:
-            return await context.browser_manager.create_context(
+            context_result = await context.browser_manager.create_context(
                 nickname=self.nickname,
                 options=self.options,
                 create_page=self.create_page,
             )
+            if context_result.is_error():
+                return Error(context_result.error)
+
+            context_id = context_result.default_value(None)
+            if context_id is None:
+                return Error(Exception("Failed to create context"))
+
+            new_context = context.derive(context_id=context_id)
+            return Ok(new_context)
         except Exception as e:
             logger.error(f"Error creating context: {e}")
             return Error(e)
@@ -89,7 +96,7 @@ class SwitchContext(Action[None]):
             return Error(e)
 
 
-class CreatePage(Action[BrowserPage]):
+class CreatePage(Action[ActionContext]):
     """
     Create a new page in the current context
 
@@ -100,8 +107,8 @@ class CreatePage(Action[BrowserPage]):
     def __init__(self, nickname: Optional[str] = None):
         self.nickname = nickname
 
-    async def execute(self, context: ActionContext) -> Result[BrowserPage, Exception]:
-        """Create a new page"""
+    async def execute(self, context: ActionContext) -> Result[ActionContext, Exception]:
+        """Create a new page and return the updated context"""
         if not context.browser_manager or not context.context_id:
             return Error(Exception("Browser manager and context ID are required"))
 
@@ -124,7 +131,7 @@ class CreatePage(Action[BrowserPage]):
 
             context.page_id = page.id
 
-            return page_result
+            return Ok(context)
         except Exception as e:
             logger.error(f"Error creating page: {e}")
             return Error(e)

@@ -18,7 +18,7 @@ from silk.browsers.manager import BrowserManager
 from silk.browsers.drivers.playwright import PlaywrightDriver, PlaywrightElementHandle
 from silk.models.browser import ActionContext, BrowserOptions
 
-
+# todo remove async_ok and async_error with AsyncMock(Ok(value)) and AsyncMock(Error(error))
 # Helper functions to create awaitable results
 async def async_ok(value):
     return Ok(value)

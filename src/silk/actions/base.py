@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import (
     TYPE_CHECKING,
     Any,
+    Optional,
     Awaitable,
     Callable,
     Generic,
@@ -51,6 +52,9 @@ class Action(ABC, Generic[T]):
         """
         pass
 
+
+    # todo we need a operation that runs a action on a list of items similar to airflow mapped tasks
+    # todo improve the doc strings, explaination and examples
     def map(self, f: Callable[[T], S]) -> "Action[S]":
         """
         Create a new action that maps the result of this action
@@ -73,7 +77,10 @@ class Action(ABC, Generic[T]):
 
         return MappedAction()
 
-    def and_then(self, f: Callable[[T], "Action[S]"]) -> "Action[S]":
+    # todo we meed to fix this and_then should pass the context to the next action
+    # it should be similar to celery task chaining 
+    # maybe we use a simlar signature  modifier like action.s(immutable_value) ? or action("input",forward_value) or action(accept_value)
+    def and_then(self, f: Callable[[Optional[T]], "Action[S]"]) -> "Action[S]":
         """
         Chain an action after this one, using the result of this action
 
@@ -94,8 +101,8 @@ class Action(ABC, Generic[T]):
                         return cast(Result[S, Exception], result)
 
                     value = result.default_value(None)
-                    if value is None:
-                        return Error(Exception("No value to chain to"))
+                    # Create the next action regardless of whether value is None
+                    # The function f may or may not use the value
                     next_action = f(value)
 
                     return await next_action.execute(context)
@@ -103,6 +110,35 @@ class Action(ABC, Generic[T]):
                     return Error(e)
 
         return ChainedAction()
+
+
+    def then(self, next_action: "Action[S]") -> "Action[S]":
+        """
+        Chain an action after this one, ignoring the result of this action
+        
+        Args:
+            next_action: Action to execute after this one completes
+                
+        Returns:
+            A new Action that chains the two actions sequentially
+        """
+        original_action = self
+
+        class SequentialAction(Action[S]):
+            async def execute(self, context: ActionContext) -> Result[S, Exception]:
+                try:
+                    result = await original_action.execute(context)
+
+                    if result.is_error():
+                        return cast(Result[S, Exception], result)
+
+                    # Ignore the value and execute the next action
+                    return await next_action.execute(context)
+                except Exception as e:
+                    return Error(e)
+
+        return SequentialAction()
+
 
     def retry(self, max_attempts: int = 3, delay_ms: int = 1000) -> "Action[T]":
         """
@@ -188,7 +224,7 @@ class Action(ABC, Generic[T]):
         - If b is an Action: a.and_then(lambda _: b)
         """
         if isinstance(other, Action):
-            return self.and_then(lambda _: other)
+            return self.then(other)
         else:
             return self.map(other)
 

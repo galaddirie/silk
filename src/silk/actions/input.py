@@ -233,7 +233,8 @@ class Click(Action[None]):
             if browser_context is None:
                 return Error(Exception("Failed to get browser context"))
 
-            mouse_options = MouseMoveOptions(timeout=self.options.timeout)
+            # Create mouse options with same timeout from click options
+            mouse_options = MouseMoveOptions(timeout=0)
             return await browser_context.mouse_click(self.options.button, mouse_options)
 
         except Exception as e:
@@ -788,6 +789,15 @@ class Select(Action[None]):
                 result = await page.execute_script(
                     script, center_x, center_y, self.value, self.text
                 )
+                
+                if result.is_error():
+                    return Error(result.error)
+                
+                script_result = result.default_value(None)
+                if isinstance(script_result, dict) and not script_result.get("success", False):
+                    return Error(Exception(script_result.get("error", "Failed to select option")))
+                
+                return Ok(None)
             elif isinstance(self.target, SelectorGroup):
                 for selector in self.target.selectors:
                     result = await page.select(selector.value, self.value, self.text)
@@ -804,18 +814,10 @@ class Select(Action[None]):
                 )
 
                 result = await page.select(selector_value, self.value, self.text)
-
-            if result.is_error():
-                return Error(result.error)
-
-            value = result.default_value(None)
-            if value is None:
-                return Error(Exception("Failed to select option"))
-
-            if isinstance(value, dict) and not value.get("success", False):
-                return Error(Exception(value.get("error", "Failed to select option")))
-
-            return Ok(None)
+                if result.is_error():
+                    return Error(result.error)
+                
+                return Ok(None)
         except Exception as e:
             logger.error(f"Error selecting option from {self.target_desc}: {e}")
             return Error(e)
