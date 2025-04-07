@@ -259,7 +259,7 @@ class Action(ABC, Generic[T]):
 
     # todo what should we retyurn
     # todo max number of parallel actions config
-    def __and__(self, other: "Action[S]") -> "Action[Tuple[T, S]]":
+    def __and__(self, other: "Action[S]") -> "Action[Tuple[Optional[T], Optional[S]]]":
         """
         Overload the & operator for parallel execution
 
@@ -270,10 +270,10 @@ class Action(ABC, Generic[T]):
         first_action = self
         second_action = other
 
-        class ParallelAction(Action[Tuple[T, S]]):
+        class ParallelAction(Action[Tuple[Optional[T], Optional[S]]]):
             async def execute(
                 self, context: ActionContext
-            ) -> Result[Tuple[T, S], Exception]:
+            ) -> Result[Tuple[Optional[T], Optional[S]], Exception]:
                 if not context.browser_manager:
                     return Error(
                         Exception(
@@ -341,6 +341,7 @@ class Action(ABC, Generic[T]):
                         return Error(result2.error)
 
                     # Extract values from successful results and return a tuple
+                    # successful tasks might return None
                     value1 = result1.default_value(None)
                     value2 = result2.default_value(None)
                     return Ok((value1, value2))
