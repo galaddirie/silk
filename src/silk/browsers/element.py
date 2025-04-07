@@ -9,7 +9,9 @@ from typing import (
     Generic,
     List,
     Optional,
+    Protocol,
     TypeVar,
+    runtime_checkable,
 )
 
 from expression.core import Result
@@ -24,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: remove the execute_script methods, these should be handled by the driver or in the implementation of this base class
-class ElementHandle(Generic[T], ABC):
+@runtime_checkable
+class ElementHandle(Generic[T], Protocol):
     """
     Represents a handle to an element in a web page.
 
