@@ -28,6 +28,11 @@ jobs:
           poetry config virtualenvs.create false
           poetry install --with dev
 
+      - name: Install Playwright
+        run: |
+          playwright install
+          playwright install-deps
+
       - name: Run tests
         run: |
           pytest --cov=silk tests/ -v
