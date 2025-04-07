@@ -5,18 +5,19 @@ Pytest fixtures for the Silk browser automation framework.
 import asyncio
 import os
 from pathlib import Path
-from typing import AsyncGenerator, Dict, Any, Optional
-from unittest.mock import MagicMock, AsyncMock, patch
+from typing import AsyncGenerator
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from expression.core import Error, Ok
 
 from silk.browsers.context import BrowserContext, BrowserPage
 from silk.browsers.driver import BrowserDriver
+from silk.browsers.drivers.playwright import PlaywrightDriver, PlaywrightElementHandle
 from silk.browsers.element import ElementHandle
 from silk.browsers.manager import BrowserManager
-from silk.browsers.drivers.playwright import PlaywrightDriver, PlaywrightElementHandle
 from silk.models.browser import ActionContext, BrowserOptions
+
 
 # todo remove async_ok and async_error with AsyncMock(Ok(value)) and AsyncMock(Error(error))
 # Helper functions to create awaitable results
@@ -49,18 +50,26 @@ def mock_element_handle() -> MagicMock:
     mock.get_html = AsyncMock(return_value=Ok("<div>Mock HTML</div>"))
     mock.get_attribute = AsyncMock(return_value=Ok("mock-attribute"))
     mock.get_property = AsyncMock(return_value=Ok("mock-property"))
-    mock.get_bounding_box = AsyncMock(return_value=Ok(
-        {"x": 10, "y": 20, "width": 100, "height": 50}
-    ))
+    mock.get_bounding_box = AsyncMock(
+        return_value=Ok({"x": 10, "y": 20, "width": 100, "height": 50})
+    )
     mock.click = AsyncMock(return_value=Ok(None))
     mock.fill = AsyncMock(return_value=Ok(None))
     mock.select = AsyncMock(return_value=Ok(None))
     mock.is_visible = AsyncMock(return_value=Ok(True))
     mock.is_enabled = AsyncMock(return_value=Ok(True))
-    mock.get_parent = AsyncMock(return_value=Ok(None))  # Will be set in specific tests if needed
-    mock.get_children = AsyncMock(return_value=Ok([]))  # Will be set in specific tests if needed
-    mock.query_selector = AsyncMock(return_value=Ok(None))  # Will be set in specific tests if needed
-    mock.query_selector_all = AsyncMock(return_value=Ok([]))  # Will be set in specific tests if needed
+    mock.get_parent = AsyncMock(
+        return_value=Ok(None)
+    )  # Will be set in specific tests if needed
+    mock.get_children = AsyncMock(
+        return_value=Ok([])
+    )  # Will be set in specific tests if needed
+    mock.query_selector = AsyncMock(
+        return_value=Ok(None)
+    )  # Will be set in specific tests if needed
+    mock.query_selector_all = AsyncMock(
+        return_value=Ok([])
+    )  # Will be set in specific tests if needed
     mock.scroll_into_view = AsyncMock(return_value=Ok(None))
 
     # Set up non-async methods
@@ -91,9 +100,15 @@ def mock_browser_driver() -> MagicMock:
     mock.reload = AsyncMock(return_value=Ok(None))
     mock.go_back = AsyncMock(return_value=Ok(None))
     mock.go_forward = AsyncMock(return_value=Ok(None))
-    mock.query_selector = AsyncMock(return_value=Ok(None))  # Will be set in specific tests
-    mock.query_selector_all = AsyncMock(return_value=Ok([]))  # Will be set in specific tests
-    mock.wait_for_selector = AsyncMock(return_value=Ok(None))  # Will be set in specific tests
+    mock.query_selector = AsyncMock(
+        return_value=Ok(None)
+    )  # Will be set in specific tests
+    mock.query_selector_all = AsyncMock(
+        return_value=Ok([])
+    )  # Will be set in specific tests
+    mock.wait_for_selector = AsyncMock(
+        return_value=Ok(None)
+    )  # Will be set in specific tests
     mock.wait_for_navigation = AsyncMock(return_value=Ok(None))
     mock.click = AsyncMock(return_value=Ok(None))
     mock.double_click = AsyncMock(return_value=Ok(None))
@@ -112,15 +127,15 @@ def mock_browser_driver() -> MagicMock:
     mock.key_up = AsyncMock(return_value=Ok(None))
     mock.get_element_text = AsyncMock(return_value=Ok("Mock Element Text"))
     mock.get_element_attribute = AsyncMock(return_value=Ok("mock-element-attribute"))
-    mock.get_element_bounding_box = AsyncMock(return_value=Ok(
-        {"x": 10, "y": 20, "width": 100, "height": 50}
-    ))
+    mock.get_element_bounding_box = AsyncMock(
+        return_value=Ok({"x": 10, "y": 20, "width": 100, "height": 50})
+    )
     mock.click_element = AsyncMock(return_value=Ok(None))
     mock.get_element_html = AsyncMock(return_value=Ok("<div>Mock Element HTML</div>"))
     mock.get_element_inner_text = AsyncMock(return_value=Ok("Mock Element Inner Text"))
-    mock.extract_table = AsyncMock(return_value=Ok(
-        [{"header1": "value1", "header2": "value2"}]
-    ))
+    mock.extract_table = AsyncMock(
+        return_value=Ok([{"header1": "value1", "header2": "value2"}])
+    )
 
     return mock
 
@@ -159,7 +174,9 @@ def mock_browser_page(mock_browser_driver) -> MagicMock:
     mock.wait_for_selector = AsyncMock(return_value=Ok(None))  # Set in specific tests
     mock.wait_for_navigation = AsyncMock(return_value=Ok(None))
     mock.screenshot = AsyncMock(return_value=Ok(Path("mock_screenshot.png")))
-    mock.get_page_source = AsyncMock(return_value=Ok("<html><body>Mock page</body></html>"))
+    mock.get_page_source = AsyncMock(
+        return_value=Ok("<html><body>Mock page</body></html>")
+    )
     mock.click = AsyncMock(return_value=Ok(None))
     mock.fill = AsyncMock(return_value=Ok(None))
     mock.double_click = AsyncMock(return_value=Ok(None))
@@ -315,7 +332,7 @@ def playwright_driver(browser_options) -> MagicMock:
     mock.reload = AsyncMock(return_value=Ok(None))
     mock.go_back = AsyncMock(return_value=Ok(None))
     mock.go_forward = AsyncMock(return_value=Ok(None))
-    
+
     # Mock element interaction methods
     mock.query_selector = AsyncMock()
     mock.query_selector_all = AsyncMock()
@@ -327,7 +344,7 @@ def playwright_driver(browser_options) -> MagicMock:
     mock.fill = AsyncMock(return_value=Ok(None))
     mock.select = AsyncMock(return_value=Ok(None))
     mock.execute_script = AsyncMock(return_value=Ok("mock-script-result"))
-    
+
     # Mock mouse and keyboard methods
     mock.mouse_move = AsyncMock(return_value=Ok(None))
     mock.mouse_down = AsyncMock(return_value=Ok(None))
@@ -338,13 +355,15 @@ def playwright_driver(browser_options) -> MagicMock:
     mock.key_press = AsyncMock(return_value=Ok(None))
     mock.key_down = AsyncMock(return_value=Ok(None))
     mock.key_up = AsyncMock(return_value=Ok(None))
-    
+
     # Element methods
     mock.get_element_text = AsyncMock(return_value=Ok("Mock Text"))
     mock.get_element_attribute = AsyncMock(return_value=Ok("mock-attribute"))
-    mock.get_element_bounding_box = AsyncMock(return_value=Ok({"x": 10, "y": 20, "width": 100, "height": 50}))
+    mock.get_element_bounding_box = AsyncMock(
+        return_value=Ok({"x": 10, "y": 20, "width": 100, "height": 50})
+    )
     mock.click_element = AsyncMock(return_value=Ok(None))
-    
+
     return mock
 
 
@@ -352,22 +371,24 @@ def playwright_driver(browser_options) -> MagicMock:
 def element_handle(playwright_driver) -> PlaywrightElementHandle:
     """Fixture to create a PlaywrightElementHandle with a mocked element reference."""
     mock_element_ref = MagicMock()
-    
+
     # Add necessary async methods to the element_ref
     mock_element_ref.text_content = AsyncMock(return_value="Test Text")
     mock_element_ref.get_attribute = AsyncMock(return_value="attribute-value")
     mock_element_ref.click = AsyncMock()
     mock_element_ref.fill = AsyncMock()
     mock_element_ref.is_visible = AsyncMock(return_value=True)
-    mock_element_ref.bounding_box = AsyncMock(return_value={"x": 10, "y": 20, "width": 100, "height": 50})
-    
+    mock_element_ref.bounding_box = AsyncMock(
+        return_value={"x": 10, "y": 20, "width": 100, "height": 50}
+    )
+
     element_handle = PlaywrightElementHandle(
         driver=playwright_driver,
         page_id="test-page",
         element_ref=mock_element_ref,
-        selector="#test-element"
+        selector="#test-element",
     )
-    
+
     return element_handle
 
 

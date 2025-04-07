@@ -4,7 +4,6 @@ from typing import Any, Dict, Optional, TypeVar
 from expression.core import Error, Ok, Result
 
 from silk.actions.base import Action
-from silk.browsers.context import BrowserContext, BrowserPage
 from silk.models.browser import ActionContext
 
 T = TypeVar("T")

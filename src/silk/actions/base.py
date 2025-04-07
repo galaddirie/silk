@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Awaitable,
     Callable,
     Generic,
+    Optional,
     ParamSpec,
     Tuple,
     TypeVar,
@@ -52,7 +52,6 @@ class Action(ABC, Generic[T]):
         """
         pass
 
-
     # todo we need a operation that runs a action on a list of items similar to airflow mapped tasks
     # todo improve the doc strings, explaination and examples
     def map(self, f: Callable[[T], S]) -> "Action[S]":
@@ -78,8 +77,9 @@ class Action(ABC, Generic[T]):
         return MappedAction()
 
     # todo we meed to fix this and_then should pass the context to the next action
-    # it should be similar to celery task chaining 
-    # maybe we use a simlar signature  modifier like action.s(immutable_value) ? or action("input",forward_value) or action(accept_value)
+    # it should be similar to celery task chaining
+    # maybe we use a simlar signature  modifier like action.s(immutable_value) ?
+    #  or action("input",forward_value) or action(accept_value)
     def and_then(self, f: Callable[[Optional[T]], "Action[S]"]) -> "Action[S]":
         """
         Chain an action after this one, using the result of this action
@@ -111,14 +111,13 @@ class Action(ABC, Generic[T]):
 
         return ChainedAction()
 
-
     def then(self, next_action: "Action[S]") -> "Action[S]":
         """
         Chain an action after this one, ignoring the result of this action
-        
+
         Args:
             next_action: Action to execute after this one completes
-                
+
         Returns:
             A new Action that chains the two actions sequentially
         """
@@ -138,7 +137,6 @@ class Action(ABC, Generic[T]):
                     return Error(e)
 
         return SequentialAction()
-
 
     def retry(self, max_attempts: int = 3, delay_ms: int = 1000) -> "Action[T]":
         """
@@ -259,12 +257,16 @@ class Action(ABC, Generic[T]):
 
         return FallbackAction()
 
+    # todo what should we retyurn
+    # todo max number of parallel actions config
     def __and__(self, other: "Action[S]") -> "Action[Tuple[T, S]]":
         """
         Overload the & operator for parallel execution
 
         a & b means "execute actions a and b in parallel with separate contexts"
         """
+        from expression.core import Ok  # Make sure Ok is imported
+
         first_action = self
         second_action = other
 
@@ -324,28 +326,24 @@ class Action(ABC, Generic[T]):
                         metadata={"parallel_execution": "second_action"},
                     )
 
+                    # Execute both actions in parallel
                     results = await asyncio.gather(
                         first_action.execute(action_context1),
                         second_action.execute(action_context2),
+                        return_exceptions=False,
                     )
-
-                    if any(isinstance(r, Exception) for r in results):
-                        for r in results:
-                            if isinstance(r, Exception):
-                                return Error(r)
 
                     result1, result2 = results[0], results[1]
 
                     if result1.is_error():
-                        return cast(
-                            Result[Tuple[T, S], Exception], Error(result1.error)
-                        )
+                        return Error(result1.error)
                     if result2.is_error():
-                        return cast(
-                            Result[Tuple[T, S], Exception], Error(result2.error)
-                        )
+                        return Error(result2.error)
 
-                    return Error(Exception("Unexpected error in parallel execution"))
+                    # Extract values from successful results and return a tuple
+                    value1 = result1.default_value(None)
+                    value2 = result2.default_value(None)
+                    return Ok((value1, value2))
                 except Exception as e:
                     return Error(e)
                 finally:
@@ -354,6 +352,7 @@ class Action(ABC, Generic[T]):
                     if second_context_id and context.browser_manager:
                         await context.browser_manager.close_context(second_context_id)
 
+        # Make sure to return an instance of the ParallelAction class
         return ParallelAction()
 
     def __call__(

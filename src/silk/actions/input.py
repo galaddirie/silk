@@ -789,14 +789,18 @@ class Select(Action[None]):
                 result = await page.execute_script(
                     script, center_x, center_y, self.value, self.text
                 )
-                
+
                 if result.is_error():
                     return Error(result.error)
-                
+
                 script_result = result.default_value(None)
-                if isinstance(script_result, dict) and not script_result.get("success", False):
-                    return Error(Exception(script_result.get("error", "Failed to select option")))
-                
+                if isinstance(script_result, dict) and not script_result.get(
+                    "success", False
+                ):
+                    return Error(
+                        Exception(script_result.get("error", "Failed to select option"))
+                    )
+
                 return Ok(None)
             elif isinstance(self.target, SelectorGroup):
                 for selector in self.target.selectors:
@@ -816,7 +820,7 @@ class Select(Action[None]):
                 result = await page.select(selector_value, self.value, self.text)
                 if result.is_error():
                     return Error(result.error)
-                
+
                 return Ok(None)
         except Exception as e:
             logger.error(f"Error selecting option from {self.target_desc}: {e}")

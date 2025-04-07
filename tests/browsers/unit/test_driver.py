@@ -2,27 +2,26 @@
 Tests for the BrowserDriver abstract class.
 """
 
-import pytest
-from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+import pytest
 from expression.core import Error, Ok, Result
-from unittest.mock import MagicMock, patch
 
 from silk.browsers.driver import BrowserDriver
+from silk.browsers.element import ElementHandle
 from silk.models.browser import (
     BrowserOptions,
     ClickOptions,
+    CoordinateType,
     DragOptions,
     KeyPressOptions,
+    MouseButtonLiteral,
     MouseMoveOptions,
     NavigationOptions,
     TypeOptions,
     WaitOptions,
 )
-from silk.models.browser import MouseButtonLiteral, CoordinateType
-from silk.browsers.element import ElementHandle
-from silk.browsers.context import BrowserContext
-
 
 
 class MockBrowserDriver(BrowserDriver):
@@ -43,7 +42,9 @@ class MockBrowserDriver(BrowserDriver):
         self.closed = True
         return Ok(None)
 
-    async def create_context(self, options: Optional[Dict[str, Any]] = None) -> Result[str, Exception]:
+    async def create_context(
+        self, options: Optional[Dict[str, Any]] = None
+    ) -> Result[str, Exception]:
         context_id = f"context-{len(self.contexts)}"
         self.contexts[context_id] = options or {}
         return Ok(context_id)
@@ -67,7 +68,9 @@ class MockBrowserDriver(BrowserDriver):
         del self.pages[page_id]
         return Ok(None)
 
-    async def goto(self, page_id: str, url: str, options: Optional[NavigationOptions] = None) -> Result[None, Exception]:
+    async def goto(
+        self, page_id: str, url: str, options: Optional[NavigationOptions] = None
+    ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
@@ -82,7 +85,9 @@ class MockBrowserDriver(BrowserDriver):
             return Error(Exception(f"Page {page_id} not found"))
         return Ok("<html><body>Test</body></html>")
 
-    async def screenshot(self, page_id: str, path: Optional[Path] = None) -> Result[Union[Path, bytes], Exception]:
+    async def screenshot(
+        self, page_id: str, path: Optional[Path] = None
+    ) -> Result[Union[Path, bytes], Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(Path("test.png") if path else b"mock_screenshot_data")
@@ -102,132 +107,223 @@ class MockBrowserDriver(BrowserDriver):
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def query_selector(self, page_id: str, selector: str) -> Result[Optional[ElementHandle], Exception]:
+    async def query_selector(
+        self, page_id: str, selector: str
+    ) -> Result[Optional[ElementHandle], Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def query_selector_all(self, page_id: str, selector: str) -> Result[List[ElementHandle], Exception]:
+    async def query_selector_all(
+        self, page_id: str, selector: str
+    ) -> Result[List[ElementHandle], Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok([])
 
-    async def wait_for_selector(self, page_id: str, selector: str, options: Optional[WaitOptions] = None) -> Result[Optional[ElementHandle], Exception]:
+    async def wait_for_selector(
+        self, page_id: str, selector: str, options: Optional[WaitOptions] = None
+    ) -> Result[Optional[ElementHandle], Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def wait_for_navigation(self, page_id: str, options: Optional[NavigationOptions] = None) -> Result[None, Exception]:
+    async def wait_for_navigation(
+        self, page_id: str, options: Optional[NavigationOptions] = None
+    ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def click(self, page_id: str, selector: str, options: Optional[ClickOptions] = None) -> Result[None, Exception]:
+    async def click(
+        self, page_id: str, selector: str, options: Optional[ClickOptions] = None
+    ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def double_click(self, page_id: str, selector: str, options: Optional[ClickOptions] = None) -> Result[None, Exception]:
+    async def double_click(
+        self, page_id: str, selector: str, options: Optional[ClickOptions] = None
+    ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def type(self, page_id: str, selector: str, text: str, options: Optional[TypeOptions] = None) -> Result[None, Exception]:
+    async def type(
+        self,
+        page_id: str,
+        selector: str,
+        text: str,
+        options: Optional[TypeOptions] = None,
+    ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def fill(self, page_id: str, selector: str, text: str, options: Optional[TypeOptions] = None) -> Result[None, Exception]:
+    async def fill(
+        self,
+        page_id: str,
+        selector: str,
+        text: str,
+        options: Optional[TypeOptions] = None,
+    ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def select(self, page_id: str, selector: str, value: Optional[str] = None, text: Optional[str] = None) -> Result[None, Exception]:
+    async def select(
+        self,
+        page_id: str,
+        selector: str,
+        value: Optional[str] = None,
+        text: Optional[str] = None,
+    ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def execute_script(self, page_id: str, script: str, *args: Any) -> Result[Any, Exception]:
+    async def execute_script(
+        self, page_id: str, script: str, *args: Any
+    ) -> Result[Any, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def mouse_move(self, context_id: str, x: int, y: int, options: Optional[MouseMoveOptions] = None) -> Result[None, Exception]:
+    async def mouse_move(
+        self,
+        context_id: str,
+        x: int,
+        y: int,
+        options: Optional[MouseMoveOptions] = None,
+    ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
-    async def mouse_down(self, context_id: str, button: MouseButtonLiteral = "left", options: Optional[MouseMoveOptions] = None) -> Result[None, Exception]:
+    async def mouse_down(
+        self,
+        context_id: str,
+        button: MouseButtonLiteral = "left",
+        options: Optional[MouseMoveOptions] = None,
+    ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
-    async def mouse_up(self, context_id: str, button: MouseButtonLiteral = "left", options: Optional[MouseMoveOptions] = None) -> Result[None, Exception]:
+    async def mouse_up(
+        self,
+        context_id: str,
+        button: MouseButtonLiteral = "left",
+        options: Optional[MouseMoveOptions] = None,
+    ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
-    async def mouse_click(self, context_id: str, button: MouseButtonLiteral = "left", options: Optional[MouseMoveOptions] = None) -> Result[None, Exception]:
+    async def mouse_click(
+        self,
+        context_id: str,
+        button: MouseButtonLiteral = "left",
+        options: Optional[MouseMoveOptions] = None,
+    ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
-    async def mouse_double_click(self, context_id: str, x: int, y: int, options: Optional[MouseMoveOptions] = None) -> Result[None, Exception]:
+    async def mouse_double_click(
+        self,
+        context_id: str,
+        x: int,
+        y: int,
+        options: Optional[MouseMoveOptions] = None,
+    ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
-    async def mouse_drag(self, context_id: str, source: Union[str, ElementHandle, CoordinateType], target: Union[str, ElementHandle, CoordinateType], options: Optional[DragOptions] = None) -> Result[None, Exception]:
+    async def mouse_drag(
+        self,
+        context_id: str,
+        source: Union[str, ElementHandle, CoordinateType],
+        target: Union[str, ElementHandle, CoordinateType],
+        options: Optional[DragOptions] = None,
+    ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
-    async def key_press(self, context_id: str, key: str, options: Optional[KeyPressOptions] = None) -> Result[None, Exception]:
+    async def key_press(
+        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+    ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
-    async def key_down(self, context_id: str, key: str, options: Optional[KeyPressOptions] = None) -> Result[None, Exception]:
+    async def key_down(
+        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+    ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
-    async def key_up(self, context_id: str, key: str, options: Optional[KeyPressOptions] = None) -> Result[None, Exception]:
+    async def key_up(
+        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+    ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
-    async def get_element_text(self, page_id: str, element: ElementHandle) -> Result[str, Exception]:
+    async def get_element_text(
+        self, page_id: str, element: ElementHandle
+    ) -> Result[str, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok("Test Text")
 
-    async def get_element_attribute(self, page_id: str, element: ElementHandle, name: str) -> Result[Optional[str], Exception]:
+    async def get_element_attribute(
+        self, page_id: str, element: ElementHandle, name: str
+    ) -> Result[Optional[str], Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok("test-attribute")
 
-    async def get_element_bounding_box(self, page_id: str, element: ElementHandle) -> Result[Dict[str, float], Exception]:
+    async def get_element_bounding_box(
+        self, page_id: str, element: ElementHandle
+    ) -> Result[Dict[str, float], Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok({"x": 0, "y": 0, "width": 100, "height": 100})
 
-    async def click_element(self, page_id: str, element: ElementHandle) -> Result[None, Exception]:
+    async def click_element(
+        self, page_id: str, element: ElementHandle
+    ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
-    async def get_element_html(self, page_id: str, element: ElementHandle, outer: bool = True) -> Result[str, Exception]:
+    async def get_element_html(
+        self, page_id: str, element: ElementHandle, outer: bool = True
+    ) -> Result[str, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok("<div>Test</div>")
 
-    async def get_element_inner_text(self, page_id: str, element: ElementHandle) -> Result[str, Exception]:
+    async def get_element_inner_text(
+        self, page_id: str, element: ElementHandle
+    ) -> Result[str, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok("Test Inner Text")
 
-    async def extract_table(self, page_id: str, table_element: ElementHandle, include_headers: bool = True, header_selector: str = "th", row_selector: str = "tr", cell_selector: str = "td") -> Result[List[Dict[str, str]], Exception]:
+    async def extract_table(
+        self,
+        page_id: str,
+        table_element: ElementHandle,
+        include_headers: bool = True,
+        header_selector: str = "th",
+        row_selector: str = "tr",
+        cell_selector: str = "td",
+    ) -> Result[List[Dict[str, str]], Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok([{"header1": "value1", "header2": "value2"}])
@@ -326,7 +422,9 @@ class TestBrowserDriver:
         assert result.is_ok()
         assert result.default_value(None) == "Test Text"
 
-        result = await driver.get_element_attribute(page_id, mock_element_handle, "test")
+        result = await driver.get_element_attribute(
+            page_id, mock_element_handle, "test"
+        )
         assert result.is_ok()
         assert result.default_value(None) == "test-attribute"
 
@@ -411,4 +509,4 @@ class TestBrowserDriver:
         result = await driver.screenshot(page_id)
         assert result.is_ok()
         assert isinstance(result.default_value(None), bytes)
-        assert result.default_value(None) == b"mock_screenshot_data" 
+        assert result.default_value(None) == b"mock_screenshot_data"
