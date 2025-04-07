@@ -11,7 +11,7 @@ from silk.browsers.driver import BrowserDriver
 from silk.browsers.driver_factory import create_driver, ValidDriverTypes
 from silk.models.browser import BrowserOptions, ActionContext
 from silk.actions.base import Action
-from silk.browsers.context import BrowserContext  # Added missing import
+from silk.browsers.context import BrowserContext
 
 
 if TYPE_CHECKING:

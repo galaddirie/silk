@@ -7,7 +7,6 @@ import logging
 import asyncio
 from expression.core import Result, Ok, Error
 
-# Playwright imports
 from playwright.async_api import (
     async_playwright, Playwright, Browser, BrowserContext as PlaywrightContext,
     Page, ElementHandle as PlaywrightNativeElement, Response,
