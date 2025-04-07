@@ -4,13 +4,13 @@ Playwright implementation of the browser driver and element handle for Silk.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast, Sequence, Mapping, Pattern
 
 from expression.core import Error, Ok, Result
 from playwright.async_api import Browser
 from playwright.async_api import BrowserContext as PlaywrightContext
 from playwright.async_api import ElementHandle as PlaywrightNativeElement
-from playwright.async_api import Page, Playwright
+from playwright.async_api import Page, Playwright, JSHandle
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
@@ -25,6 +25,7 @@ from silk.models.browser import (
     MouseButtonLiteral,
     MouseMoveOptions,
     NavigationOptions,
+    NavigationWaitLiteral,
     TypeOptions,
     WaitOptions,
 )
@@ -34,7 +35,9 @@ logger = logging.getLogger(__name__)
 ContextEntry = Tuple[str, PlaywrightContext]
 PageEntry = Tuple[str, Page]
 
-
+# TODO for ease of access all methods should accept both context and page, 
+# this avoids situations where some automation libraries need a page and others need a context
+# ex we have pages[0]  instead of getting the page via page_id
 class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
     """
     Playwright implementation of the element handle.
@@ -135,11 +138,8 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
     ) -> Result[None, Exception]:
         """Fill this element with the given text."""
         try:
-            fill_options = {}
-            if options and options.delay is not None:
-                fill_options["timeout"] = options.delay
-
-            await self.element_ref.fill(text, **fill_options)
+            # Playwright's fill doesn't take a delay parameter, only a timeout
+            await self.element_ref.fill(text)
             return Ok(None)
         except Exception as e:
             logger.error(f"Error filling element: {e}")
@@ -181,20 +181,24 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
         """Get the parent element."""
         try:
             parent = await self.element_ref.evaluate_handle("el => el.parentElement")
-            if parent is None or await parent.is_null():
+            # Check if the handle is null
+            if parent is None or await parent.evaluate("handle => handle === null"):
                 return Ok(None)
 
-            parent_element = cast(PlaywrightElementHandle, parent)
+            # Cast to the correct type
+            parent_element = cast(PlaywrightNativeElement, parent)
             return Ok(
                 PlaywrightElementHandle(
-                    driver=self.driver, page_id=self.page_id, element_ref=parent_element
+                    driver=cast(PlaywrightDriver, self.driver), 
+                    page_id=self.page_id, 
+                    element_ref=parent_element
                 )
             )
         except Exception as e:
             logger.error(f"Error getting parent element: {e}")
             return Error(e)
 
-    async def get_children(self) -> Result[List[ElementHandle], Exception]:
+    async def get_children(self) -> Result[list[ElementHandle], Exception]:
         """Get all child elements."""
         try:
             children = await self.element_ref.evaluate_handle(
@@ -202,13 +206,14 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
             )
             children_array = await children.evaluate("arr => arr.map((_, i) => i)")
 
-            result_children = []
+            result_children: list[ElementHandle] = []
             for i in range(len(children_array)):
                 child_handle = await children.evaluate_handle(f"arr => arr[{i}]")
-                child_element = cast(PlaywrightElementHandle, child_handle)
+                # Cast to the correct type
+                child_element = cast(PlaywrightNativeElement, child_handle)
                 result_children.append(
                     PlaywrightElementHandle(
-                        driver=self.driver,
+                        driver=cast(PlaywrightDriver, self.driver),
                         page_id=self.page_id,
                         element_ref=child_element,
                     )
@@ -230,7 +235,7 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
 
             return Ok(
                 PlaywrightElementHandle(
-                    driver=self.driver,
+                    driver=cast(PlaywrightDriver, self.driver),
                     page_id=self.page_id,
                     element_ref=element,
                     selector=selector,
@@ -242,16 +247,16 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
 
     async def query_selector_all(
         self, selector: str
-    ) -> Result[List[ElementHandle], Exception]:
+    ) -> Result[list[ElementHandle], Exception]:
         """Find all descendant elements matching the selector."""
         try:
             elements = await self.element_ref.query_selector_all(selector)
-            result_elements = []
+            result_elements: list[ElementHandle] = []
 
             for element in elements:
                 result_elements.append(
                     PlaywrightElementHandle(
-                        driver=self.driver,
+                        driver=cast(PlaywrightDriver, self.driver),
                         page_id=self.page_id,
                         element_ref=element,
                         selector=selector,
@@ -295,20 +300,26 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
         try:
             self.playwright = await async_playwright().start()
 
-            browser_type = self.options.browser_type or "chromium"
+            # Default to chromium if not specified
+            browser_type = getattr(self.options, "browser_type", "chromium")
             if browser_type == "chrome":
                 browser_type = "chromium"
 
-            launch_options = {
+            # Prepare launch options as a proper dictionary
+            launch_options: Dict[str, Any] = {
                 "headless": self.options.headless,
             }
 
-            if self.options.slow_mo:
-                launch_options["slow_mo"] = self.options.slow_mo
+            # Add slow_mo if it exists
+            slow_mo = getattr(self.options, "slow_mo", None)
+            if slow_mo is not None:
+                launch_options["slow_mo"] = slow_mo
 
+            # Add proxy if specified
             if self.options.proxy:
                 launch_options["proxy"] = {"server": self.options.proxy}
 
+            # Launch the appropriate browser
             if browser_type == "chromium":
                 self.browser = await self.playwright.chromium.launch(**launch_options)
             elif browser_type == "firefox":
@@ -358,31 +369,44 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
                 return Error(launch_result.error)
 
         try:
-            context_options = {}
+            context_options: Dict[str, Any] = {}
 
+            # Set viewport
             if self.options.viewport_width and self.options.viewport_height:
                 context_options["viewport"] = {
                     "width": self.options.viewport_width,
                     "height": self.options.viewport_height,
                 }
 
-            if self.options.locale:
-                context_options["locale"] = self.options.locale
+            # Set locale
+            locale = getattr(self.options, "locale", None)
+            if locale:
+                context_options["locale"] = locale
 
-            if self.options.timezone:
-                context_options["timezone_id"] = self.options.timezone
+            # Set timezone
+            timezone = getattr(self.options, "timezone", None)
+            if timezone:
+                context_options["timezone_id"] = timezone
 
+            # Set user agent
             if self.options.user_agent:
                 context_options["user_agent"] = self.options.user_agent
 
+            # Merge additional options
             if options:
                 context_options.update(options)
 
+            # Create the context
+            if not self.browser:
+                return Error(Exception("Browser is not initialized"))
+                
             context = await self.browser.new_context(**context_options)
 
+            # Set default timeout
             if self.options.timeout:
                 context.set_default_timeout(self.options.timeout)
 
+            # Generate unique context ID
             context_id = f"context-{len(self.contexts) + 1}"
             self.contexts[context_id] = context
 
@@ -398,6 +422,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not context:
                 return Error(Exception(f"Context with ID '{context_id}' not found"))
 
+            # Remove all pages associated with this context
             pages_to_remove = []
             for page_id, page in self.pages.items():
                 if page.context == context:
@@ -406,6 +431,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             for page_id in pages_to_remove:
                 self.pages.pop(page_id, None)
 
+            # Close the context
             await context.close()
             self.contexts.pop(context_id, None)
 
@@ -421,11 +447,14 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not context:
                 return Error(Exception(f"Context with ID '{context_id}' not found"))
 
+            # Create new page
             page = await context.new_page()
 
+            # Set default timeout
             if self.options.timeout:
                 page.set_default_timeout(self.options.timeout)
 
+            # Generate unique page ID
             page_id = f"page-{len(self.pages) + 1}"
             self.pages[page_id] = page
 
@@ -441,6 +470,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
+            # Close the page
             await page.close()
             self.pages.pop(page_id, None)
 
@@ -458,22 +488,23 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
-            goto_options = {}
+            goto_options: Dict[str, Any] = {}
 
             if options:
+                # Set timeout if provided
                 if options.timeout:
                     goto_options["timeout"] = options.timeout
 
+                # Set wait_until if provided
                 if options.wait_until:
-                    if options.wait_until == "load":
-                        goto_options["wait_until"] = "load"
-                    elif options.wait_until == "domcontentloaded":
-                        goto_options["wait_until"] = "domcontentloaded"
-                    elif options.wait_until == "networkidle":
-                        goto_options["wait_until"] = "networkidle"
-                    elif options.wait_until == "commit":
-                        goto_options["wait_until"] = "commit"
+                    # Map wait_until values to Playwright's expected values
+                    goto_options["wait_until"] = options.wait_until
 
+                # Set referer if provided
+                if options.referer:
+                    goto_options["referer"] = options.referer
+
+            # Navigate to URL
             await page.goto(url, **goto_options)
             return Ok(None)
         except PlaywrightTimeoutError as e:
@@ -521,7 +552,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             if path:
                 screenshot_options["path"] = str(path)
-                await page.screenshot(screenshot_options)
+                await page.screenshot(**screenshot_options)
                 return Ok(path)
             else:
                 screenshot_bytes = await page.screenshot()
@@ -593,7 +624,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
     async def query_selector_all(
         self, page_id: str, selector: str
-    ) -> Result[List[ElementHandle], Exception]:
+    ) -> Result[list[ElementHandle], Exception]:
         """Query all elements that match the provided selector in a page."""
         try:
             page = self.pages.get(page_id)
@@ -601,10 +632,10 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
             elements = await page.query_selector_all(selector)
-            result = []
+            result_elements: list[ElementHandle] = []
 
             for element in elements:
-                result.append(
+                result_elements.append(
                     PlaywrightElementHandle(
                         driver=self,
                         page_id=page_id,
@@ -613,7 +644,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
                     )
                 )
 
-            return Ok(result)
+            return Ok(result_elements)
         except Exception as e:
             logger.error(f"Error querying selector all '{selector}': {e}")
             return Error(e)
@@ -627,22 +658,18 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
-            wait_options = {}
+            wait_options: Dict[str, Any] = {}
 
             if options:
+                # Set timeout if provided
                 if options.timeout:
                     wait_options["timeout"] = options.timeout
 
+                # Set state if provided
                 if options.state:
-                    if options.state == "visible":
-                        wait_options["state"] = "visible"
-                    elif options.state == "hidden":
-                        wait_options["state"] = "hidden"
-                    elif options.state == "attached":
-                        wait_options["state"] = "attached"
-                    elif options.state == "detached":
-                        wait_options["state"] = "detached"
+                    wait_options["state"] = options.state
 
+            # Wait for selector
             element = await page.wait_for_selector(selector, **wait_options)
             if element is None:
                 return Ok(None)
@@ -668,23 +695,18 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
-            wait_options = {}
+            wait_until: NavigationWaitLiteral = "load"
 
-            if options:
-                if options.timeout:
-                    wait_options["timeout"] = options.timeout
+            if options and options.wait_until:
+                wait_until = options.wait_until
+            
+            # Set timeout
+            timeout = None
+            if options and options.timeout is not None:
+                timeout = options.timeout
 
-                if options.wait_until:
-                    if options.wait_until == "load":
-                        wait_options["wait_until"] = "load"
-                    elif options.wait_until == "domcontentloaded":
-                        wait_options["wait_until"] = "domcontentloaded"
-                    elif options.wait_until == "networkidle":
-                        wait_options["wait_until"] = "networkidle"
-                    elif options.wait_until == "commit":
-                        wait_options["wait_until"] = "commit"
-
-            await page.wait_for_load_state(wait_options.get("wait_until", "load"))
+            # Wait for navigation to complete
+            await page.wait_for_load_state(wait_until, timeout=timeout)
             return Ok(None)
         except PlaywrightTimeoutError as e:
             logger.error(f"Timeout waiting for navigation: {e}")
@@ -702,29 +724,32 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
-            click_options = {}
+            click_options: Dict[str, Any] = {}
 
             if options:
+                # Set button if provided
                 if options.button:
-                    if options.button == "left":
-                        click_options["button"] = "left"
-                    elif options.button == "middle":
-                        click_options["button"] = "middle"
-                    elif options.button == "right":
-                        click_options["button"] = "right"
+                    click_options["button"] = options.button
 
-                if options.click_count:
+                # Set click_count if provided
+                if hasattr(options, "click_count") and options.click_count is not None:
                     click_options["click_count"] = options.click_count
 
-                if options.delay:
-                    click_options["delay"] = options.delay
+                # Set delay if provided
+                delay = getattr(options, "delay_between_ms", None)
+                if delay is not None:
+                    click_options["delay"] = delay
 
+                # Set timeout if provided
                 if options.timeout:
                     click_options["timeout"] = options.timeout
 
-                if options.force:
-                    click_options["force"] = options.force
+                # Set force if provided
+                force = getattr(options, "force", None)
+                if force is not None:
+                    click_options["force"] = force
 
+            # Click the element
             await page.click(selector, **click_options)
             return Ok(None)
         except PlaywrightTimeoutError as e:
@@ -743,29 +768,34 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
-            click_options = {}
+            click_options: Dict[str, Any] = {}
 
             if options:
+                # Set button if provided
                 if options.button:
-                    if options.button == "left":
-                        click_options["button"] = "left"
-                    elif options.button == "middle":
-                        click_options["button"] = "middle"
-                    elif options.button == "right":
-                        click_options["button"] = "right"
+                    click_options["button"] = options.button
 
-                if options.delay:
-                    click_options["delay"] = options.delay
+                # Set delay if provided
+                delay = getattr(options, "delay_between_ms", None)
+                if delay is not None:
+                    click_options["delay"] = delay
 
+                # Set timeout if provided
                 if options.timeout:
                     click_options["timeout"] = options.timeout
 
-                if options.force:
-                    click_options["force"] = options.force
+                # Set force if provided
+                force = getattr(options, "force", None)
+                if force is not None:
+                    click_options["force"] = force
 
-            click_options["click_count"] = 2
+                # Set position_offset if provided
+                position_offset = getattr(options, "position_offset", None)
+                if position_offset is not None:
+                    click_options["position"] = {"x": position_offset[0], "y": position_offset[1]}
 
-            await page.click(selector, **click_options)
+            # Double-click the element
+            await page.dblclick(selector, **click_options)
             return Ok(None)
         except PlaywrightTimeoutError as e:
             logger.error(f"Timeout double clicking element '{selector}': {e}")
@@ -787,15 +817,18 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
-            type_options = {}
+            type_options: Dict[str, Any] = {}
 
             if options:
-                if options.delay:
+                # Set delay if provided
+                if options.delay is not None:
                     type_options["delay"] = options.delay
 
-                if options.timeout:
+                # Set timeout if provided
+                if options.timeout is not None:
                     type_options["timeout"] = options.timeout
 
+            # Type the text
             await page.type(selector, text, **type_options)
             return Ok(None)
         except PlaywrightTimeoutError as e:
@@ -818,12 +851,17 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
-            fill_options = {}
+            # Note: Playwright's fill() only accepts one optional parameter: force (boolean)
+            force = False
+            timeout = None
 
-            if options and options.timeout:
-                fill_options["timeout"] = options.timeout
+            if options:
+                # Set timeout if provided
+                if options.timeout is not None:
+                    timeout = options.timeout
 
-            await page.fill(selector, text, **fill_options)
+            # Fill the element
+            await page.fill(selector, text, timeout=timeout)
             return Ok(None)
         except PlaywrightTimeoutError as e:
             logger.error(f"Timeout filling element '{selector}': {e}")
@@ -845,7 +883,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
-            select_options = {}
+            select_options: Dict[str, Any] = {}
 
             if value is not None:
                 select_options["value"] = value
@@ -854,6 +892,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             else:
                 return Error(Exception("Either value or text must be provided"))
 
+            # Select the option
             await page.select_option(selector, **select_options)
             return Ok(None)
         except PlaywrightTimeoutError as e:
@@ -872,6 +911,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             if not page:
                 return Error(Exception(f"Page with ID '{page_id}' not found"))
 
+            # Execute the script
             result = await page.evaluate(script, *args)
             return Ok(result)
         except Exception as e:
@@ -897,10 +937,11 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             page = pages[0]
 
-            move_options = {}
+            move_options: Dict[str, Any] = {}
             if options and options.steps:
                 move_options["steps"] = options.steps
 
+            # Move the mouse
             await page.mouse.move(x, y, **move_options)
             return Ok(None)
         except Exception as e:
@@ -925,13 +966,8 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             page = pages[0]
 
-            playwright_button = "left"
-            if button == "middle":
-                playwright_button = "middle"
-            elif button == "right":
-                playwright_button = "right"
-
-            await page.mouse.down(button=playwright_button)
+            # Press the mouse button
+            await page.mouse.down(button=button)
             return Ok(None)
         except Exception as e:
             logger.error(f"Error pressing mouse button '{button}': {e}")
@@ -955,13 +991,8 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             page = pages[0]
 
-            playwright_button = "left"
-            if button == "middle":
-                playwright_button = "middle"
-            elif button == "right":
-                playwright_button = "right"
-
-            await page.mouse.up(button=playwright_button)
+            # Release the mouse button
+            await page.mouse.up(button=button)
             return Ok(None)
         except Exception as e:
             logger.error(f"Error releasing mouse button '{button}': {e}")
@@ -985,14 +1016,9 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             page = pages[0]
 
-            playwright_button = "left"
-            if button == "middle":
-                playwright_button = "middle"
-            elif button == "right":
-                playwright_button = "right"
-
-            await page.mouse.down(button=playwright_button)
-            await page.mouse.up(button=playwright_button)
+            # Press and release the mouse button
+            await page.mouse.down(button=button)
+            await page.mouse.up(button=button)
             return Ok(None)
         except Exception as e:
             logger.error(f"Error clicking mouse button '{button}': {e}")
@@ -1017,13 +1043,15 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             page = pages[0]
 
-            move_options = {}
+            move_options: Dict[str, Any] = {}
             if options and options.steps:
                 move_options["steps"] = options.steps
 
+            # Move the mouse to the specified coordinates
             await page.mouse.move(x, y, **move_options)
 
-            await page.mouse.dblclick()
+            # Double click
+            await page.mouse.dblclick(button="left", x=x, y=y)
             return Ok(None)
         except Exception as e:
             logger.error(f"Error double clicking at ({x}, {y}): {e}")
@@ -1048,16 +1076,22 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             page = pages[0]
 
+            # Get source coordinates
             source_x, source_y = await self._get_coordinates(page, source)
             if source_x is None or source_y is None:
                 return Error(Exception("Could not determine source coordinates"))
 
+            # Get target coordinates
             target_x, target_y = await self._get_coordinates(page, target)
             if target_x is None or target_y is None:
                 return Error(Exception("Could not determine target coordinates"))
 
-            steps = options.steps if options and options.steps is not None else 1
+            # Get steps
+            steps = 1
+            if options and options.steps is not None:
+                steps = options.steps
 
+            # Perform the drag operation
             await page.mouse.move(source_x, source_y, steps=steps)
             await page.mouse.down()
             await page.mouse.move(target_x, target_y, steps=steps)
@@ -1083,10 +1117,12 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             page = pages[0]
 
-            press_options = {}
-            if options and options.delay:
+            press_options: Dict[str, Any] = {}
+            # Set delay if provided
+            if options and hasattr(options, "delay") and options.delay is not None:
                 press_options["delay"] = options.delay
 
+            # Press the key
             await page.keyboard.press(key, **press_options)
             return Ok(None)
         except Exception as e:
@@ -1108,6 +1144,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             page = pages[0]
 
+            # Press and hold the key
             await page.keyboard.down(key)
             return Ok(None)
         except Exception as e:
@@ -1129,6 +1166,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
 
             page = pages[0]
 
+            # Release the key
             await page.keyboard.up(key)
             return Ok(None)
         except Exception as e:
