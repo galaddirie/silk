@@ -21,7 +21,7 @@ These can also be used through operators:
 
 from silk.actions.base import Action
 from silk.actions.composition import compose, fallback, parallel, pipe, sequence
-from silk.actions.control import (
+from silk.actions.flow import (
     branch,
     loop_until,
     retry,
