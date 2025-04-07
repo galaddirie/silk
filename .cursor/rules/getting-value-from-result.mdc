@@ -1,6 +1,0 @@
----
-description:
-globs:
-alwaysApply: true
----
-always use .default_value(<value>) instead of .value. Refer to expression refrence rules.
