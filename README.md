@@ -194,7 +194,7 @@ These operators make it easy to build complex scraping workflows with clear, rea
 
 ### Handling Complex Selectors
 
-Silk provides robust ways to handle changing website structures with selector groups:
+Silk provides robust ways to handle changing website structures with selector groups. Selector groups are a collection of selectors that are tried in order until one succeeds.
 
 ```python
 from silk.selectors.selector import SelectorGroup, css, xpath
