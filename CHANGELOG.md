@@ -1,24 +1,19 @@
 # Changelog
 
-## [Unreleased]
-
-### Added
-
-### Fixed
-
-### Changed
-
-
-## [Unreleased]
-
-### Added
-
-### Fixed
-
-### Changed
 
 
 All notable changes to this project will be documented in this file.
+
+
+## [0.1.2] - 2025-04-08
+
+### Added
+
+### Fixed
+- housekeeping, fixing imports, updating readme
+
+### Changed
+
 
 ## [0.1.1] - 2025-04-08
 
