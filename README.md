@@ -77,10 +77,10 @@ async def main():
         )
         
         # Execute the pipeline
-        result = await manager.execute_action(pipeline)
+        result = await pipeline(manager)
         
         if result.is_ok():
-            print(f"Page title: {result.unwrap()}")
+            print(f"Page title: {result.default_value(None)}")
         else:
             print(f"Error: {result.error}")
 
@@ -125,19 +125,27 @@ async def extract_price(context, selector):
     if page_result.is_error():
         return page_result
         
-    page = page_result.unwrap()
+    page = page_result.default_value(None)
+    if page is None:
+        return Error("No page found")   
+    
     element_result = await page.query_selector(selector)
     
     if element_result.is_error():
         return Error(f"Element not found: {selector}")
         
-    element = element_result.unwrap()
+    element = element_result.default_value(None)
+    if element is None:
+        return Error("No element found")
+    
     text_result = await element.get_text()
     
     if text_result.is_error():
         return text_result
         
-    text = text_result.unwrap()
+    text = text_result.default_value(None)
+    if text is None:
+        return Error("No text found")
     
     try:
         # Remove currency symbol and convert to float
@@ -166,7 +174,10 @@ class FindElement(Action[ElementHandle]):
             if page_result.is_error():
                 return page_result
                 
-            page = page_result.unwrap()
+            page = page_result.default_value(None)
+            if page is None:
+                return Error("No page found")
+            
             return await page.query_selector(self.selector)
         except Exception as e:
             return Error(e)
@@ -200,7 +211,7 @@ Silk provides robust ways to handle changing website structures with selector gr
 from silk.selectors.selector import SelectorGroup, css, xpath
 
 # Create a selector group with fallback options
-product_price = SelectorGroup.create(
+product_price = SelectorGroup(
     "product_price",
     css(".current-price"),             # Try this first
     css(".product-price .amount"),     # Fall back to this
@@ -255,11 +266,15 @@ product_details = parallel(
 # Use in a pipeline
 pipeline = Navigate(product_url) >> product_details
 
-# Results come back as a Block collection
-result = await manager.execute_action(pipeline)
+# Results come back as a collection
+result = await pipeline(manager)
 if result.is_ok():
-    [name, price, image_url, description] = result.unwrap()
-    print(f"Product: {name}, Price: {price}")
+    product_details = result.default_value(None)
+    if product_details is None:
+        print("No product details found")
+    else:
+        [name, price, image_url, description] = product_details
+        print(f"Product: {name}, Price: {price}")
 ```
 
 ### Form Filling and Submission
@@ -328,7 +343,7 @@ pipeline = (
 
 result = await pipeline(browser)
 if result.is_ok():
-    print(f"Extracted text after scrolling: {result.unwrap()}")
+    print(f"Extracted text after scrolling: {result.default_value(None)}")
 ```
 
 ## Composable Operations
@@ -382,6 +397,108 @@ Navigate(url) & Navigate(url2) & Navigate(url3)
 ```python
 # Try to extract with one selector, fall back to another if it fails
 GetText(primary_selector) | GetText(fallback_selector)
+```
+
+Fallback operations are powerful tools for building resilient scraping pipelines. They allow you to try multiple scraping strategies and return the first successful result. in combination with SelectorGroups, you can create very robust scraping pipelines.
+
+```python
+from silk.actions.navigation import Navigate
+from silk.actions.extraction import GetText, GetAttribute, QueryAll, ExtractTable
+from silk.actions.input import Click
+from silk.actions.flow import wait, retry, fallback
+from silk.selectors.selector import SelectorGroup, css, xpath
+
+# Example: Advanced product information scraping with multiple strategies
+async def scrape_product(url, manager):
+    # Strategy 1: Direct extraction using primary selectors
+    primary_strategy = (
+        Navigate(url)
+        >> GetText(".product-title")
+    )
+    
+    # Strategy 2: Click on a tab first, then extract from revealed content
+    secondary_strategy = (
+        Navigate(url)
+        >> Click(".details-tab")
+        >> wait(500)  # Wait for tab content to load
+        >> GetText(".tab-content h1")
+    )
+    
+    # Strategy 3: Extract from structured JSON data in script tag
+    json_strategy = (
+        Navigate(url)
+        >> GetAttribute('script[type="application/ld+json"]', "textContent")
+        # Additional processing would parse the JSON and extract title
+    )
+    
+    # Combine all strategies with fallback operator
+    product_title_pipeline = (
+        primary_strategy | secondary_strategy | json_strategy
+    )
+    
+    # Multiple fallback approaches for price extraction
+    price_pipeline = (
+        # Try special sale price first
+        (Navigate(url) >> GetText(".special-price .price-amount"))
+        |
+        # Then try regular price
+        (Navigate(url) >> GetText(".regular-price"))
+        |
+        # Then try to extract from a pricing table
+        (Navigate(url) 
+         >> ExtractTable("#pricing-table")
+         # Additional processing would extract price from table data
+        )
+        |
+        # Last resort: Try to find price in any element containing "$"
+        (Navigate(url)
+         >> QueryAll("*:contains('$')")
+         # Additional processing would filter and extract price
+        )
+    )
+    
+    # Execute both pipelines
+    title_result = await product_title_pipeline(manager)
+    price_result = await price_pipeline(manager)
+    
+    return {
+        "title": title_result.default_value("Unknown Title"),
+        "price": price_result.default_value("Price Unavailable")
+    }
+
+# Example with SelectorGroups for even more resilience
+def build_robust_product_scraper(url):
+    # Create selector groups with multiple options
+    title_selectors = SelectorGroup(
+        "product_title",
+        css(".product-title"),
+        css("h1.title"),
+        xpath("//div[@class='product-info']//h1"),
+        css(".pdp-title")
+    )
+    
+    price_selectors = SelectorGroup(
+        "product_price",
+        css(".special-price .amount"),
+        css(".product-price"),
+        xpath("//span[contains(@class, 'price')]"),
+        css(".price-info .price")
+    )
+    
+    image_selectors = SelectorGroup(
+        "product_image",
+        css(".product-image-gallery img"),
+        css(".main-image"),
+        xpath("//div[contains(@class, 'gallery')]//img")
+    )
+    
+    # Use these groups in a pipeline with retries
+    return (
+        Navigate(url)
+        >> retry(GetText(title_selectors), max_attempts=3, delay_ms=1000)
+        >> retry(GetText(price_selectors), max_attempts=3, delay_ms=1000)
+        >> retry(GetAttribute(image_selectors, "src"), max_attempts=3, delay_ms=1000)
+    )
 ```
 
 ## API Reference
@@ -456,9 +573,9 @@ For a complete API reference, please see the [API documentation](https://silk-do
 Silk uses Railway-Oriented Programming for error handling. Instead of using try/except, leverage the Result type:
 
 ```python
-result = await manager.execute_action(pipeline)
+result = await pipeline(manager)
 if result.is_ok():
-    data = result.unwrap()
+    data = result.default_value(None)
     # Process the data
 else:
     # Handle the error
@@ -485,7 +602,7 @@ Use selector groups for resilient scraping that can handle UI changes:
 extract_price = GetText(".price-box .price")
 
 # Use a group with fallbacks:
-price_selector = SelectorGroup.create(
+price_selector = SelectorGroup(
     "price",
     css(".price-box .price"),
     css(".product-price"),

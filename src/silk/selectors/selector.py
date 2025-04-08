@@ -1,12 +1,9 @@
-# selectors/selector.py
 from enum import Enum
-from typing import Awaitable, Callable, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Awaitable, Callable, List, Optional, Tuple, TypeVar, Union
 
 from expression.core import Error, Result
-from pydantic import BaseModel, Field
 
 T = TypeVar("T")
-S = TypeVar("S")
 
 
 class SelectorType(str, Enum):
@@ -22,12 +19,13 @@ class SelectorType(str, Enum):
     LINK_TEXT = "link_text"
 
 
-class Selector(BaseModel):
+class Selector:
     """Model representing a selector for finding elements"""
 
-    type: SelectorType
-    value: str
-    timeout: Optional[int] = Field(default=None)
+    def __init__(self, type: SelectorType, value: str, timeout: Optional[int] = None):
+        self.type = type
+        self.value = value
+        self.timeout = timeout
 
     def get_type(self) -> SelectorType:
         return self.type
@@ -51,54 +49,41 @@ class Selector(BaseModel):
         return f"Selector(type={self.type}, value={self.value})"
 
 
-class SelectorGroup(BaseModel, Generic[T]):
+class SelectorGroup:
     """
     A group of selectors representing fallbacks for the same element.
 
     If one selector fails, the next one will be tried.
     """
 
-    name: str
-    selectors: List[Selector] = Field(default_factory=list)
-
-    @classmethod
-    def create_mixed(
-        cls, name: str, *selectors: Union[Selector, str, Tuple[str, str]]
-    ) -> "SelectorGroup[T]":
+    def __init__(self, name: str, *selectors: Union[Selector, str, Tuple[str, str]]):
         """
-        Create a selector group from mixed selector types.
+        Initialize a selector group with a name and selectors.
 
         Args:
             name: Name of the selector group
-            *selectors: Selectors to group. Can be:
+            *selectors: Selectors to include in the group. Can be:
                 - Selector objects
                 - Strings (assumed to be CSS selectors)
                 - Tuples of (value, type)
-
-        Returns:
-            A new SelectorGroup instance
         """
-        processed_selectors = []
-
+        self.name = name
+        self.selectors = []
+        
         for selector in selectors:
             if isinstance(selector, Selector):
-                processed_selectors.append(selector)
+                self.selectors.append(selector)
             elif isinstance(selector, str):
-                processed_selectors.append(
+                self.selectors.append(
                     Selector(type=SelectorType.CSS, value=selector)
                 )
             elif isinstance(selector, tuple) and len(selector) == 2:
                 selector_value, selector_type = selector
                 if isinstance(selector_type, str):
                     selector_type = SelectorType(selector_type)
-                processed_selectors.append(
+                self.selectors.append(
                     Selector(type=selector_type, value=selector_value)
                 )
-
-        return cls(
-            name=name,
-            selectors=processed_selectors,
-        )
 
     async def execute(
         self, find_element: Callable[[Selector], Awaitable[Result[T, Exception]]]
@@ -118,14 +103,6 @@ class SelectorGroup(BaseModel, Generic[T]):
                 return result
 
         return Error(Exception(f"All selectors in group '{self.name}' failed"))
-
-    @classmethod
-    def create(cls, name: str, *selectors: Selector) -> "SelectorGroup[T]":
-        """Factory method to create a selector group"""
-        return cls(
-            name=name,
-            selectors=list(selectors),
-        )
 
 
 class css(Selector):
