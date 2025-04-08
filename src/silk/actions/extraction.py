@@ -9,7 +9,8 @@ from expression.core import Error, Ok, Result
 
 from silk.actions.base import Action
 from silk.browsers.element import ElementHandle
-from silk.models.browser import ActionContext, BrowserPage
+from silk.models.browser import ActionContext
+from silk.browsers.context import BrowserPage
 from silk.selectors.selector import Selector, SelectorGroup, SelectorType
 
 T = TypeVar("T")
