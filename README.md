@@ -77,7 +77,7 @@ async def main():
         )
         
         # Execute the pipeline
-        result = await manager.execute_action(pipeline)
+        result = await pipeline(manager)
         
         if result.is_ok():
             print(f"Page title: {result.default_value(None)}")
@@ -267,7 +267,7 @@ product_details = parallel(
 pipeline = Navigate(product_url) >> product_details
 
 # Results come back as a collection
-result = await manager.execute_action(pipeline)
+result = await pipeline(manager)
 if result.is_ok():
     product_details = result.default_value(None)
     if product_details is None:
@@ -458,8 +458,8 @@ async def scrape_product(url, manager):
     )
     
     # Execute both pipelines
-    title_result = await manager.execute_action(product_title_pipeline)
-    price_result = await manager.execute_action(price_pipeline)
+    title_result = await product_title_pipeline(manager)
+    price_result = await price_pipeline(manager)
     
     return {
         "title": title_result.default_value("Unknown Title"),
@@ -573,7 +573,7 @@ For a complete API reference, please see the [API documentation](https://silk-do
 Silk uses Railway-Oriented Programming for error handling. Instead of using try/except, leverage the Result type:
 
 ```python
-result = await manager.execute_action(pipeline)
+result = await pipeline(manager)
 if result.is_ok():
     data = result.default_value(None)
     # Process the data
