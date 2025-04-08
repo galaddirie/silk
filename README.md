@@ -2,9 +2,11 @@
 
 [![PyPI version](https://img.shields.io/badge/pypi-v0.1.1-blue.svg)](https://pypi.org/project/silk-scraper/)
 [![Python versions](https://img.shields.io/badge/python-3.10%2B-blue)](https://pypi.org/project/silk-scraper/)
+[![codecov](https://codecov.io/gh/galaddirie/silk/graph/badge.svg?token=MFTEFWJ4EF)](https://codecov.io/gh/galaddirie/silk)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Type check: mypy](https://img.shields.io/badge/type%20check-mypy-blue)](https://github.com/python/mypy)
+
 
 **Silk** is a functional web scraping framework that transforms how you build web automation in Python. By leveraging composable "Actions" and Railway-Oriented Programming, Silk enables you to craft elegant, resilient scrapers with true functional programming patterns.
 
