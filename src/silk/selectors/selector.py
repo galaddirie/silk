@@ -61,6 +61,17 @@ class SelectorGroup(BaseModel, Generic[T]):
     name: str
     selectors: List[Selector] = Field(default_factory=list)
 
+    def __init__(self, name: str, *selectors: Selector, **data):
+        """
+        Initialize a selector group with a name and selectors.
+
+        Args:
+            name: Name of the selector group
+            *selectors: Selectors to include in the group
+            **data: Additional data for BaseModel initialization
+        """
+        super().__init__(name=name, selectors=list(selectors), **data)
+
     @classmethod
     def create_mixed(
         cls, name: str, *selectors: Union[Selector, str, Tuple[str, str]]
