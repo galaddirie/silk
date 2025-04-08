@@ -531,24 +531,28 @@ Contributions to Silk are welcome! Please feel free to submit a Pull Request.
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/silk.git
+   git clone https://github.com/galaddirie/silk.git
    cd silk
    ```
 
-2. Create a virtual environment
+2. Install Poetry (if not already installed)
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   curl -sSL https://install.python-poetry.org | python3 -
    ```
 
-3. Install development dependencies
+3. Install dependencies
    ```bash
-   pip install -e ".[dev,test,all]"
+   poetry install --all-extras
    ```
 
-4. Run tests
+4. Activate the virtual environment
    ```bash
-   pytest
+   poetry shell
+   ```
+
+5. Run tests
+   ```bash
+   poetry run pytest
    ```
 
 ### Guidelines
@@ -568,9 +572,19 @@ Silk builds upon several excellent libraries:
 ## Roadmap
 
 - [x] Initial release with Playwright support
-- [x] Selenium integration
+- [ ] Improve parallel execution 
+- [ ] Support multiple actions in parallel in the same context/page eg. (GetText & GetAttribute & GetHtml) in an ergonomic way
+- [ ] Selenium integration
 - [ ] Puppeteer integration
+- [ ] Add examples
+- [ ] Support Mapped tasks similar to airflow tasks eg. (QueryAll >> GetText[]) where get text is applied to each element in the collection
+- [ ] Add proxy options
+- [ ] Explore stealth options for browser automation ( implement patchwright, no-driver, driverless, etc.)
+- [ ] add dependency review
+- [ ] Support for task dependencies
+- [ ] action signature validation
 - [ ] Data extraction DSL for declarative scraping
+- [ ] Support computer using agentds (browser-use, openai cua, claude computer-use)
 - [ ] Enhanced caching mechanisms
 - [ ] Distributed scraping support
 - [ ] Rate limiting and polite scraping utilities
