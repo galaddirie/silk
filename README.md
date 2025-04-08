@@ -13,7 +13,7 @@ Unlike traditional scraping libraries, Silk embraces Railway-Oriented Programmin
 ## Why Silk?
 
 Traditional web scraping approaches in Python often lead to complex, brittle code that's difficult to maintain. Silk solves these common challenges:
-
+- **Declarative**: Express your scraping goals directly without implementation details
 - **No More Callback Hell**: Replace nested try/except blocks with elegant Railway-Oriented Programming
 - **Resilient Scraping**: Built-in retry mechanisms, fallback selectors, and error recovery
 - **Composable Actions**: Chain operations with intuitive operators (`>>`, `&`, `|`) for cleaner code
@@ -22,6 +22,81 @@ Traditional web scraping approaches in Python often lead to complex, brittle cod
 - **Parallelization Made Easy**: Run operations concurrently with the `&` operator
 
 Whether you're building a small data collection script or a large-scale scraping system, Silk's functional approach scales with your needs while keeping your codebase clean and maintainable.
+
+## Composition as a First-Class Citizen
+
+At the heart of Silk lies the fundamental principle that **composition is a first-class citizen**, not just an add-on feature. This means:
+
+- **Actions are values**: Every operation is a composable unit that can be stored, passed around, and combined
+- **Expressive operators**: Intuitive symbols (`>>`, `&`, `|`) make composition feel natural and readable, 
+- **Pipeline-oriented thinking**: Build complex workflows by combining simpler operations
+- **Mix and match**: Compose any actions together regardless of their implementation details
+
+Compare the traditional approach:
+
+```python
+# Traditional approach with nested logic and state management
+try:
+    driver.get(url)
+    try:
+        element = driver.find_element_by_css_selector(".product-title")
+        product_title = element.text
+        try:
+            price_element = driver.find_element_by_css_selector(".product-price")
+            product_price = price_element.text
+            # ... more nested code ...
+        except:
+            # Error handling for price
+    except:
+        # Error handling for title
+except:
+    # Error handling for navigation
+```
+
+With Silk's compositional approach:
+
+```python
+# Silk's compositional approach
+product_info = (
+    Navigate(url)
+    >> GetText(".product-title")  # This operation uses the result of Navigate
+    >> GetText(".product-price")   # This operation uses the result of the previous GetText
+)
+
+# Or extract multiple items in parallel
+product_details = Navigate(url) >> (
+    GetText(".product-title") & 
+    GetText(".product-price") & 
+    GetAttribute(".product-image", "src")
+)
+```
+
+## Declarative API: Describe What, Not How
+
+Silk embraces a declarative programming model that lets you focus on **what** you want to accomplish rather than **how** to do it:
+
+- **Intent-focused**: Express your scraping goals directly without implementation details
+- **Separation of concerns**: Define what data to extract separately from how to handle errors or retries
+- **Higher level of abstraction**: Work with scraping concepts rather than browser automation primitives
+- **Self-documenting code**: Code that reads like a description of the scraping process
+
+Compare an imperative approach:
+
+```python
+# Imperative: HOW to do things
+driver.get(url)
+driver.find_element_by_id("username").send_keys("user")
+driver.find_element_by_id("password").send_keys("pass")
+driver.find_element_by_css_selector("button[type='submit']").click()
+
+# Declarative: WHAT to do (with Silk)
+login_flow = (
+    Navigate(url)
+    >> Fill("#username", "user") 
+    >> Fill("#password", "pass")
+    >> Click("button[type='submit']")
+)
+```
 
 ## Features
 
@@ -201,546 +276,75 @@ Silk provides powerful operators for composing actions:
 
 These operators make it easy to build complex scraping workflows with clear, readable code.
 
-## Detailed Examples
+## Real-World Examples: The Power of Composition
 
-### Handling Complex Selectors
-
-Silk provides robust ways to handle changing website structures with selector groups. Selector groups are a collection of selectors that are tried in order until one succeeds.
+### E-commerce Product Monitoring
 
 ```python
-from silk.selectors.selector import SelectorGroup, css, xpath
-
-# Create a selector group with fallback options
-product_price = SelectorGroup(
-    "product_price",
-    css(".current-price"),             # Try this first
-    css(".product-price .amount"),     # Fall back to this
-    xpath("//div[contains(@class, 'price')]//span")  # Last resort
+# Define reusable extraction component
+extract_product_data = (
+    GetText(".product-title") &
+    GetText(".product-price") &
+    GetAttribute(".product-image", "src") &
+    GetText(".stock-status")
 )
 
-# Use it in an extraction action
-extract_price = GetText(product_price)
-```
+# Define a complete scraping pipeline for a single product
+scrape_product = (
+    Navigate(product_url)
+    >> Wait(1000)  # Wait for dynamic content
+    >> extract_product_data
+    >> ParseProductData()  # Custom action to transform raw data
+)
 
-### Resilient Scraping with Retry and Fallbacks
+# Scale to multiple products effortlessly
+scrape_multiple_products = parallel(*(
+    scrape_product(url) for url in product_urls
+))
 
-```python
-from silk.actions.flow import retry, fallback
-from silk.actions.extraction import GetText
-from silk.actions.navigation import Navigate
-
-# Retry navigation up to 3 times with 2s delay
-resilient_navigation = retry(
-    Navigate("https://example.com"),
+# Add resilience with minimal changes
+resilient_product_scraper = retry(
+    scrape_product,
     max_attempts=3,
-    delay_ms=2000
-)
-
-# Try multiple selectors for extracting data
-extract_title = fallback(
-    GetText(".main-title"),
-    GetText("h1.title"),
-    GetText("#product-name")
-)
-
-# Combine into a pipeline
-pipeline = resilient_navigation >> extract_title
-```
-
-### Parallel Extraction
-
-Extract multiple pieces of information at once:
-
-```python
-from silk.actions.composition import parallel
-from silk.actions.extraction import GetText, GetAttribute
-
-# Extract product details in parallel
-product_details = parallel(
-    GetText(".product-name"),
-    GetText(".product-price"),
-    GetAttribute(".product-image", "src"),
-    GetText(".product-description")
-)
-
-# Use in a pipeline
-pipeline = Navigate(product_url) >> product_details
-
-# Results come back as a collection
-result = await pipeline(manager)
-if result.is_ok():
-    product_details = result.default_value(None)
-    if product_details is None:
-        print("No product details found")
-    else:
-        [name, price, image_url, description] = product_details
-        print(f"Product: {name}, Price: {price}")
-```
-
-### Form Filling and Submission
-
-```python
-from silk.actions.input import Fill, Click
-from silk.actions.flow import compose
-
-login_action = compose(
-    Navigate("https://example.com/login"),
-    Fill("#username", "user@example.com"),
-    Fill("#password", "password123"),
-    Click("button[type='submit']")
-)
-```
-
-### Handling Dynamic Content
-
-```python
-from silk.actions.flow import wait, loop_until
-from silk.actions.conditions import ElementExists
-
-# Wait for dynamic content to load
-wait_for_results = wait(1000) >> ElementExists(".search-results-item")
-
-# Loop until a condition is met
-load_all_results = loop_until(
-    condition=ElementExists(".no-more-results"),
-    body=Click(".load-more-button"),
-    max_iterations=10,
     delay_ms=1000
 )
+```
 
-# Use in a pipeline
-search_pipeline = (
-    Navigate("https://example.com/search?q=example")
-    >> wait_for_results
-    >> load_all_results
-    >> GetText(".search-results-count")
+### Handling Complex User Flows
+
+```python
+# Define composable steps for a checkout process
+add_to_cart = (
+    Click(".add-to-cart-button")
+    >> Wait(500)
+    >> ElementExists(".cart-confirmation")
+)
+
+proceed_to_checkout = (
+    Navigate("/cart")
+    >> Click(".checkout-button")
+    >> Wait(1000)
+)
+
+fill_shipping_form = (
+    Fill("#first-name", customer.first_name)
+    >> Fill("#last-name", customer.last_name)
+    >> Fill("#address", customer.address)
+    >> Fill("#city", customer.city)
+    >> Select("#country", customer.country)
+    >> Fill("#postal-code", customer.postal_code)
+    >> Click(".continue-button")
+)
+
+# Combine into a complete checkout pipeline
+checkout_pipeline = (
+    Navigate(product_url)
+    >> add_to_cart
+    >> proceed_to_checkout
+    >> fill_shipping_form
+    >> verify_checkout_details
+    >> complete_payment
 )
 ```
 
-### Action Decorator for Custom Functions
-
-Easily convert any function into a composable Action using the `@action` decorator:
-
-```python
-from silk import action, Ok, Error
-
-@action
-async def scroll_to_element(driver, selector, smooth=True):
-    """Scrolls the page to bring the element into view"""
-    try:
-        element = await driver.query_selector(selector)
-        await element.scroll_into_view({"behavior": "smooth" if smooth else "auto"})
-        return "Element scrolled into view"
-    except Exception as e:
-        raise e
-
-# Use it in a pipeline - the function is now a composable Action!
-pipeline = (
-    Navigate(url)
-    >> scroll_to_element("#my-element")
-    >> extract_text("#my-element")
-)
-
-result = await pipeline(browser)
-if result.is_ok():
-    print(f"Extracted text after scrolling: {result.default_value(None)}")
-```
-
-## Composable Operations
-
-Silk provides intuitive operators for composable scraping:
-
-### Sequential Operations (`>>`)
-
-```python
-# Navigate to a page, then extract the title
-Navigate(url) >> Click(title_selector)
-```
-
-### Parallel Operations (`&`)
-
-```python
-# Extract name, price, and description in parallel
-# Each action is executed in a new context when using the & operator
-Navigate(url) & Navigate(url2) & Navigate(url3)
-```
-
-```python
-# Combining parallel and sequential operations
-# Each parallel branch can contain its own chain of sequential actions
-(
-    # First website: Get product details
-    (Navigate("https://site1.com/product") 
-     >> Wait(1000)
-     >> GetText(".product-name"))
-    &
-    # Second website: Search and extract first result
-    (Navigate("https://site2.com") 
-     >> Fill("#search-input", "smartphone")
-     >> Click("#search-button")
-     >> Wait(2000)
-     >> GetText(".first-result .name"))
-    &
-    # Third website: Login and get account info
-    (Navigate("https://site3.com/login")
-     >> Fill("#username", "user@example.com")
-     >> Fill("#password", "password123")
-     >> Click(".login-button")
-     >> Wait(1500)
-     >> GetText(".account-info"))
-)
-# Results are collected as a Block of 3 items, one from each parallel branch
-```
-
-### Fallback Operations (`|`)
-
-```python
-# Try to extract with one selector, fall back to another if it fails
-GetText(primary_selector) | GetText(fallback_selector)
-```
-
-Fallback operations are powerful tools for building resilient scraping pipelines. They allow you to try multiple scraping strategies and return the first successful result. in combination with SelectorGroups, you can create very robust scraping pipelines.
-
-```python
-from silk.actions.navigation import Navigate
-from silk.actions.extraction import GetText, GetAttribute, QueryAll, ExtractTable
-from silk.actions.input import Click
-from silk.actions.flow import wait, retry, fallback
-from silk.selectors.selector import SelectorGroup, css, xpath
-
-# Example: Advanced product information scraping with multiple strategies
-async def scrape_product(url, manager):
-    # Strategy 1: Direct extraction using primary selectors
-    primary_strategy = (
-        Navigate(url)
-        >> GetText(".product-title")
-    )
-    
-    # Strategy 2: Click on a tab first, then extract from revealed content
-    secondary_strategy = (
-        Navigate(url)
-        >> Click(".details-tab")
-        >> wait(500)  # Wait for tab content to load
-        >> GetText(".tab-content h1")
-    )
-    
-    # Strategy 3: Extract from structured JSON data in script tag
-    json_strategy = (
-        Navigate(url)
-        >> GetAttribute('script[type="application/ld+json"]', "textContent")
-        # Additional processing would parse the JSON and extract title
-    )
-    
-    # Combine all strategies with fallback operator
-    product_title_pipeline = (
-        primary_strategy | secondary_strategy | json_strategy
-    )
-    
-    # Multiple fallback approaches for price extraction
-    price_pipeline = (
-        # Try special sale price first
-        (Navigate(url) >> GetText(".special-price .price-amount"))
-        |
-        # Then try regular price
-        (Navigate(url) >> GetText(".regular-price"))
-        |
-        # Then try to extract from a pricing table
-        (Navigate(url) 
-         >> ExtractTable("#pricing-table")
-         # Additional processing would extract price from table data
-        )
-        |
-        # Last resort: Try to find price in any element containing "$"
-        (Navigate(url)
-         >> QueryAll("*:contains('$')")
-         # Additional processing would filter and extract price
-        )
-    )
-    
-    # Execute both pipelines
-    title_result = await product_title_pipeline(manager)
-    price_result = await price_pipeline(manager)
-    
-    return {
-        "title": title_result.default_value("Unknown Title"),
-        "price": price_result.default_value("Price Unavailable")
-    }
-
-# Example with SelectorGroups for even more resilience
-def build_robust_product_scraper(url):
-    # Create selector groups with multiple options
-    title_selectors = SelectorGroup(
-        "product_title",
-        css(".product-title"),
-        css("h1.title"),
-        xpath("//div[@class='product-info']//h1"),
-        css(".pdp-title")
-    )
-    
-    price_selectors = SelectorGroup(
-        "product_price",
-        css(".special-price .amount"),
-        css(".product-price"),
-        xpath("//span[contains(@class, 'price')]"),
-        css(".price-info .price")
-    )
-    
-    image_selectors = SelectorGroup(
-        "product_image",
-        css(".product-image-gallery img"),
-        css(".main-image"),
-        xpath("//div[contains(@class, 'gallery')]//img")
-    )
-    
-    # Use these groups in a pipeline with retries
-    return (
-        Navigate(url)
-        >> retry(GetText(title_selectors), max_attempts=3, delay_ms=1000)
-        >> retry(GetText(price_selectors), max_attempts=3, delay_ms=1000)
-        >> retry(GetAttribute(image_selectors, "src"), max_attempts=3, delay_ms=1000)
-    )
-```
-
-## API Reference
-
-### Core Modules
-
-- **`silk.actions`**: Core action classes for browser automation
-  - **`silk.actions.base`**: Base Action class and core utilities
-  - **`silk.actions.navigation`**: Actions for navigating between pages
-  - **`silk.actions.extraction`**: Actions for extracting data from pages
-  - **`silk.actions.input`**: Actions for interacting with forms and elements
-  - **`silk.actions.flow`**: Control flow actions like branch, retry, and loop
-  - **`silk.actions.composition`**: Utilities for composing actions (sequence, parallel, pipe)
-  - **`silk.actions.decorators`**: Decorators like @action for creating custom actions
-
-- **`silk.browsers`**: Browser management and abstraction layer
-  - **`silk.browsers.manager`**: BrowserManager for session handling
-  - **`silk.browsers.driver`**: Abstract BrowserDriver interface
-  - **`silk.browsers.element`**: ElementHandle for working with DOM elements
-  
-- **`silk.selectors`**: Selector utilities
-  - **`silk.selectors.selector`**: Selector and SelectorGroup classes
-
-- **`silk.models`**: Data models using Pydantic
-  - **`silk.models.browser`**: BrowserOptions, ActionContext, etc.
-
-### Common Action Classes
-
-- **Navigation**
-  - `Navigate(url)`: Navigate to a URL
-  - `Reload()`: Reload the current page
-  - `GoBack()`: Navigate back in history
-  - `GoForward()`: Navigate forward in history
-
-- **Extraction**
-  - `Query(selector)`: Find an element
-  - `QueryAll(selector)`: Find all matching elements
-  - `GetText(selector)`: Extract text from an element
-  - `GetAttribute(selector, attribute)`: Get an attribute value
-  - `GetHtml(selector, outer=True)`: Get element HTML
-  - `ExtractTable(table_selector)`: Extract data from an HTML table
-
-- **Input**
-  - `Click(target)`: Click an element
-  - `DoubleClick(target)`: Double-click an element
-  - `Fill(target, text)`: Fill a form field
-  - `Type(target, text)`: Type text (alias for Fill)
-  - `Select(target, value/text)`: Select an option from a dropdown
-  - `MouseMove(target)`: Move the mouse to an element
-  - `KeyPress(key, modifiers)`: Press a key or key combination
-
-- **Flow Control**
-  - `branch(condition, if_true, if_false)`: Conditional branching
-  - `loop_until(condition, body, max_iterations)`: Loop until condition is met
-  - `retry(action, max_attempts, delay_ms)`: Retry an action on failure
-  - `retry_with_backoff(action)`: Retry with exponential backoff
-  - `with_timeout(action, timeout_ms)`: Apply a timeout to an action
-
-- **Composition**
-  - `sequence(*actions)`: Run actions in sequence, collect all results
-  - `parallel(*actions)`: Run actions in parallel, collect all results
-  - `pipe(*actions)`: Create a pipeline where each action uses the previous result
-  - `fallback(*actions)`: Try actions in sequence until one succeeds
-  - `compose(*actions)`: Compose actions sequentially, return only the last result
-
-For a complete API reference, please see the [API documentation](https://silk-docs.example.com).
-
-## Best Practices
-
-### Error Handling
-
-Silk uses Railway-Oriented Programming for error handling. Instead of using try/except, leverage the Result type:
-
-```python
-result = await pipeline(manager)
-if result.is_ok():
-    data = result.default_value(None)
-    # Process the data
-else:
-    # Handle the error
-    error = result.error
-    logger.error(f"Scraping failed: {error}")
-```
-
-### Browser Resources
-
-Always use context managers to ensure browser resources are properly cleaned up:
-
-```python
-async with BrowserManager() as manager:
-    # Your scraping code here
-    pass  # Resources automatically cleaned up
-```
-
-### Selector Resilience
-
-Use selector groups for resilient scraping that can handle UI changes:
-
-```python
-# Instead of a single brittle selector:
-extract_price = GetText(".price-box .price")
-
-# Use a group with fallbacks:
-price_selector = SelectorGroup(
-    "price",
-    css(".price-box .price"),
-    css(".product-price"),
-    xpath("//span[contains(@class, 'price')]")
-)
-extract_price = GetText(price_selector)
-```
-
-### Action Composition
-
-Build reusable pipelines through composition instead of large monolithic functions:
-
-```python
-# Define reusable components
-navigate_to_product = Navigate("https://example.com/product")
-extract_product_info = parallel(
-    GetText(".product-name"),
-    GetText(".product-price"),
-    GetText(".product-description")
-)
-extract_related_products = QueryAll(".related-product") >> extract_text_from_elements
-
-# Compose them in different ways
-full_scraper = navigate_to_product >> extract_product_info >> extract_related_products
-minimal_scraper = navigate_to_product >> extract_product_info
-```
-
-### Logging
-
-Enable logging to better debug your scraping pipelines:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger("silk").setLevel(logging.DEBUG)
-```
-
-## Contributing
-
-Contributions to Silk are welcome! Please feel free to submit a Pull Request.
-
-### Development Setup
-
-1. Clone the repository
-   ```bash
-   git clone https://github.com/galaddirie/silk.git
-   cd silk
-   ```
-
-2. Install Poetry (if not already installed)
-   ```bash
-   curl -sSL https://install.python-poetry.org | python3 -
-   ```
-
-3. Install dependencies
-   ```bash
-   poetry install --all-extras
-   ```
-
-4. Activate the virtual environment
-   ```bash
-   poetry shell
-   ```
-
-5. Run tests
-   ```bash
-   poetry run pytest
-   ```
-
-### Guidelines
-
-- Follow PEP 8 and use Black for code formatting
-- Write tests for new features
-- Keep the functional programming paradigm in mind
-- Update documentation with new features
-
-## Acknowledgements
-
-Silk builds upon several excellent libraries:
-- [Expression](https://github.com/dbrattli/Expression) for functional programming patterns in Python
-- [Playwright](https://playwright.dev/) and [Selenium](https://www.selenium.dev/) for browser automation
-- [Pydantic](https://pydantic-docs.helpmanual.io/) for data validation and settings management
-
-## Roadmap
-
-- [x] Initial release with Playwright support
-- [ ] Improve parallel execution 
-- [ ] Support multiple actions in parallel in the same context/page eg. (GetText & GetAttribute & GetHtml) in an ergonomic way
-- [ ] Selenium integration
-- [ ] Puppeteer integration
-- [ ] Add examples
-- [ ] Support Mapped tasks similar to airflow tasks eg. (QueryAll >> GetText[]) where get text is applied to each element in the collection
-- [ ] Add proxy options
-- [ ] Explore stealth options for browser automation ( implement patchwright, no-driver, driverless, etc.)
-- [ ] add dependency review
-- [ ] Support for task dependencies
-- [ ] action signature validation
-- [ ] Data extraction DSL for declarative scraping
-- [ ] Support computer using agentds (browser-use, openai cua, claude computer-use)
-- [ ] Enhanced caching mechanisms
-- [ ] Distributed scraping support
-- [ ] Rate limiting and polite scraping utilities
-- [ ] Integration with popular data processing libraries (Pandas, etc.)
-- [ ] CLI tool for quick scraping tasks
-
-## FAQ
-
-### How does Silk compare to other scraping libraries?
-
-Silk differs from traditional scraping libraries like Scrapy, Beautiful Soup, or plain Selenium/Playwright in its functional approach. While these tools focus on imperative code with callbacks and exceptions, Silk embraces functional composition, immutable data structures, and Railway-Oriented Programming for cleaner, more maintainable code.
-
-### Can I use Silk with my existing Playwright/Selenium code?
-
-Yes, Silk is designed to work alongside existing browser automation code. You can gradually adopt Silk's patterns while keeping your existing code.
-
-### Is Silk suitable for large-scale scraping?
-
-Absolutely. Silk's composable nature makes it excellent for large-scale scraping projects. Its built-in error handling, retries, and parallel execution capabilities are particularly valuable for robust production systems.
-
-### How can I handle authentication in Silk?
-
-You can handle authentication like any other browser interaction:
-
-```python
-login_action = compose(
-    Navigate("https://example.com/login"),
-    Fill("#username", "user@example.com"),
-    Fill("#password", "password123"),
-    Click("button[type='submit']"),
-    wait(1000)  # Wait for login to complete
-)
-
-# Then use the authenticated context for further actions
-pipeline = login_action >> Navigate("https://example.com/protected-content") >> GetText("#protected-data")
-```
-
-You can also save and reuse authentication state with browser context options.
-
-## License
-
-Silk is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+## Additional examples and sections would continue below...
