@@ -14,8 +14,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Add support for creating selector groups with unpacked selectors using `SelectorGroup(name, *selectors)`
 
 ### Fixed
+- correct playwright driver import
+- remove selenium and puppeteer drivers
 
 ### Changed
 
