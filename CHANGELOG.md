@@ -1,10 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.3]
 
 ### Added
 
 ### Fixed
+
+- fix incorrect pypi links
 
 ### Changed
 
