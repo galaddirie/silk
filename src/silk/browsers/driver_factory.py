@@ -9,7 +9,7 @@ from silk.browsers.driver import BrowserDriver, BrowserOptions
 
 T = TypeVar("T")
 
-ValidDriverTypes = Literal["playwright", "selenium", "puppeteer"]
+ValidDriverTypes = Literal["playwright"]
 
 
 class DriverFactory:
@@ -23,7 +23,7 @@ class DriverFactory:
         Create a browser driver instance of the specified type.
 
         Args:
-            driver_type: Type of driver to create ('playwright', 'selenium', 'puppeteer')
+            driver_type: Type of driver to create ('playwright')
             options: Browser options (will use defaults if None)
 
         Returns:
@@ -36,9 +36,7 @@ class DriverFactory:
         options = options or BrowserOptions()
 
         driver_classes = {
-            "playwright": ("silk.browser.playwright_driver", "PlaywrightDriver"),
-            "selenium": ("silk.browser.selenium_driver", "SeleniumDriver"),
-            "puppeteer": ("silk.browser.puppeteer_driver", "PuppeteerDriver"),
+            "playwright": ("silk.browsers.drivers.playwright", "PlaywrightDriver"),
         }
 
         if driver_type not in driver_classes:
@@ -54,6 +52,7 @@ class DriverFactory:
             return cast(BrowserDriver[Any], driver_class(options))
         except ImportError as e:
             package_names = {
+                "playwright": "playwright",
                 "patchright": "patchright",
                 "selenium": "selenium",
                 "puppeteer": "pyppeteer",

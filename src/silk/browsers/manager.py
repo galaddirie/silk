@@ -34,7 +34,7 @@ class BrowserManager:
 
         Args:
             driver_type: The type of driver to use. Valid values are
-            'playwright', 'selenium', 'puppeteer'. Defaults to 'playwright'
+            'playwright'. Defaults to 'playwright'
             default_options: Default browser options
         """
         self.default_options = default_options or BrowserOptions()
