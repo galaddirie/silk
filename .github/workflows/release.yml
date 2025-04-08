@@ -1,0 +1,96 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.1.1)'
+        required: true
+      type:
+        description: 'Release type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install semver
+          
+      - name: Set release version
+        id: set-version
+        run: |
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            RELEASE_VERSION="${{ github.event.inputs.version }}"
+          else
+            # Get current version from pyproject.toml
+            CURRENT_VERSION=$(grep -oP 'version = "\K[0-9]+\.[0-9]+\.[0-9]+(?=")' pyproject.toml)
+            echo "Current version: $CURRENT_VERSION"
+            
+            # Calculate next version based on type
+            RELEASE_VERSION=$(python -c "import semver; print(semver.VersionInfo.parse('$CURRENT_VERSION').bump_${{ github.event.inputs.type }}())")
+          fi
+          
+          echo "release_version=$RELEASE_VERSION" >> $GITHUB_ENV
+          echo "Release version: $RELEASE_VERSION"
+      
+      - name: Update version
+        run: |
+          python scripts/update_version.py ${{ env.release_version }}
+      
+      - name: Update CHANGELOG.md with release date
+        run: |
+          # Get today's date
+          TODAY=$(date +%Y-%m-%d)
+          
+          # Update the CHANGELOG.md entry with today's date
+          sed -i "s/## \[${{ env.release_version }}\].*$/## [${{ env.release_version }}] - $TODAY/" CHANGELOG.md
+          
+          # Add a new section for the next development version in unreleased format 
+          # (will be updated during actual release)
+          UNRELEASED="## [Unreleased]\n\n### Added\n\n### Fixed\n\n### Changed\n"
+          sed -i "s/# Changelog/# Changelog\n\n$UNRELEASED/" CHANGELOG.md
+      
+      - name: Extract changelog for release
+        id: extract-changelog
+        run: |
+          # Extract changelog for this version
+          CHANGELOG=$(python scripts/extract_changelog.py ${{ env.release_version }})
+          
+          # Create a file with the changelog content
+          echo "$CHANGELOG" > changelog_extract.md
+          
+      - name: Commit version changes
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore: prepare release v${{ env.release_version }}"
+          file_pattern: 'pyproject.toml src/silk/__init__.py README.md CHANGELOG.md'
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.release_version }}
+          name: "Version ${{ env.release_version }}"
+          draft: true
+          generate_release_notes: false
+          body_path: changelog_extract.md 

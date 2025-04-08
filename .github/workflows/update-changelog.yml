@@ -1,0 +1,126 @@
+name: Update Changelog
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  update-changelog:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      
+      - name: Extract changelog entry from PR body
+        id: extract-changelog
+        run: |
+          PR_BODY=$(cat << 'EOF'
+          ${{ github.event.pull_request.body }}
+          EOF
+          )
+          
+          # Extract changelog entry between the markers
+          CHANGELOG_ENTRY=$(echo "$PR_BODY" | awk '/## Changelog Entry/{flag=1;next}/##/{if(flag){flag=0}}flag')
+          CHANGELOG_ENTRY=$(echo "$CHANGELOG_ENTRY" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          
+          # Only proceed if we have a non-empty changelog entry
+          if [ -n "$CHANGELOG_ENTRY" ]; then
+            echo "CHANGELOG_ENTRY<<EOF" >> $GITHUB_ENV
+            echo "$CHANGELOG_ENTRY" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+            echo "has_entry=true" >> $GITHUB_ENV
+          else
+            echo "has_entry=false" >> $GITHUB_ENV
+          fi
+          
+          # Extract PR type
+          if echo "$PR_BODY" | grep -q "\[x\] 🚀 New Feature"; then
+            echo "pr_type=feature" >> $GITHUB_ENV
+          elif echo "$PR_BODY" | grep -q "\[x\] 🐛 Bug Fix"; then
+            echo "pr_type=bugfix" >> $GITHUB_ENV
+          elif echo "$PR_BODY" | grep -q "\[x\] 📝 Documentation Update"; then
+            echo "pr_type=docs" >> $GITHUB_ENV
+          elif echo "$PR_BODY" | grep -q "\[x\] ⚡ Performance Improvement"; then
+            echo "pr_type=performance" >> $GITHUB_ENV
+          elif echo "$PR_BODY" | grep -q "\[x\] ♻️ Code Refactoring"; then
+            echo "pr_type=refactor" >> $GITHUB_ENV
+          elif echo "$PR_BODY" | grep -q "\[x\] 🧪 Test Addition/Fix"; then
+            echo "pr_type=test" >> $GITHUB_ENV
+          elif echo "$PR_BODY" | grep -q "\[x\] 🔧 Build/CI Update"; then
+            echo "pr_type=ci" >> $GITHUB_ENV
+          elif echo "$PR_BODY" | grep -q "\[x\] 🤖 Dependencies"; then
+            echo "pr_type=deps" >> $GITHUB_ENV
+          elif echo "$PR_BODY" | grep -q "\[x\] ⚠️ Breaking Change"; then
+            echo "pr_type=breaking" >> $GITHUB_ENV
+          else
+            echo "pr_type=other" >> $GITHUB_ENV
+          fi
+
+      - name: Update CHANGELOG.md
+        if: env.has_entry == 'true'
+        run: |
+          # Create a backup of the current changelog
+          cp CHANGELOG.md CHANGELOG.md.bak
+          
+          # Get current version from changelog
+          CURRENT_VERSION=$(grep -oP '## \[\K[0-9]+\.[0-9]+\.[0-9]+(?=\])' CHANGELOG.md | head -1)
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Determine section to update based on PR type
+          if [ "${{ env.pr_type }}" == "feature" ]; then
+            SECTION="### Added"
+          elif [ "${{ env.pr_type }}" == "bugfix" ]; then
+            SECTION="### Fixed"
+          elif [ "${{ env.pr_type }}" == "docs" ]; then
+            SECTION="### Documentation"
+          elif [ "${{ env.pr_type }}" == "performance" ]; then
+            SECTION="### Performance"
+          elif [ "${{ env.pr_type }}" == "refactor" ]; then
+            SECTION="### Changed"
+          elif [ "${{ env.pr_type }}" == "test" ]; then
+            SECTION="### Tests"
+          elif [ "${{ env.pr_type }}" == "ci" ]; then
+            SECTION="### CI/CD"
+          elif [ "${{ env.pr_type }}" == "deps" ]; then
+            SECTION="### Dependencies"
+          elif [ "${{ env.pr_type }}" == "breaking" ]; then
+            SECTION="### Breaking Changes"
+          else
+            SECTION="### Other"
+          fi
+          
+          # Check if the section already exists in the current version
+          if grep -q "^$SECTION" CHANGELOG.md; then
+            # Section exists, append the entry
+            sed -i "/^$SECTION/a - ${{ env.CHANGELOG_ENTRY }} (PR #${{ github.event.pull_request.number }})" CHANGELOG.md
+          else
+            # Section doesn't exist, create it just after the version header
+            sed -i "/## \[$CURRENT_VERSION\]/a \\\n$SECTION\\\n- ${{ env.CHANGELOG_ENTRY }} (PR #${{ github.event.pull_request.number }})" CHANGELOG.md
+          fi
+          
+          # If something went wrong, restore the backup
+          if [ $? -ne 0 ]; then
+            cp CHANGELOG.md.bak CHANGELOG.md
+            exit 1
+          fi
+          
+          # Remove the backup
+          rm CHANGELOG.md.bak
+      
+      - name: Commit and push changes
+        if: env.has_entry == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "docs: update changelog for PR #${{ github.event.pull_request.number }}"
+          file_pattern: CHANGELOG.md 
