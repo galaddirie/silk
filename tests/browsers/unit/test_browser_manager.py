@@ -53,8 +53,8 @@ class TestBrowserManager:
 
         # Custom initialization
         options = BrowserOptions(headless=False, timeout=10000)
-        manager = BrowserManager(driver_type="selenium", default_options=options)
-        assert manager.driver_type == "selenium"
+        manager = BrowserManager(driver_type="playwright", default_options=options)
+        assert manager.driver_type == "playwright"
         assert manager.default_options == options
 
     @pytest.mark.asyncio
