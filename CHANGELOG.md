@@ -1,10 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.4]
 
 ### Added
 
 ### Fixed
+- readme updates
 
 ### Changed
 
