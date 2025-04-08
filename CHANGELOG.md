@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+### Changed
+
+
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
@@ -10,7 +19,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-## [0.1.0] - 2025-04-07
+## [0.1.0] - 2025-04-08
 
 ### Added
 Initial release of Silk
