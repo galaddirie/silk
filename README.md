@@ -294,7 +294,7 @@ product_data = await sequence(
     GetText(".product-title"),
     GetText(".product-price"),
     GetText(".product-description")
-).execute(context)
+)
 
 # product_data contains a Block with all three text values
 titles = product_data.default_value(Block.empty())
@@ -314,7 +314,7 @@ results = await parallel(
     Navigate("https://site1.com") >> GetText(".data"),
     Navigate("https://site2.com") >> GetText(".data"),
     Navigate("https://site3.com") >> GetText(".data")
-).execute(context)
+)
 
 # Each action runs in a separate browser context for true parallelism
 ```
@@ -342,7 +342,7 @@ async def parse_price(context, price_text):
 price = await pipe(
     GetText(".price"),        # Returns "$42.99"
     lambda text: parse_price(text)  # Transforms to 42.99
-).execute(context)
+)
 ```
 
 ### fallback(*actions)
@@ -358,7 +358,7 @@ price = await fallback(
     GetText(".sale-price"),
     GetText(".regular-price"),
     GetText(".price")
-).execute(context)
+)
 
 # Returns the first successful extraction
 ```
@@ -378,7 +378,7 @@ product_name = await compose(
     Navigate(url),
     Click(".product-link"),
     GetText(".product-title")  # Only this result is returned
-).execute(context)
+)
 ```
 
 ## Flow Control Functions
@@ -398,7 +398,7 @@ result = await branch(
     ElementExists(".out-of-stock"),
     GetText(".out-of-stock-message"),  # If out of stock
     GetText(".in-stock-price")         # If in stock
-).execute(context)
+)
 ```
 
 ### loop_until(condition, body, max_iterations, delay_ms)
@@ -416,10 +416,10 @@ product_details = await loop_until(
     Click("#load-more-button"),
     max_iterations=10,
     delay_ms=1000
-).execute(context)
+)
 
 # After finding the element, extract its details
-product_name = await GetText("#target-product .name").execute(context)
+product_name = await GetText("#target-product .name")
 ```
 
 ### retry(action, max_attempts, delay_ms)
@@ -435,7 +435,7 @@ price = await retry(
     GetText("#dynamic-price"),
     max_attempts=3,
     delay_ms=1000
-).execute(context)
+)
 ```
 
 ### retry_with_backoff(action, max_attempts, initial_delay_ms, backoff_factor, jitter)
@@ -453,7 +453,7 @@ page = await retry_with_backoff(
     initial_delay_ms=1000,
     backoff_factor=2.0,  # Each retry doubles the wait time
     jitter=True          # Adds randomness to prevent request clustering
-).execute(context)
+)
 ```
 
 ### with_timeout(action, timeout_ms)
@@ -469,7 +469,7 @@ try:
     result = await with_timeout(
         GetText("#slow-loading-element"),
         timeout_ms=5000
-    ).execute(context)
+    )
 except Exception as e:
     print(f"Extraction timed out: {e}")
 ```
@@ -486,7 +486,7 @@ from silk.actions.extraction import GetText
 product_name = await tap(
     GetText(".product-title"),
     log("Product title extracted successfully")
-).execute(context)
+)
 ```
 
 ### wait(ms)
@@ -503,7 +503,7 @@ title = await (
     Navigate("https://example.com")
     >> wait(2000)  # Wait 2 seconds for page to fully load
     >> GetText("h1")
-).execute(context)
+)
 ```
 
 ## Real-World Example
