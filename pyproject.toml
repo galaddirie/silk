@@ -27,8 +27,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/galdirie/silk-py"
-"Bug Tracker" = "https://github.com/galdirie/silk-py/issues"
+"Homepage" = "https://github.com/galaddirie/silk"
+"Bug Tracker" = "https://github.com/galaddirie/silk/issues"
 
 [project.optional-dependencies]
 playwright = [
@@ -58,7 +58,7 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
-python_version = "0.1.2"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
