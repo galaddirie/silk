@@ -1,21 +1,14 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.6]
 
 ### Added
 
 ### Fixed
+- desync between pypi and github releases skipping 0.1.5
 
 ### Changed
 
-
-## [Unreleased]
-
-### Added
-
-### Fixed
-
-### Changed
 
 
 ## [0.1.4] - 2025-04-08
