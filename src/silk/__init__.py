@@ -2,7 +2,7 @@
 Silk - A flexible browser automation library
 """
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 from expression import Ok, Error, Result, Option, Some, Nothing
 
