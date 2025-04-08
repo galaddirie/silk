@@ -12,7 +12,7 @@
 
 ## Key Features
 
-- **Railway-Oriented Programming**: Replace nested try/except blocks with elegant error handling
+- **Railway-Oriented Programming**: Honest error handling with errors as values, no more nested try/except blocks
 - **Immutable Data Flow**: Thread-safe operations with predictable behavior
 - **Resilient by Design**: Built-in retry mechanisms and fallback selectors
 - **Type-Safe**: Full typing support with Mypy and Pydantic
@@ -21,9 +21,9 @@
 
 ## First-Class Composition
 
-Silk treats composition as a **first-class citizen**, not merely a feature. This fundamental principle means:
+Silk treats composition as a **first-class citizen**:
 
-- **Actions as values**: Operations are composable units that can be stored, passed, and combined
+- **Actions as values**: Browser actions are composable units that can be stored, passed, and combined
 - **Intuitive operators**: Compose with natural symbols (`>>`, `&`, `|`) for readable pipelines
 - **Modular architecture**: Complex workflows emerge from simple, reusable components
 
