@@ -81,8 +81,8 @@ class TestMouseMove:
         mock_browser_page.query_selector.return_value = Ok(mock_element_handle)
 
         selector_group = SelectorGroup(
-            name="test_group",
-            selectors=[Selector(type=SelectorType.CSS, value="#test-element")],
+            "test_group",
+            Selector(type=SelectorType.CSS, value="#test-element"),
         )
         action = MouseMove(selector_group)
 
@@ -250,8 +250,8 @@ class TestFill:
         mock_browser_page.fill.return_value = Ok(None)
 
         selector_group = SelectorGroup(
-            name="test_group",
-            selectors=[Selector(type=SelectorType.CSS, value="#input-field")],
+            "test_group",
+            Selector(type=SelectorType.CSS, value="#input-field"),
         )
         action = Fill(selector_group, "test text")
 
