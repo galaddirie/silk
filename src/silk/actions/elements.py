@@ -1,17 +1,18 @@
 """
 Extraction actions for retrieving data from web pages.
 """
-
+import asyncio
 import logging
-from typing import Any, Dict, List, Optional, TypeVar, Union
+from typing import Any, Dict, List, Optional, TypeVar, Union, cast
 
 from expression.core import Error, Ok, Result
 
 from silk.actions.base import Action
 from silk.browsers.element import ElementHandle
-from silk.models.browser import ActionContext
+from silk.models.browser import ActionContext, WaitOptions, BrowserPage
 from silk.browsers.context import BrowserPage
 from silk.selectors.selector import Selector, SelectorGroup, SelectorType
+
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -653,3 +654,195 @@ class ExtractTable(Action[List[Dict[str, str]]]):
         except Exception as e:
             logger.error(f"Error extracting table data: {e}")
             return Error(e)
+
+
+class WaitForFunction(Action[Any]):
+    """
+    Action to wait for a JavaScript function to return true
+
+    Args:
+        function_body: JavaScript function body or expression that evaluates to true/false
+        polling: Polling interval in milliseconds
+        timeout: Timeout in milliseconds
+
+    Returns:
+        The return value of the function when it evaluates to true
+    """
+
+    def __init__(self, function_body: str, polling: int = 100, timeout: int = 30000):
+        self.function_body = function_body
+        self.polling = polling
+        self.timeout = timeout
+
+    async def execute(self, context: ActionContext) -> Result[Any, Exception]:
+        """Wait for function to evaluate to true"""
+        try:
+            logger.debug(
+                f"Waiting for function to return true (timeout={self.timeout}ms)"
+            )
+
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+
+            is_expression = (
+                not self.function_body.strip().startswith("function")
+                and "{" not in self.function_body
+            )
+
+            if is_expression:
+                script = rf"return () => {self.function_body};"
+            else:
+                script = rf"return {self.function_body};"
+
+            func_result = await page.execute_script(script)
+            if func_result.is_error():
+                return func_result
+
+            start_time = asyncio.get_event_loop().time()
+
+            while True:
+                current_time = asyncio.get_event_loop().time()
+                if (current_time - start_time) * 1000 > self.timeout:
+                    return Error(
+                        Exception(f"Wait for function timed out after {self.timeout}ms")
+                    )
+
+                result = await page.execute_script("return (arguments[0])();")
+                if result.is_error():
+                    return result
+
+                value = result.default_value(None)
+                if value is not None and value:
+                    return result
+
+                await asyncio.sleep(self.polling / 1000)
+
+        except Exception as e:
+            logger.error(f"Error waiting for function: {e}")
+            return Error(e)
+
+class WaitForSelector(Action[Any]):
+    """
+    Action to wait for an element to appear in the DOM
+
+    Args:
+        selector: Element selector to wait for
+        options: Additional wait options
+
+    Returns:
+        The found element if successful
+    """
+
+    def __init__(
+        self,
+        selector: Union[str, Selector, SelectorGroup],
+        options: Optional[WaitOptions] = None,
+    ):
+        self.selector = selector
+        self.options = options or WaitOptions()
+
+        if isinstance(selector, str):
+            self.selector_desc = f"'{selector}'"
+        elif isinstance(selector, Selector):
+            self.selector_desc = f"{selector}"
+        else:
+            self.selector_desc = f"selector group '{selector.name}'"
+
+    async def execute(self, context: ActionContext) -> Result[Any, Exception]:
+        """Wait for selector to match an element in the DOM"""
+        try:
+            logger.debug(f"Waiting for selector {self.selector_desc}")
+
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page"))
+
+            if isinstance(self.selector, SelectorGroup):
+                for selector in self.selector.selectors:
+                    try:
+                        result = await self._wait_for_selector(selector, page)
+                        if result.is_ok():
+                            return result
+                    except Exception:
+                        pass
+
+                return Error(
+                    Exception(f"No selector in group matched: {self.selector.name}")
+                )
+            else:
+                selector = (
+                    self.selector
+                    if isinstance(self.selector, Selector)
+                    else Selector(type=cast(SelectorType, "css"), value=self.selector)
+                )
+                return await self._wait_for_selector(selector, page)
+
+        except Exception as e:
+            logger.error(f"Error waiting for selector {self.selector_desc}: {e}")
+            return Error(e)
+
+    async def _wait_for_selector(
+        self, selector: Selector, page: BrowserPage
+    ) -> Result[Any, Exception]:
+        """Helper method to wait for a specific selector"""
+        try:
+            timeout = self.options.timeout or selector.timeout
+
+            options = self._create_driver_options(timeout)
+
+            element_result = await page.wait_for_selector(selector.value, options)
+            if element_result.is_error():
+                return Error(element_result.error)
+            return Ok(element_result.default_value(None))
+        except Exception as e:
+            return Error(e)
+
+    def _create_driver_options(self, timeout: Optional[int]) -> WaitOptions:
+        """Create options object with the right timeout"""
+        options_dict = (
+            self.options.model_dump()
+            if hasattr(self.options, "model_dump")
+            else self.options.dict()
+        )
+        if timeout is not None:
+            options_dict["timeout"] = timeout
+        return WaitOptions(**options_dict)
+
+class ElementExists(Action[bool]):
+    """
+    Action to check if an element exists in the DOM
+    """
+    def __init__(self, selector: Union[str, Selector, SelectorGroup]):
+        self.selector = selector
+
+    async def execute(self, context: ActionContext) -> Result[bool, Exception]:
+        """Check if element exists in the DOM"""
+        try:
+            logger.debug(f"Checking if element exists with selector {self.selector_desc}")
+
+            page_result = await context.get_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("Failed to get page from context"))
+
+            element_result = await page.query_selector(self.selector.value)
+            if element_result.is_error():
+                return Error(element_result.error)
+
+            return Ok(element_result.default_value(None) is not None)
+        except Exception as e:
+            logger.error(f"Error checking if element exists: {e}")
+            return Error(e)
+        

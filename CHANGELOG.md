@@ -2,11 +2,19 @@
 
 ## [Unreleased]
 
-### Added
+### Added\
+- added variable aliases for flow functions (ex. branch -> If)
 
 ### Fixed
+- fix action decorator so its not @action() but @action 
+- build pipeline no longer overides mypy version
 
 ### Changed
+- Refactored actions to be true "pure" functions
+- actions are associative
+- Move WaitForSelector and WaitForFunction from actions.navigation to actions.elements
+- renamed actions.extraction to action.elements
+
 
 
 ## [0.1.6] - 2025-04-08
