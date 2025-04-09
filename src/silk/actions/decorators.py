@@ -1,7 +1,7 @@
 import inspect
 import logging
 from functools import wraps
-from typing import Any, Awaitable, Callable, ParamSpec, TypeVar, Union
+from typing import Any, Awaitable, Callable, ParamSpec, TypeVar, Union, get_type_hints, Optional, Type, cast, Dict, Protocol, runtime_checkable
 
 from expression.core import Error, Ok, Result
 
@@ -26,67 +26,6 @@ def wrap_result(
         return Error(value)
     else:
         return Ok(value)
-
-
-def action() -> Callable[[Callable[..., Any]], Callable[..., Action[Any]]]:
-    """
-    Decorator to convert a function into an Action.
-
-    Makes it easy to create custom actions with proper railway-oriented error handling.
-    Handles both synchronous and asynchronous functions.
-
-    Returns:
-        A decorator function that converts the decorated function to an Action
-
-    Example:
-        @action()
-        async def custom_click(context, selector):
-            page_result = await context.get_page()
-            if page_result.is_error():
-                return page_result
-            page = page_result.default_value(None)
-            if page is None:
-                return Error(Exception("Failed to get page"))
-            element_result = await page.query_selector(selector)
-            if element_result.is_error():
-                return element_result
-            element = element_result.default_value(None)
-            if element is None:
-                return Error(Exception("Failed to get element"))
-            return await element.click()
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Action[Any]]:
-        is_async = inspect.iscoroutinefunction(func)
-        sig = inspect.signature(func)
-        has_context_param = "context" in sig.parameters
-
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Action[Any]:
-            class DecoratedAction(Action[Any]):
-                async def execute(
-                    self, context: ActionContext
-                ) -> Result[Any, Exception]:
-                    try:
-                        # Add context as the first argument if the function expects it
-                        if has_context_param:
-                            kwargs["context"] = context
-
-                        if is_async:
-                            result = await func(*args, **kwargs)
-                        else:
-                            result = func(*args, **kwargs)
-
-                        return wrap_result(result)
-                    except Exception as e:
-                        logger.debug(f"Error in action {func.__name__}: {e}")
-                        return Error(e)
-
-            return DecoratedAction()
-
-        return wrapper
-
-    return decorator
 
 
 def unwrap(
@@ -131,116 +70,226 @@ def unwrap(
     return wrapper
 
 
-def with_context(func: Callable[[T, ActionContext], S]) -> Callable[[T], Action[S]]:
+# Define a protocol for action factory functions
+@runtime_checkable
+class ActionFactory(Protocol[T]):
+    """Protocol for action factory functions"""
+    def __call__(self, **kwargs: Any) -> Action[T]: ...
+    action_class: Type[Action[T]]
+    original_func: Callable[..., Any]
+    is_action_factory: bool
+    input_param: Optional[str]
+
+
+def action(
+    function: Optional[Callable[..., Any]] = None,
+    name: Optional[str] = None,
+    input_param: Optional[str] = None,
+    auto_adapt: bool = True,
+    description: Optional[str] = None
+) -> Union[ActionFactory[Any], Callable[[Callable[..., Any]], ActionFactory[Any]]]:
     """
-    Decorator to create an action that processes a value with access to the ActionContext.
-
-    This is useful for creating transformation actions that need access to the context.
-
+    Decorator to transform a function into an Action.
+    
+    This decorator can be used in two ways:
+    
+    1. As a simple decorator:
+       @action
+       def my_function(context, param1, param2='default'):
+           # function body
+           
+    2. With configuration options:
+       @action(name="CustomName", input_param="param1", description="Does something")
+       def my_function(context, param1, param2='default'):
+           # function body
+    
+    The decorated function:
+    - Must accept a context as its first parameter
+    - Can have additional parameters (optional or required)
+    - Can be synchronous or asynchronous
+    - Can return a Result or a regular value (which will be wrapped in Ok)
+    
     Args:
-        func: A function that takes a value and context and returns a new value
-
+        function: The function to decorate
+        name: Optional custom name for the Action
+        input_param: Parameter name that should receive input from previous actions
+                     If None, will try to determine automatically
+        auto_adapt: Whether to automatically adapt to inputs from previous actions
+        description: Optional description for the Action
+    
     Returns:
-        A function that takes a value and returns an Action
-
-    Example:
-    ```python
-        @with_context
-        def add_metadata(value, context):
-            return {**value, "metadata": context.metadata}
-
-        # Usage: extract_data() >> add_metadata
-    ```
+        A factory function that creates instances of an Action class
     """
-
-    def wrapper(value: T) -> Action[S]:
-        class ContextAwareAction(Action[S]):
-            async def execute(self, context: ActionContext) -> Result[S, Exception]:
-                try:
-                    result = func(value, context)
-                    return Ok(result)
-                except Exception as e:
-                    return Error(e)
-
-        return ContextAwareAction()
-
-    return wrapper
-
-
-def transform(func: Callable[[T], S]) -> Callable[[T], Action[S]]:
-    """
-    Decorator to create a transformation action from a simple function.
-
-    This is a shorthand for map() when you want to define a reusable transformation.
-
-    Args:
-        func: A function that takes a value and returns a transformed value
-
-    Returns:
-        A function that takes a value and returns an Action with the transformed value
-
-    Example:
-    ```python
-        @transform
-        def extract_prices(html):
-            return re.findall(r'...', html)
-
-        # Usage: get_html() >> extract_prices
-    ```
-    """
-
-    def wrapper(value: T) -> Action[S]:
-        class TransformAction(Action[S]):
-            async def execute(self, context: ActionContext) -> Result[S, Exception]:
-                try:
-                    result = func(value)
-                    return Ok(result)
-                except Exception as e:
-                    return Error(e)
-
-        return TransformAction()
-
-    return wrapper
-
-
-def async_action() -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Action[T]]]:
-    """
-    Decorator to convert an async function into an Action with proper error handling.
-
-    Similar to @action() but specifically for async functions that don't return Results.
-
-    Returns:
-        A decorator function that converts an async function to an Action
-
-    Example:
-        @async_action()
-        async def wait_and_get_data(seconds, url):
-            await asyncio.sleep(seconds)
-            # This will be automatically wrapped in Result
-            return {"url": url, "timestamp": time.time()}
-    """
-
-    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Action[T]]:
+    def decorator(func: Callable[..., Any]) -> ActionFactory[Any]:
+        # Get function signature and parameters
         sig = inspect.signature(func)
-        has_context_param = "context" in sig.parameters
-
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Action[T]:
-            class AsyncAction(Action[T]):
-                async def execute(self, context: ActionContext) -> Result[T, Exception]:
-                    try:
-                        # Add context as an argument if the function expects it
-                        if has_context_param:
-                            kwargs["context"] = context
-
-                        result = await func(*args, **kwargs)
+        params = list(sig.parameters.values())
+        
+        # Extract parameter information
+        has_context_param = len(params) > 0 and params[0].name != 'self'
+        
+        # Figure out which parameter should accept input from previous actions
+        adapt_param = input_param
+        if adapt_param is None and auto_adapt and len(params) > 1:
+            # Default to the first parameter after context
+            adapt_param = params[1].name
+        
+        # Get return type hint if available
+        extracted_return_type: Any = Any
+        try:
+            hints = get_type_hints(func)
+            if 'return' in hints:
+                return_hint = hints['return']
+                # If it's a Result, extract the value type
+                if hasattr(return_hint, '__origin__') and return_hint.__origin__ is Result:
+                    if hasattr(return_hint, '__args__'):
+                        extracted_return_type = return_hint.__args__[0]
+                else:
+                    extracted_return_type = return_hint
+        except (TypeError, ValueError):
+            pass
+            
+        # Create the Action class
+        class FunctionAction(Action[Any]):
+            def __init__(self, **kwargs: Any) -> None:
+                self.kwargs: Dict[str, Any] = kwargs
+                # Set default values for missing parameters with defaults
+                for p in params[1:]:  # Skip context parameter
+                    if p.default is not inspect.Parameter.empty and p.name not in self.kwargs:
+                        self.kwargs[p.name] = p.default
+                
+            async def execute(self, context: ActionContext) -> Result[Any, Exception]:
+                try:
+                    # Prepare arguments
+                    args = [context]
+                    
+                    # Call the function
+                    is_async = inspect.iscoroutinefunction(func)
+                    
+                    if is_async:
+                        result = await func(*args, **self.kwargs)
+                    else:
+                        result = func(*args, **self.kwargs)
+                    
+                    # Process the result
+                    if isinstance(result, Result):
+                        return result
+                    else:
                         return Ok(result)
-                    except Exception as e:
-                        logger.debug(f"Error in async action {func.__name__}: {e}")
-                        return Error(e)
+                except Exception as e:
+                    return Error(e)
+            
+            def with_input(self, value: Any) -> Action[Any]:
+                """Create a new action with the input applied to the specified parameter"""
+                if not auto_adapt or adapt_param is None:
+                    return self
+                    
+                # Create a new instance with the adapted parameter
+                new_kwargs = dict(self.kwargs)
+                new_kwargs[adapt_param] = value
+                return FunctionAction(**new_kwargs)
+            
+            def __str__(self) -> str:
+                action_name = name or func.__name__
+                param_str = ", ".join(f"{k}={v}" for k, v in self.kwargs.items())
+                return f"{action_name}({param_str})"
+                
+            def __repr__(self) -> str:
+                return self.__str__()
+                
+        # Set metadata on the class
+        FunctionAction.__name__ = name or func.__name__ + "Action"
+        FunctionAction.__doc__ = description or func.__doc__
+        
+        # Create a factory function to instantiate the action
+        @wraps(func)
+        def factory(**kwargs: Any) -> Action[Any]:
+            return FunctionAction(**kwargs)
+            
+        # Attach metadata for introspection
+        # Use cast to help mypy understand these attributes will exist
+        typed_factory = cast(ActionFactory[Any], factory)
+        typed_factory.action_class = FunctionAction
+        typed_factory.original_func = func
+        typed_factory.is_action_factory = True
+        typed_factory.input_param = adapt_param
+        
+        return typed_factory
+    
+    # Handle case where decorator is used without parentheses
+    if function is not None:
+        return decorator(function)
+    
+    return decorator
 
-            return AsyncAction()
 
-        return wrapper
-
+def inputs(*param_names: str) -> Callable[[ActionFactory[Any]], ActionFactory[Any]]:
+    """
+    Decorator to specify which parameters should receive inputs from previous actions.
+    
+    Use with @action to customize input handling:
+    
+    @action
+    @inputs('selector', 'text')
+    def custom_action(context, selector, text):
+        # This action will create adapters for both 'selector' and 'text'
+        # parameters based on inputs from previous actions
+    
+    Args:
+        *param_names: Names of parameters that should adapt to inputs
+        
+    Returns:
+        A decorator that adds input handling logic
+    """
+    def decorator(factory_func: ActionFactory[Any]) -> ActionFactory[Any]:
+        if not hasattr(factory_func, 'is_action_factory'):
+            raise TypeError("@inputs can only be used with @action")
+            
+        original_create = factory_func
+        
+        @wraps(original_create)
+        def wrapped_factory(**kwargs: Any) -> Action[Any]:
+            original_action = original_create(**kwargs)
+            
+            # Instead of replacing the method, create a wrapper class
+            class InputAdapterAction(Action[Any]):
+                def __init__(self, wrapped_action: Action[Any]):
+                    self.wrapped_action = wrapped_action
+                
+                async def execute(self, context: ActionContext) -> Result[Any, Exception]:
+                    return await self.wrapped_action.execute(context)
+                
+                def with_input(self, value: Any) -> Action[Any]:
+                    if value is None:
+                        return self
+                    
+                    new_kwargs = dict(kwargs)
+                    
+                    # Try to match the value to the first parameter
+                    if len(param_names) > 0:
+                        new_kwargs[param_names[0]] = value
+                        
+                    return original_create(**new_kwargs)
+                
+                def __str__(self) -> str:
+                    return str(self.wrapped_action)
+                
+                def __repr__(self) -> str:
+                    return repr(self.wrapped_action)
+            
+            # Return the wrapped action
+            return InputAdapterAction(original_action)
+            
+        # Add metadata to wrapped factory
+        typed_wrapped = cast(ActionFactory[Any], wrapped_factory)
+        typed_wrapped.original_func = factory_func.original_func
+        typed_wrapped.is_action_factory = True
+        typed_wrapped.action_class = factory_func.action_class
+        typed_wrapped.input_param = None
+        
+        # Store param_names as an attribute
+        setattr(typed_wrapped, 'input_params', param_names)
+        
+        return typed_wrapped
+        
     return decorator

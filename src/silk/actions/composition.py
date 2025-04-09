@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Callable, TypeVar, Union
+from typing import Any, Callable, TypeVar, Union, Optional
 
 from expression.collections import Block
 from expression.core import Error, Ok, Result
@@ -56,6 +56,103 @@ def sequence(*actions: Action[Any]) -> Action[Block[Any]]:
             return Ok(results.sort(reverse=True))
 
     return SequenceAction()
+
+
+def pipe(*steps: Union[Action[Any], Callable[[Any], Action[Any]]]) -> Action[Any]:
+    """
+    Create a pipeline of actions where each step can be either an Action or
+    a function that takes the previous result and returns an Action.
+
+    This is the most flexible composition function:
+    - For simple cases, use compose() or the >> operator
+    - For complex cases where you need to inspect values or decide which action to run next,
+      use pipe() with lambda functions
+
+    Example:
+    ```python
+        result = await pipe(
+            Query(".item"),                      # Returns an element
+            lambda el: Click(el) if el else Navigate("/fallback"),  # Conditional logic
+            ExtractText("#result")               # Extract result text
+        ).execute(context)
+    ```
+
+    Args:
+        *steps: Steps in the pipeline. Can be Action objects or callables
+               that take a value and return an Action.
+
+    Returns:
+        A new Action that executes the steps in a pipeline
+    """
+    steps_list = list(steps)
+    if not steps_list:
+        raise ValueError("Cannot create a pipeline with no steps")
+    if len(steps_list) == 1:
+        first_step = steps_list[0]
+        if callable(first_step) and not isinstance(first_step, Action):
+            raise ValueError("First item in pipe must be an Action, not a callable")
+        return first_step if isinstance(first_step, Action) else first_step(None)
+
+    class PipelineAction(Action[Any]):
+        async def execute(self, context: ActionContext) -> Result[Any, Exception]:
+            try:
+                # Get the first action
+                first_step = steps_list[0]
+                if callable(first_step) and not isinstance(first_step, Action):
+                    return Error(
+                        Exception(
+                            "First item in pipe must be an Action, not a callable"
+                        )
+                    )
+
+                first_action = (
+                    first_step if isinstance(first_step, Action) else first_step(None)
+                )
+                result = await first_action.execute(context)
+
+                if result.is_error():
+                    return result
+
+                # Process each step in the pipeline
+                value = result.default_value(None)
+
+                for step in steps_list[1:]:
+                    try:
+                        # Create the next action from the step
+                        if callable(step) and not isinstance(step, Action):
+                            # If it's a callable, call it with the value from the previous step
+                            next_action = step(value)
+                        else:
+                            # If it's an Action, adapt it to use the value if possible
+                            next_action = (
+                                step.with_input(value)
+                                if hasattr(step, "with_input")
+                                else step
+                            )
+
+                        if not isinstance(next_action, Action):
+                            return Error(
+                                Exception(
+                                    f"Expected an Action but got {type(next_action)}: {next_action}"
+                                )
+                            )
+
+                        # Execute the action
+                        result = await next_action.execute(context)
+                        if result.is_error():
+                            return result
+
+                        # Get the value for the next step
+                        value = result.default_value(None)
+                    except Exception as e:
+                        return Error(e)
+
+                # Return the final result
+                return Ok(value)
+            except Exception as e:
+                return Error(e)
+
+    return PipelineAction()
 
 
 def parallel(*actions: Action[Any]) -> Action[Block[Any]]:
@@ -168,88 +265,6 @@ def parallel(*actions: Action[Any]) -> Action[Block[Any]]:
     return ParallelAction()
 
 
-def pipe(*actions: Union[Action[Any], Callable[[Any], Action[Any]]]) -> Action[Any]:
-    """
-    Create a pipeline of actions where each action receives the result of the previous action.
-
-    This differs from 'compose' in that each action in the chain can use the result
-    of the previous action, instead of just executing in sequence.
-
-    Example:
-    ```python
-        result = await pipe(
-            extract_text(selector),      # Returns "42"
-            lambda val: multiply(val, 2) # Uses "42" as input, returns 84
-        ).execute(context)
-        # result is Ok(84)
-    ```
-
-    Args:
-        *actions: Actions to pipe together. Can be Action objects or callables that take a value and return an Action.
-
-    Returns:
-        A new Action that executes the actions in a pipeline
-    """
-    action_list = list(actions)
-    if not action_list:
-        raise ValueError("Cannot create a pipeline with no actions")
-    if len(action_list) == 1:
-        first_action = action_list[0]
-        if callable(first_action) and not isinstance(first_action, Action):
-            raise ValueError("First item in pipe must be an Action, not a callable")
-        return first_action
-
-    class PipelineAction(Action[Any]):
-        async def execute(self, context: ActionContext) -> Result[Any, Exception]:
-            try:
-                first_action = action_list[0]
-                if callable(first_action) and not isinstance(first_action, Action):
-                    return Error(
-                        Exception(
-                            "First item in pipe must be an Action, not a callable"
-                        )
-                    )
-
-                result = await first_action.execute(context)
-                if result.is_error():
-                    return result
-
-                value = result.default_value(None)
-                if value is None:
-                    return Error(Exception("First action in pipe returned None"))
-
-                for action in action_list[1:]:
-                    try:
-                        next_action = (
-                            action(value)
-                            if callable(action) and not isinstance(action, Action)
-                            else action
-                        )
-
-                        if not isinstance(next_action, Action):
-                            return Error(
-                                Exception(
-                                    f"Expected an Action but got {type(next_action)}: {next_action}"
-                                )
-                            )
-
-                        result = await next_action.execute(context)
-                        if result.is_error():
-                            return result
-
-                        value = result.default_value(None)
-                        if value is None:
-                            return Error(Exception("Action in pipe returned None"))
-                    except Exception as e:
-                        return Error(e)
-
-                return Ok(value)
-            except Exception as e:
-                return Error(e)
-
-    return PipelineAction()
-
-
 def fallback(*actions: Action[T]) -> Action[T]:
     """
     Try actions in sequence until one succeeds.
@@ -345,3 +360,55 @@ def compose(*actions: Action[Any]) -> Action[Any]:
                 return Error(e)
 
     return ComposeAction()
+
+
+def identity(value: Optional[T] = None) -> Action[T]:
+    """Create an identity action that returns the provided value or passes through inputs"""
+
+    class Identity(Action[T]):
+        """
+        Identity action that passes its input through unchanged
+
+        This action satisfies the identity laws of composition:
+        id >> f = f and f >> id = f
+        """
+
+        def __init__(self, value: Optional[T] = None):
+            self.value = value
+
+        async def execute(self, context: ActionContext) -> Result[T, Exception]:
+            if self.value is None:
+                return Error(Exception("Identity action received no value"))
+            return Ok(self.value)
+
+        def with_input(self, value: Any) -> "Action[Any]":
+            return Identity(value)
+
+    return Identity(value)
+
+
+def value(val: T) -> Action[T]:
+    """
+    Create an action that returns a constant value
+    alias for identity
+
+    Example:
+    ```python
+        # Create default values for branching logic
+        result = await pipe(
+            Query("#optional-element"),
+            branch(
+                lambda el: el is not None,
+                ExtractText(),
+                value("Default text")  # Use this if element not found
+            )
+        ).execute(context)
+    ```
+
+    Args:
+        val: Value to return
+
+    Returns:
+        An Action that returns the value
+    """
+    return identity(val)

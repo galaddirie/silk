@@ -13,9 +13,11 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    runtime_checkable,
+    Protocol,
 )
 
-from expression.core import Error, Result
+from expression.core import Error, Result, Ok
 
 from silk.models.browser import ActionContext
 
@@ -30,6 +32,12 @@ P = ParamSpec("P")
 
 logger = logging.getLogger(__name__)
 
+@runtime_checkable
+class AdaptableAction(Protocol):
+    """Protocol for actions that can adapt to inputs from previous actions"""
+    def with_input(self, value: Any) -> "Action[Any]":
+        """Create a new action that uses the provided value as input"""
+        ...
 
 class Action(ABC, Generic[T]):
     """
@@ -51,6 +59,13 @@ class Action(ABC, Generic[T]):
             Result containing either the action result or an exception
         """
         pass
+
+    def with_input(self, value: Any) -> "Action[T]":
+        """
+        Default implementation that returns self unchanged.
+        Subclasses should override this to adapt to inputs.
+        """
+        return self
 
     # todo we need a operation that runs a action on a list of items similar to airflow mapped tasks
     # todo improve the doc strings, explaination and examples
@@ -101,8 +116,6 @@ class Action(ABC, Generic[T]):
                         return cast(Result[S, Exception], result)
 
                     value = result.default_value(None)
-                    # Create the next action regardless of whether value is None
-                    # The function f may or may not use the value
                     next_action = f(value)
 
                     return await next_action.execute(context)
@@ -111,9 +124,41 @@ class Action(ABC, Generic[T]):
 
         return ChainedAction()
 
+    def compose(self, next_action: "Action[S]") -> "Action[S]":
+        """
+        Compose this action with another action, passing the result as input when possible
+
+        Args:
+            next_action: Action to execute after this one
+
+        Returns:
+            A new Action that applies functional composition
+        """
+        original_action = self
+
+        class ComposedAction(Action[S]):
+            async def execute(self, context: ActionContext) -> Result[S, Exception]:
+                try:
+                    result = await original_action.execute(context)
+
+                    if result.is_error():
+                        return cast(Result[S, Exception], result)
+
+                    value = result.default_value(None)
+                    
+                    # Try to adapt the next action to use the value from this action
+                    adapted_action = next_action.with_input(value)
+                    
+                    return await adapted_action.execute(context)
+                except Exception as e:
+                    return Error(e)
+
+        return ComposedAction()
+
     def then(self, next_action: "Action[S]") -> "Action[S]":
         """
         Chain an action after this one, ignoring the result of this action
+        (Legacy behavior for backward compatibility)
 
         Args:
             next_action: Action to execute after this one completes
@@ -215,14 +260,14 @@ class Action(ABC, Generic[T]):
         self, other: Union[Callable[[T], S], "Action[Any]"]
     ) -> "Action[Any]":
         """
-        Overload the >> operator for pipe-like sequencing
-
-        a >> b is equivalent to:
-        - If b is a function: a.map(b)
-        - If b is an Action: a.and_then(lambda _: b)
+        Overload the >> operator for functional composition
+        
+        a >> b means:
+        - If b is a function: a.map(b) (equivalent to b ∘ a in math)
+        - If b is an Action: a.compose(b) (tries to pass a's output to b)
         """
         if isinstance(other, Action):
-            return self.then(other)
+            return self.compose(other)
         else:
             return self.map(other)
 
@@ -265,7 +310,6 @@ class Action(ABC, Generic[T]):
 
         a & b means "execute actions a and b in parallel with separate contexts"
         """
-        from expression.core import Ok  # Make sure Ok is imported
 
         first_action = self
         second_action = other
