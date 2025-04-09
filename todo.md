@@ -51,4 +51,6 @@ we likely need to do  Mapped(Filter)
 - we need to think about how to chain actions to pydantic models
 
 
-    
+
+- import model/type exports ex we have silk.models.browser and silk.actions.base
+- we need to have a uniform place for our types
