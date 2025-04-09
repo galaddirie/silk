@@ -13,7 +13,6 @@
 
 - FIX selectors.selector import it should be from .selectors import *
 
--fix action decorator so its not @action() but @action 
 
 - move WaitForSelector to extraction from navigation
 
@@ -31,7 +30,7 @@
 
 - should custom actions return actions?
 
-@action()
+@action
 def Login(context: ActionContext, username: str, password: str):
     if not username or not password:
         return Error("Username and password are required")
@@ -48,7 +47,7 @@ def Login(context: ActionContext, username: str, password: str):
 
 - how do we forward to sub actions
 
-@action()
+@action
 def CloseModals(context: ActionContext):  # how do we forward the context?
     pipeline: Action[None] = If(
         ElementExists(selectors.LoginModal.MODAL),
