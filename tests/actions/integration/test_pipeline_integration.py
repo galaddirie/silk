@@ -10,7 +10,7 @@ from expression.collections import Block
 from silk.browsers.manager import BrowserManager
 from silk.models.browser import BrowserOptions, ActionContext
 from silk.actions.navigation import Navigate
-from silk.actions.extraction import GetText, GetAttribute, GetHtml, QueryAll
+from silk.actions.elements import GetText, GetAttribute, GetHtml, QueryAll
 from silk.actions.input import Click, Fill, Select, MouseMove
 from silk.actions.flow import branch, loop_until, retry, retry_with_backoff, wait, tap, log as log_action
 from silk.actions.composition import sequence, parallel, pipe, fallback, compose
@@ -25,7 +25,7 @@ logger = logging.getLogger("silk_e2e_test")
 # Base URL for our E2E tests
 BASE_URL = "http://books.toscrape.com"
 
-@action()
+@action
 async def extract_book_data(context: ActionContext, data_block: Block[Any]) -> Result[Dict[str, Any], Exception]:
     """Custom action to parse extracted book data into a structured format"""
     try:
@@ -44,7 +44,7 @@ async def extract_book_data(context: ActionContext, data_block: Block[Any]) -> R
     except Exception as e:
         return Error(e)
 
-@action()
+@action
 async def extract_category_links(context: ActionContext, html_content: str) -> Result[List[str], Exception]:
     """Extract category links from the side navigation"""
     try:
@@ -72,7 +72,7 @@ async def extract_category_links(context: ActionContext, html_content: str) -> R
     except Exception as e:
         return Error(e)
 
-@action()
+@action
 async def extract_book_links(context: ActionContext, html_content: str) -> Result[List[str], Exception]:
     """Extract book links from a category page"""
     try:
@@ -117,7 +117,7 @@ async def extract_book_links(context: ActionContext, html_content: str) -> Resul
     except Exception as e:
         return Error(e)
 
-@action()
+@action
 async def parse_rating(context: ActionContext, element_class: Optional[str]) -> Result[str, Exception]:
     """Parse the star rating from class name"""
     try:
@@ -141,7 +141,7 @@ async def parse_rating(context: ActionContext, element_class: Optional[str]) -> 
     except Exception as e:
         return Error(e)
 
-
+@pytest.mark.integration
 class TestE2EPipelineIntegration:
     @pytest.mark.asyncio
     async def test_basic_navigation_and_extraction(self):
@@ -221,11 +221,11 @@ class TestE2EPipelineIntegration:
                         # Checking if it's inexpensive using a lambda function here
                         lambda price: branch(
                             # Condition: price < £20
-                            action()(lambda ctx, p: Ok(float(p.replace('£', '')) < 20)),
+                            action(lambda ctx, p: Ok(float(p.replace('£', '')) < 20)),
                             # If true, get the title
                             GetText(f".product_pod:nth-child({i}) h3 a"),
                             # If false, return empty string
-                            action()(lambda ctx, _: Ok(""))
+                            action(lambda ctx, _: Ok(""))
                         )
                     ) for i in range(1, 21)  # Loop through first 20 books
                 ])
@@ -474,7 +474,7 @@ class TestE2EPipelineIntegration:
             assert retry_result.is_ok()
             assert "Books to Scrape" in retry_result.default_value("")
             
-            @action()
+            @action
             async def element_exists(context: ActionContext, selector: str) -> Result[bool, Exception]:
                 """Check if an element exists on the page"""
                 page_result = await context.get_page()
