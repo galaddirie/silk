@@ -23,9 +23,10 @@ def update_version(new_version: str) -> None:
     if pyproject_path.exists():
         content = pyproject_path.read_text()
         updated = re.sub(
-            r'version = "[^"]+"',
-            f'version = "{new_version}"',
-            content
+            r'(^\[project\].*?version = ")[^"]+(.*?)$',
+            fr'\1{new_version}\2',
+            content,
+            flags=re.DOTALL | re.MULTILINE
         )
         pyproject_path.write_text(updated)
         print(f"Updated version in {pyproject_path} to {new_version}")
