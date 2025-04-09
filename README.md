@@ -25,6 +25,9 @@ Silk treats composition as a **first-class citizen**:
 
 - **Actions as values**: Browser actions are composable units that can be stored, passed, and combined
 - **Intuitive operators**: Compose with natural symbols (`>>`, `&`, `|`) for readable pipelines
+- **Composition is associative**: (a >> b) >> c = a >> (b >> c) - allowing flexible pipeline construction
+
+
 - **Modular architecture**: Complex workflows emerge from simple, reusable components
 
 ```python
@@ -329,7 +332,7 @@ from silk.actions.extraction import GetText
 from silk.actions.decorators import action
 from expression.core import Ok
 
-@action()
+@action
 async def parse_price(context, price_text):
     # Convert "$42.99" to a float
     try:
@@ -539,7 +542,7 @@ Extend Silk with your own custom actions:
 from silk.actions.decorators import action
 from expression.core import Ok, Error
 
-@action()
+@action
 async def extract_price(context, selector):
     """Extract and parse a price from the page"""
     page_result = await context.get_page()
