@@ -20,7 +20,7 @@ These can also be used through operators:
 """
 
 from silk.actions.base import Action
-from silk.actions.composition import compose, fallback, parallel, pipe, sequence
+from silk.actions.composition import compose, fallback, parallel, pipe, sequence, identity, value
 from silk.actions.flow import (
     branch,
     loop_until,
@@ -28,6 +28,17 @@ from silk.actions.flow import (
     retry_with_backoff,
     tap,
     with_timeout,
+    with_timeout_and_fallback,
+    wait,
+    If,
+    LoopUntil,
+    Retry,
+    RetryWithBackoff,
+    Wait,
+    Log,
+    WithTimeout,
+    WithTimeoutAndFallback,
+    
 )
 
 __all__ = [
@@ -37,12 +48,24 @@ __all__ = [
     "loop_until",
     "retry_with_backoff",
     "with_timeout",
+    "with_timeout_and_fallback",
     "tap",
+    "wait",
     "retry",
+    "If",
+    "LoopUntil",
+    "Retry",
+    "RetryWithBackoff",
+    "Wait",
+    "Log",
+    "WithTimeout",
+    "WithTimeoutAndFallback",
     # Composition
     "sequence",
     "parallel",
     "pipe",
     "fallback",
     "compose",
+    "identity",
+    "value",
 ]
