@@ -4,6 +4,7 @@
 
 ### Added\
 - added variable aliases for flow functions (ex. branch -> If)
+- added assertion actions, no real use case yet, exploring use cases
 
 ### Fixed
 - fix action decorator so its not @action() but @action 
