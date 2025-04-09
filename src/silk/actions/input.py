@@ -242,6 +242,8 @@ class Click(Action[None]):
             return Error(e)
 
 
+
+
 class DoubleClick(Action[None]):
     """
     Action to double-click an element
