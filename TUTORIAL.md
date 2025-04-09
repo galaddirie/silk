@@ -184,13 +184,13 @@ pipeline = (
 
 ## Creating Custom Actions
 
-Use the `@action()` decorator for custom logic.
+Use the `@action` decorator for custom logic.
 
 ```python
 from silk.actions.decorators import action
 from expression.core import Ok, Error
 
-@action()
+@action
 async def parse_price(context: ActionContext, price_text: str):
     # Your custom parsing logic
     try:
