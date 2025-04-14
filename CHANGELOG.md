@@ -1,4 +1,12 @@
 # Changelog
+
+## [0.2.3] - 2025-04-14
+
+### Fixed
+- fix release
+- removed old actions.composition.py
+
+
 ## [0.2.2] - 2025-04-14
 
 ### Fixed
