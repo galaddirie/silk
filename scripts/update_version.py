@@ -23,9 +23,12 @@ def update_version(new_version: str) -> None:
     pyproject_path = Path("pyproject.toml")
     if pyproject_path.exists():
         content = pyproject_path.read_text()
+        # Use a proper way to handle backreferences by constructing the replacement string separately
+        # This avoids the issue where \1 + 0.2.0 gets interpreted as \10.2.0
+        replacement = r'\1' + new_version + r'\2'
         updated = re.sub(
             r'(^\[project\].*?version = ")[^"]+(.*?)$',
-            rf"\1{new_version}\2",
+            replacement,
             content,
             flags=re.DOTALL | re.MULTILINE,
         )
