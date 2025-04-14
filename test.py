@@ -9,7 +9,7 @@ from silk.actions.navigation import Navigate, WaitForSelector, Screenshot
 from silk.actions.elements import GetText, GetAttribute, Query, QueryAll, ExtractTable
 from silk.actions.input import Click, Fill
 from silk.flow import retry, wait
-from silk.primitives import constant
+from silk.composition import constant
 from silk.actions.manage import (
      WithContext,
      InitializeContext
