@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.1] - 2025-04-14
+
+### Fixed
+- fix import error with expression library
+
 ## [0.2.0] - 2025-04-13
 
 ### Added

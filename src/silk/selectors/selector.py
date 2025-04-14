@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Awaitable, Callable, List, Optional, Tuple, TypeVar, Union
 
-from expression.core import Error, Result
+from expression import Error, Result
 
 T = TypeVar("T")
 
