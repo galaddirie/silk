@@ -4,11 +4,10 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type
 
 from expression.core import Error, Ok, Result
 
-from silk.actions.base import Action
 from silk.browsers.context import BrowserContext
 from silk.browsers.driver import BrowserDriver
 from silk.browsers.driver_factory import ValidDriverTypes, create_driver
-from silk.models.browser import ActionContext, BrowserOptions
+from silk.browsers.types import BrowserOptions
 
 if TYPE_CHECKING:
     pass
@@ -100,6 +99,7 @@ class BrowserManager:
                 manager=self,
                 options=options,
                 context_ref=context_ref,
+                nickname=nickname,  # Pass the nickname parameter
             )
 
             self.contexts[context_id] = context
@@ -117,22 +117,32 @@ class BrowserManager:
         except Exception as e:
             logger.error(f"Error creating context: {e}")
             return Error(e)
-
+    # In BrowserManager class (paste-3.txt)
     def get_context(
-        self, context_id: Optional[str] = None
+        self, context_id_or_nickname: Optional[str] = None
     ) -> Result["BrowserContext", Exception]:
         """Get a context by ID or the default context"""
         try:
-            context_id = context_id or self.default_context_id
+            context_id = context_id_or_nickname or self.default_context_id
 
             if context_id is None:
                 return Error(Exception("No contexts available"))
 
-            context = self.contexts.get(context_id)
-            if context is None:
+            # First, try direct lookup by ID in the contexts dictionary
+            if context_id in self.contexts:
+                return Ok(self.contexts[context_id])
+            
+            # If not found by ID, try to find by nickname
+            found_context = None
+            for ctx in self.contexts.values():
+                if ctx.nickname == context_id:
+                    found_context = ctx
+                    break
+
+            if found_context is None:
                 return Error(Exception(f"Context with ID '{context_id}' not found"))
 
-            return Ok(context)
+            return Ok(found_context)
         except Exception as e:
             logger.error(f"Error getting context: {e}")
             return Error(e)
@@ -191,45 +201,10 @@ class BrowserManager:
             logger.error(f"Error closing all contexts: {e}")
             return Error(e)
 
-    async def execute_action(self, action: Action[T]) -> Result[T, Exception]:
-        """
-        Execute an action with a new default context
-
-        Args:
-            action: Action to execute
-
-        Returns:
-            Result of the action
-        """
-        context_result = await self.create_context(nickname="action-context")
-        if context_result.is_error():
-            return Error(context_result.error)
-        browser_context = context_result.default_value(None)
-        if browser_context is None:
-            return Error(Exception("Failed to create context"))
-
-        try:
-            page_result = browser_context.get_page()
-            if page_result.is_error():
-                return Error(page_result.error)
-            page = page_result.default_value(None)
-            if page is None:
-                return Error(Exception("Failed to get page"))
-
-            action_context = ActionContext(
-                browser_manager=self, context_id=browser_context.id, page_id=page.id
-            )
-
-            action_result = await action.execute(action_context)
-
-            return action_result
-        finally:
-            await self.close_context(browser_context.id)
-
     @asynccontextmanager
     async def session(
         self, nickname: Optional[str] = None, options: Optional[Dict[str, Any]] = None
-    ) -> "AsyncIterator[BrowserContext]":
+    ) -> AsyncIterator[BrowserContext]:
         """Context manager for a browser session"""
         created = False
         context = None

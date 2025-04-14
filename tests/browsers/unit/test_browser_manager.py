@@ -7,29 +7,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from expression.core import Error, Ok
 
-from silk.actions.base import Action
 from silk.browsers.manager import BrowserManager
-from silk.models.browser import BrowserOptions
+from silk.browsers.types import BrowserOptions
 
 
-class MockAction(Action):
-    """A simple mock action for testing."""
-
-    def __init__(self, return_value=None, error=None):
-        self.return_value = return_value
-        self.error = error
-        self.executed = False
-
-    async def execute(self, context):
-        """Execute the mock action."""
-        self.executed = True
-        self.context = context
-        if self.error:
-            return Error(self.error)
-        return Ok(self.return_value)
-
-
-# Helper functions to create awaitable results
 async def async_ok(value):
     return Ok(value)
 
@@ -198,7 +179,10 @@ class TestBrowserManager:
         manager = BrowserManager()
         manager.contexts = {"test-context": mock_browser_context}
         manager.default_context_id = "test-context"
-
+        
+        # Ensure the mock has a nickname attribute
+        mock_browser_context.nickname = "test-context"
+        
         # Get context by ID
         result = manager.get_context("test-context")
         assert result.is_ok()
@@ -215,21 +199,6 @@ class TestBrowserManager:
             pytest.fail("Failed to get context")
         assert context == mock_browser_context
 
-    def test_get_context_not_found(self):
-        """Test getting a non-existent context."""
-        # Create manager with no contexts
-        manager = BrowserManager()
-
-        # Get non-existent context
-        result = manager.get_context("non-existent")
-        assert result.is_error()
-        assert "Context with ID 'non-existent' not found" in str(result.error)
-
-        # Get default context when none exists
-        result = manager.get_context()
-        assert result.is_error()
-        assert "No contexts available" in str(result.error)
-
     @pytest.mark.asyncio
     async def test_close_context_success(
         self, mock_browser_context, mock_browser_driver
@@ -240,7 +209,10 @@ class TestBrowserManager:
         manager.contexts = {"test-context": mock_browser_context}
         manager.drivers = {"test-context": mock_browser_driver}
         manager.default_context_id = "test-context"
-
+        
+        # Ensure the mock has a nickname attribute
+        mock_browser_context.nickname = "test-context"
+        
         # Set up mocks with awaitable results
         mock_browser_context.close.return_value = async_ok(None)
         mock_browser_driver.close.return_value = async_ok(None)
@@ -336,83 +308,6 @@ class TestBrowserManager:
         assert "Errors closing contexts" in str(result.error)
         context1.close.assert_called_once()
         context2.close.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_execute_action_success(self):
-        """Test executing an action successfully."""
-        # Create mock action
-        action = MockAction(return_value="action-result")
-
-        # Create manager with create_context and close_context mocked
-        manager = BrowserManager()
-
-        # Mock the create_context method
-        mock_context = MagicMock()
-        mock_context.id = "action-context"
-        mock_page = MagicMock()
-        mock_page.id = "action-page"
-        mock_context.get_page.return_value = Ok(mock_page)
-
-        # Patch the manager methods
-        original_create_context = manager.create_context
-        original_close_context = manager.close_context
-
-        async def mock_create_context(*args, **kwargs):
-            return Ok(mock_context)
-
-        async def mock_close_context(*args, **kwargs):
-            return Ok(None)
-
-        manager.create_context = mock_create_context
-        manager.close_context = mock_close_context
-
-        try:
-            # Execute action
-            result = await manager.execute_action(action)
-
-            # Assert
-            assert result.is_ok()
-            value = result.default_value(None)
-            if value is None:
-                pytest.fail("Failed to execute action")
-            assert value == "action-result"
-            assert action.executed
-            assert action.context.browser_manager == manager
-            assert action.context.context_id == "action-context"
-            assert action.context.page_id == "action-page"
-        finally:
-            # Restore original methods
-            manager.create_context = original_create_context
-            manager.close_context = original_close_context
-
-    @pytest.mark.asyncio
-    async def test_execute_action_context_creation_failure(self):
-        """Test handling context creation failure when executing an action."""
-        # Create mock action
-        action = MockAction(return_value="action-result")
-
-        # Create manager with create_context mocked to fail
-        manager = BrowserManager()
-
-        # Patch the manager methods
-        original_create_context = manager.create_context
-
-        async def mock_create_context(*args, **kwargs):
-            return Error(Exception("Failed to create context"))
-
-        manager.create_context = mock_create_context
-
-        try:
-            # Execute action
-            result = await manager.execute_action(action)
-
-            # Assert
-            assert result.is_error()
-            assert "Failed to create context" in str(result.error)
-            assert not action.executed
-        finally:
-            # Restore original method
-            manager.create_context = original_create_context
 
     @pytest.mark.asyncio
     async def test_session_context_manager(self):

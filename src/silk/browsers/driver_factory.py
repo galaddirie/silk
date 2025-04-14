@@ -3,7 +3,7 @@ Driver factory module for creating browser driver instances based on available d
 """
 
 from importlib import import_module
-from typing import Any, Literal, Optional, TypeVar, cast
+from typing import Literal, Optional, TypeVar, cast
 
 from silk.browsers.driver import BrowserDriver, BrowserOptions
 
@@ -18,7 +18,7 @@ class DriverFactory:
     @staticmethod
     def create_driver(
         driver_type: ValidDriverTypes, options: Optional[BrowserOptions] = None
-    ) -> BrowserDriver[Any]:
+    ) -> BrowserDriver:
         """
         Create a browser driver instance of the specified type.
 
@@ -49,7 +49,7 @@ class DriverFactory:
         try:
             module = import_module(module_name)
             driver_class = getattr(module, class_name)
-            return cast(BrowserDriver[Any], driver_class(options))
+            return cast(BrowserDriver, driver_class(options))
         except ImportError as e:
             package_names = {
                 "playwright": "playwright",
@@ -68,6 +68,6 @@ class DriverFactory:
 
 def create_driver(
     driver_type: ValidDriverTypes, options: Optional[BrowserOptions] = None
-) -> BrowserDriver[Any]:
+) -> BrowserDriver:
     """Shorthand function to create a browser driver instance"""
     return DriverFactory.create_driver(driver_type, options)
