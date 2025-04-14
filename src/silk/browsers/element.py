@@ -18,14 +18,13 @@ from expression.core import Result
 
 if TYPE_CHECKING:
     from silk.browsers.driver import BrowserDriver
-    from silk.models.browser import TypeOptions
+    from silk.browsers.types import TypeOptions
 
 T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: remove the execute_script methods, these should be handled by the driver or in the implementation of this base class
 @runtime_checkable
 class ElementHandle(Generic[T], Protocol):
     """

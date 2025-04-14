@@ -8,14 +8,13 @@
 [![Type check: mypy](https://img.shields.io/badge/type%20check-mypy-blue)](https://github.com/python/mypy)
 
 
-**Silk** is a functional web scraping framework that transforms how you build web automation in Python. By leveraging composable "Actions" and Railway-Oriented Programming, Silk enables you to craft elegant, resilient scrapers with true functional programming patterns.
+**Silk** is a declative web scraping framework that transforms how you build web automation in Python. By leveraging composable "Actions", Silk enables you to craft elegant, resilient scrapers with true functional programming patterns. Built with [expression](https://github.com/dbrattli/Expression) and [fp-ops](https://github.com/galaddirie/fp-ops/)
 
 ## Key Features
 
-- **Railway-Oriented Programming**: Honest error handling with errors as values, no more nested try/except blocks
+- **Railway-Oriented Programming**: Honest error handling with errors as values.
 - **Immutable Data Flow**: Thread-safe operations with predictable behavior
 - **Resilient by Design**: Built-in retry mechanisms and fallback selectors
-- **Type-Safe**: Full typing support with Mypy and Pydantic
 - **Browser Agnostic**: Unified API across Playwright, Selenium, and other automation tools
 - **Parallelization**: Run operations concurrently with simple `&` composition
 
@@ -26,35 +25,32 @@ Silk treats composition as a **first-class citizen**:
 - **Actions as values**: Browser actions are composable units that can be stored, passed, and combined
 - **Intuitive operators**: Compose with natural symbols (`>>`, `&`, `|`) for readable pipelines
 - **Composition is associative**: (a >> b) >> c = a >> (b >> c) - allowing flexible pipeline construction
-
-
 - **Modular architecture**: Complex workflows emerge from simple, reusable components
 
 ```python
-# Traditional approach with nested logic
-try:
-    driver.get(url)
-    try:
-        element = driver.find_element_by_css_selector(".product-title")
-        # More nested try/except blocks...
-    except:
-        # Error handling
-except:
-    # More error handling
-
 # Silk's compositional approach
-product_info = (
-    Navigate(url)
-    >> GetText(".product-title") 
-    >> GetText(".product-price")
-)
+def get_product(url):
+    return (
+        Navigate(url)
+        >> GetText(".product-title")
+        >> GetText(".product-price")
+    )
 
 # Extract multiple items in parallel
-product_details = Navigate(url) >> (
-    GetText(".product-title") & 
-    GetText(".product-price") & 
-    GetAttribute(".product-image", "src")
-)
+def purchase_product():
+    return (
+        Query("#buy-button")
+        >> Click
+        >> Query("#checkout-button")
+        >> Click
+        >> GetText(".order-summary")
+    )
+
+# Compose the actions
+purchase_flow = get_product >> purchase_product
+
+# Execute the pipeline
+purchase_flow("https://example.com/product")
 ```
 
 ### Declarative API
@@ -66,18 +62,70 @@ Silk embraces **declarative programming** that focuses on **what** to accomplish
 driver.get(url)
 driver.find_element_by_id("username").send_keys("user")
 driver.find_element_by_id("password").send_keys("pass")
-driver.find_element_by_css_selector("button[type='submit']").click()
+driver.page.mouse.move(
+    driver.find_element_by_css_selector("button[type='submit']").rect["x"],
+    driver.find_element_by_css_selector("button[type='submit']").rect["y"]
+)
+driver.page.mouse.down()
+driver.page.mouse.up()
 
 # Declarative: WHAT to accomplish with Silk
 login_flow = (
-    Navigate(url)
+    Navigate(url) 
     >> Fill("#username", "user") 
-    >> Fill("#password", "pass")
+    >> Fill("#password", "pass") 
     >> Click("button[type='submit']")
+)
+
+# Execute the pipeline
+login_flow("https://example.com/login")
+```
+
+With smart defaults silk allows you to write detectionless, declarative code that is easy to understand and maintain, without the need to worry about the underlying implementation details of the browser.
+
+## Placeholder System
+
+Silk provides a convenient placeholder system that simplifies function composition and lambda expressions:
+
+```python
+from silk.placeholder import _
+
+add(1, 2) >> multiply(_, 2)
+
+# is equivalent to
+add(1, 2) >> (lambda x: multiply(x, 2))
+
+add(1, 2).bind(lambda x: multiply(x, 2))
+```
+
+The `_` symbol acts as a placeholder for the value passed from the previous action, allowing for more concise and readable code when composing functions. This is especially useful in data transformation chains where the output of one action becomes the input to another.
+
+### Examples
+
+```python
+from silk.placeholder import _
+from silk.actions.extraction import GetText
+from silk.actions.navigation import Navigate
+
+# Extract price and convert to float using placeholder
+price_pipeline = (
+    GetText(".price-element") 
+    >> _.replace("$", "").strip() 
+    >> float(_)
+)
+
+# Extract multiple data points and construct a dictionary
+product_pipeline = (
+    Navigate("https://example.com/product") 
+    >> {
+        "title": GetText(".product-title"),
+        "price": GetText(".price") >> _.replace("$", "").strip() >> float(_),
+        "rating": GetText(".rating") >> float(_)
+    }
 )
 ```
 
-
+The placeholder system integrates seamlessly with Silk's compositional approach, enabling elegant data transformations without verbose lambda expressions.
 
 ## Installation
 
@@ -101,10 +149,10 @@ async def main():
     async with BrowserManager() as manager:
         # Define a scraping pipeline
         pipeline = Navigate("https://example.com") >> GetText("h1")
-        
+
         # Execute the pipeline
         result = await pipeline(manager)
-        
+
         if result.is_ok():
             print(f"Page title: {result.default_value(None)}")
         else:
@@ -149,12 +197,12 @@ Navigate(url) & Navigate(url2) & Navigate(url3)
 # Each parallel branch can contain its own chain of sequential actions
 (
     # First website: Get product details
-    (Navigate("https://site1.com/product") 
+    (Navigate("https://site1.com/product")
      >> Wait(1000)
      >> GetText(".product-name"))
     &
     # Second website: Search and extract first result
-    (Navigate("https://site2.com") 
+    (Navigate("https://site2.com")
      >> Fill("#search-input", "smartphone")
      >> Click("#search-button")
      >> Wait(2000)
@@ -194,7 +242,7 @@ async def scrape_product(url, manager):
         Navigate(url)
         >> GetText(".product-title")
     )
-    
+
     # Strategy 2: Click on a tab first, then extract from revealed content
     secondary_strategy = (
         Navigate(url)
@@ -202,19 +250,19 @@ async def scrape_product(url, manager):
         >> wait(500)  # Wait for tab content to load
         >> GetText(".tab-content h1")
     )
-    
+
     # Strategy 3: Extract from structured JSON data in script tag
     json_strategy = (
         Navigate(url)
         >> GetAttribute('script[type="application/ld+json"]', "textContent")
         # Additional processing would parse the JSON and extract title
     )
-    
+
     # Combine all strategies with fallback operator
     product_title_pipeline = (
         primary_strategy | secondary_strategy | json_strategy
     )
-    
+
     # Multiple fallback approaches for price extraction
     price_pipeline = (
         # Try special sale price first
@@ -224,7 +272,7 @@ async def scrape_product(url, manager):
         (Navigate(url) >> GetText(".regular-price"))
         |
         # Then try to extract from a pricing table
-        (Navigate(url) 
+        (Navigate(url)
          >> ExtractTable("#pricing-table")
          # Additional processing would extract price from table data
         )
@@ -235,11 +283,11 @@ async def scrape_product(url, manager):
          # Additional processing would filter and extract price
         )
     )
-    
+
     # Execute both pipelines
     title_result = await product_title_pipeline(manager)
     price_result = await price_pipeline(manager)
-    
+
     return {
         "title": title_result.default_value("Unknown Title"),
         "price": price_result.default_value("Price Unavailable")
@@ -255,7 +303,7 @@ def build_robust_product_scraper(url):
         xpath("//div[@class='product-info']//h1"),
         css(".pdp-title")
     )
-    
+
     price_selectors = SelectorGroup(
         "product_price",
         css(".special-price .amount"),
@@ -263,14 +311,14 @@ def build_robust_product_scraper(url):
         xpath("//span[contains(@class, 'price')]"),
         css(".price-info .price")
     )
-    
+
     image_selectors = SelectorGroup(
         "product_image",
         css(".product-image-gallery img"),
         css(".main-image"),
         xpath("//div[contains(@class, 'gallery')]//img")
     )
-    
+
     # Use these groups in a pipeline with retries
     return (
         Navigate(url)
@@ -548,22 +596,22 @@ async def extract_price(context, selector):
     page_result = await context.get_page()
     if page_result.is_error():
         return page_result
-        
+
     page = page_result.default_value(None)
     if page is None:
-        return Error("No page found")   
-    
+        return Error("No page found")
+
     # Extract text from element
     text_result = await (
         page.query_selector(selector)
         .then(lambda elem: elem.get_text())
     )
-    
+
     if text_result.is_error():
         return text_result
-        
+
     text = text_result.default_value(None)
-    
+
     try:
         # Parse price from text
         price = float(text.replace('$', '').strip())
@@ -592,7 +640,7 @@ manager = BrowserManager(driver_type="playwright", default_options=options)
 ## Roadmap
 
 - [x] Initial release with Playwright support
-- [ ] Improve parallel execution 
+- [ ] Improve parallel execution
 - [ ] Support multiple actions in parallel in the same context/page eg. (GetText & GetAttribute & GetHtml) in an ergonomic way
 - [ ] Implement left shift (<<) operator for context modifiers and action decorators
 - [ ] improve manager ergonomics

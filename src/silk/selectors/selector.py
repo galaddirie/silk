@@ -68,15 +68,13 @@ class SelectorGroup:
                 - Tuples of (value, type)
         """
         self.name = name
-        self.selectors = []
-        
+        self.selectors: List[Selector] = []
+
         for selector in selectors:
             if isinstance(selector, Selector):
                 self.selectors.append(selector)
             elif isinstance(selector, str):
-                self.selectors.append(
-                    Selector(type=SelectorType.CSS, value=selector)
-                )
+                self.selectors.append(Selector(type=SelectorType.CSS, value=selector))
             elif isinstance(selector, tuple) and len(selector) == 2:
                 selector_value, selector_type = selector
                 if isinstance(selector_type, str):

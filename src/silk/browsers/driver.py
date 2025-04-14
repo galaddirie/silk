@@ -1,37 +1,34 @@
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Protocol, Type, Union
 
 from expression.core import Result
 
 from silk.browsers.element import ElementHandle
-from silk.models.browser import (
+from silk.browsers.types import (
     BrowserOptions,
-    ClickOptions,
     CoordinateType,
     DragOptions,
-    KeyPressOptions,
     MouseButtonLiteral,
-    MouseMoveOptions,
+    MouseOptions,
     NavigationOptions,
     TypeOptions,
     WaitOptions,
 )
 
-T = TypeVar("T")
-R = TypeVar("R")
-
 logger = logging.getLogger(__name__)
 
 
-class BrowserDriver(ABC, Generic[T]):
+class BrowserDriver(Protocol):
     """
     Abstract browser driver interface that defines the contract for browser automation.
 
     All concrete browser implementations (like Playwright, Selenium, etc.) must
     implement this interface to be usable with the Silk action system.
     """
+
+    options: BrowserOptions
 
     def __init__(self, options: BrowserOptions):
         """
@@ -299,7 +296,7 @@ class BrowserDriver(ABC, Generic[T]):
     # users should be able to easily click on an element or position within a context and trigger a mouse event at the same time
     @abstractmethod
     async def click(
-        self, page_id: str, selector: str, options: Optional[ClickOptions] = None
+        self, page_id: str, selector: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
         """
         Click an element in a page
@@ -316,7 +313,7 @@ class BrowserDriver(ABC, Generic[T]):
 
     @abstractmethod
     async def double_click(
-        self, page_id: str, selector: str, options: Optional[ClickOptions] = None
+        self, page_id: str, selector: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
         """
         Double click an element in a page
@@ -417,10 +414,10 @@ class BrowserDriver(ABC, Generic[T]):
     @abstractmethod
     async def mouse_move(
         self,
-        context_id: str,
-        x: int,
-        y: int,
-        options: Optional[MouseMoveOptions] = None,
+        page_id: str,
+        x: float,
+        y: float,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """
         Move the mouse to the specified coordinates within a context
@@ -439,9 +436,9 @@ class BrowserDriver(ABC, Generic[T]):
     @abstractmethod
     async def mouse_down(
         self,
-        context_id: str,
+        page_id: str,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """
         Press a mouse button within a context
@@ -459,15 +456,15 @@ class BrowserDriver(ABC, Generic[T]):
     @abstractmethod
     async def mouse_up(
         self,
-        context_id: str,
+        page_id: str,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """
         Release a mouse button within a context
 
         Args:
-            context_id: ID of the context for mouse action
+            page_id: ID of the page for mouse action
             button: Mouse button to release
             options: Mouse options
 
@@ -479,15 +476,15 @@ class BrowserDriver(ABC, Generic[T]):
     @abstractmethod
     async def mouse_click(
         self,
-        context_id: str,
+        page_id: str,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """
         Click at the current mouse position within a context
 
         Args:
-            context_id: ID of the context for mouse action
+            page_id: ID of the page for mouse action
             button: Mouse button to click with
             options: Mouse options
 
@@ -499,16 +496,16 @@ class BrowserDriver(ABC, Generic[T]):
     @abstractmethod
     async def mouse_double_click(
         self,
-        context_id: str,
+        page_id: str,
         x: int,
         y: int,
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """
         Double click at the specified coordinates within a context
 
         Args:
-            context_id: ID of the context for mouse action
+            page_id: ID of the page for mouse action
             x: X coordinate
             y: Y coordinate
             options: Mouse options
@@ -521,18 +518,18 @@ class BrowserDriver(ABC, Generic[T]):
     @abstractmethod
     async def mouse_drag(
         self,
-        context_id: str,
-        source: Union[str, ElementHandle, CoordinateType],
-        target: Union[str, ElementHandle, CoordinateType],
+        page_id: str,
+        source: CoordinateType,
+        target: CoordinateType,
         options: Optional[DragOptions] = None,
     ) -> Result[None, Exception]:
         """
         Drag from one element or position to another within a context
 
         Args:
-            context_id: ID of the context for drag operation
-            source: Source selector, element, or coordinates
-            target: Target selector, element, or coordinates
+            page_id: ID of the page for drag operation
+            source: Source coordinates
+            target: Target coordinates
             options: Drag options
 
         Returns:
@@ -542,13 +539,13 @@ class BrowserDriver(ABC, Generic[T]):
 
     @abstractmethod
     async def key_press(
-        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+        self, page_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
         """
         Press a key or key combination within a context
 
         Args:
-            context_id: ID of the context for keyboard action
+            page_id: ID of the page for keyboard action
             key: Key to press
             options: Key press options
 
@@ -559,13 +556,13 @@ class BrowserDriver(ABC, Generic[T]):
 
     @abstractmethod
     async def key_down(
-        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+        self, page_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
         """
         Press and hold a key within a context
 
         Args:
-            context_id: ID of the context for keyboard action
+            page_id: ID of the page for keyboard action
             key: Key to press
             options: Key press options
 
@@ -576,13 +573,13 @@ class BrowserDriver(ABC, Generic[T]):
 
     @abstractmethod
     async def key_up(
-        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+        self, page_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
         """
         Release a key within a context
 
         Args:
-            context_id: ID of the context for keyboard action
+            page_id: ID of the page for keyboard action
             key: Key to release
             options: Key press options
 

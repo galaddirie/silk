@@ -4,11 +4,7 @@ Silk - A flexible browser automation library
 
 __version__ = "0.1.6"
 
-from expression import Ok, Error, Result, Option, Some, Nothing
+from expression import Error, Nothing, Ok, Option, Result, Some  # noqa
+from fp_ops import operation  # noqa
 
-from . import actions
-from . import browsers
-from . import models
-from . import selectors
-
-from .actions.decorators import action
+__all__ = ["operation", "Error", "Nothing", "Ok", "Option", "Result", "Some"]

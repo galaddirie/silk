@@ -5,7 +5,7 @@ Tests for the ActionContext class.
 import pytest
 from expression.core import Error, Ok
 
-from silk.models.browser import ActionContext
+from silk.actions.context import ActionContext
 
 
 class TestActionContext:

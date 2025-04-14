@@ -3,24 +3,25 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from expression.core import Error, Ok, Result
+from fp_ops import BaseContext
+from pydantic import Field
 
 if TYPE_CHECKING:
     from silk.browsers.driver import BrowserDriver
     from silk.browsers.element import ElementHandle
     from silk.browsers.manager import BrowserManager
-    from silk.models.browser import (
-        ClickOptions,
+    from silk.browsers.types import (
         CoordinateType,
         DragOptions,
-        KeyPressOptions,
         MouseButtonLiteral,
-        MouseMoveOptions,
+        MouseOptions,
         NavigationOptions,
         TypeOptions,
         WaitOptions,
     )
 
 logger = logging.getLogger(__name__)
+
 
 
 class BrowserPage:
@@ -128,7 +129,7 @@ class BrowserPage:
         return await self.driver.get_source(self.id)
 
     async def click(
-        self, selector: str, options: Optional["ClickOptions"] = None
+        self, selector: str, options: Optional["MouseOptions"] = None
     ) -> Result[None, Exception]:
         return await self.driver.click(self.id, selector, options)
 
@@ -138,7 +139,7 @@ class BrowserPage:
         return await self.driver.fill(self.id, selector, value, options)
 
     async def double_click(
-        self, selector: str, options: Optional["ClickOptions"] = None
+        self, selector: str, options: Optional["MouseOptions"] = None
     ) -> Result[None, Exception]:
         """Double click on an element"""
         return await self.driver.double_click(self.id, selector, options)
@@ -169,6 +170,7 @@ class BrowserContext:
         manager: "BrowserManager",
         options: Optional[Dict[str, Any]] = None,
         context_ref: Optional[Any] = None,
+        nickname: Optional[str] = None,
     ):
         self.id = context_id
         self.driver = driver
@@ -177,7 +179,7 @@ class BrowserContext:
         self.context_ref = context_ref
         self.pages: Dict[str, BrowserPage] = {}
         self.default_page_id: Optional[str] = None
-
+        self.nickname = nickname or context_id 
     async def create_page(
         self, nickname: Optional[str] = None
     ) -> Result[BrowserPage, Exception]:
@@ -230,9 +232,26 @@ class BrowserContext:
             logger.error(f"Error getting page: {e}")
             return Error(e)
 
+    async def close_page(self, page_id: Optional[str] = None) -> Result[None, Exception]:
+        """Close a page by ID or the default page"""
+        try:
+            page_id = page_id or self.default_page_id
+            
+            if page_id is None:
+                return Error(Exception("No pages available in this context"))
+
+            page = self.pages.get(page_id)
+            if page is None:
+                return Error(Exception(f"Page with ID '{page_id}' not found"))
+
+            return await page.close()
+        except Exception as e:
+            logger.error(f"Error closing page: {e}")
+            return Error(e)
+
     # Context-level input methods
     async def mouse_move(
-        self, x: int, y: int, options: Optional["MouseMoveOptions"] = None
+        self, x: int, y: int, options: Optional["MouseOptions"] = None
     ) -> Result[None, Exception]:
         """Move the mouse to coordinates"""
         return await self.driver.mouse_move(self.id, x, y, options)
@@ -240,7 +259,7 @@ class BrowserContext:
     async def mouse_down(
         self,
         button: "MouseButtonLiteral" = "left",
-        options: Optional["MouseMoveOptions"] = None,
+        options: Optional["MouseOptions"] = None,
     ) -> Result[None, Exception]:
         """Press a mouse button"""
         return await self.driver.mouse_down(self.id, button, options)
@@ -248,7 +267,7 @@ class BrowserContext:
     async def mouse_up(
         self,
         button: "MouseButtonLiteral" = "left",
-        options: Optional["MouseMoveOptions"] = None,
+        options: Optional["MouseOptions"] = None,
     ) -> Result[None, Exception]:
         """Release a mouse button"""
         return await self.driver.mouse_up(self.id, button, options)
@@ -256,40 +275,40 @@ class BrowserContext:
     async def mouse_click(
         self,
         button: "MouseButtonLiteral" = "left",
-        options: Optional["MouseMoveOptions"] = None,
+        options: Optional["MouseOptions"] = None,
     ) -> Result[None, Exception]:
         """Click at the current mouse position"""
         return await self.driver.mouse_click(self.id, button, options)
 
     async def mouse_double_click(
-        self, x: int, y: int, options: Optional["MouseMoveOptions"] = None
+        self, x: int, y: int, options: Optional["MouseOptions"] = None
     ) -> Result[None, Exception]:
         """Double click at the specified coordinates"""
         return await self.driver.mouse_double_click(self.id, x, y, options)
 
     async def mouse_drag(
         self,
-        source: Union[str, "ElementHandle", "CoordinateType"],
-        target: Union[str, "ElementHandle", "CoordinateType"],
+        source: 'CoordinateType',
+        target: 'CoordinateType',
         options: Optional["DragOptions"] = None,
     ) -> Result[None, Exception]:
         """Drag from one element or position to another"""
         return await self.driver.mouse_drag(self.id, source, target, options)
 
     async def key_press(
-        self, key: str, options: Optional["KeyPressOptions"] = None
+        self, key: str, options: Optional["TypeOptions"] = None
     ) -> Result[None, Exception]:
         """Press a key or key combination"""
         return await self.driver.key_press(self.id, key, options)
 
     async def key_down(
-        self, key: str, options: Optional["KeyPressOptions"] = None
+        self, key: str, options: Optional["TypeOptions"] = None
     ) -> Result[None, Exception]:
         """Press and hold a key"""
         return await self.driver.key_down(self.id, key, options)
 
     async def key_up(
-        self, key: str, options: Optional["KeyPressOptions"] = None
+        self, key: str, options: Optional["TypeOptions"] = None
     ) -> Result[None, Exception]:
         """Release a key"""
         return await self.driver.key_up(self.id, key, options)

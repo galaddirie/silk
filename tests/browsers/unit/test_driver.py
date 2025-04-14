@@ -10,14 +10,12 @@ from expression.core import Error, Ok, Result
 
 from silk.browsers.driver import BrowserDriver
 from silk.browsers.element import ElementHandle
-from silk.models.browser import (
+from silk.browsers.types import (
     BrowserOptions,
-    ClickOptions,
     CoordinateType,
     DragOptions,
-    KeyPressOptions,
     MouseButtonLiteral,
-    MouseMoveOptions,
+    MouseOptions,
     NavigationOptions,
     TypeOptions,
     WaitOptions,
@@ -136,14 +134,14 @@ class MockBrowserDriver(BrowserDriver):
         return Ok(None)
 
     async def click(
-        self, page_id: str, selector: str, options: Optional[ClickOptions] = None
+        self, page_id: str, selector: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
         return Ok(None)
 
     async def double_click(
-        self, page_id: str, selector: str, options: Optional[ClickOptions] = None
+        self, page_id: str, selector: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
@@ -194,7 +192,7 @@ class MockBrowserDriver(BrowserDriver):
         context_id: str,
         x: int,
         y: int,
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
@@ -204,7 +202,7 @@ class MockBrowserDriver(BrowserDriver):
         self,
         context_id: str,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
@@ -214,7 +212,7 @@ class MockBrowserDriver(BrowserDriver):
         self,
         context_id: str,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
@@ -224,7 +222,7 @@ class MockBrowserDriver(BrowserDriver):
         self,
         context_id: str,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
@@ -235,7 +233,7 @@ class MockBrowserDriver(BrowserDriver):
         context_id: str,
         x: int,
         y: int,
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
@@ -253,21 +251,21 @@ class MockBrowserDriver(BrowserDriver):
         return Ok(None)
 
     async def key_press(
-        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+        self, context_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
     async def key_down(
-        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+        self, context_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))
         return Ok(None)
 
     async def key_up(
-        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+        self, context_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
         if context_id not in self.contexts:
             return Error(Exception(f"Context {context_id} not found"))

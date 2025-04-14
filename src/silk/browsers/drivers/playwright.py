@@ -24,14 +24,12 @@ from playwright.async_api import async_playwright
 
 from silk.browsers.driver import BrowserDriver
 from silk.browsers.element import ElementHandle
-from silk.models.browser import (
+from silk.browsers.types import (
     BrowserOptions,
-    ClickOptions,
     CoordinateType,
     DragOptions,
-    KeyPressOptions,
     MouseButtonLiteral,
-    MouseMoveOptions,
+    MouseOptions,
     NavigationOptions,
     NavigationWaitLiteral,
     TypeOptions,
@@ -287,7 +285,7 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
             return Error(e)
 
 
-class PlaywrightDriver(BrowserDriver[Playwright]):
+class PlaywrightDriver(BrowserDriver):
     """
     Playwright implementation of the browser driver.
     """
@@ -300,6 +298,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
         self.contexts: Dict[str, PlaywrightContext] = {}
         self.pages: Dict[str, Page] = {}
         self.initialized = False
+        self.options = options
 
     async def launch(self) -> Result[None, Exception]:
         """Launch the Playwright browser."""
@@ -309,20 +308,14 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
         try:
             self.playwright = await async_playwright().start()
 
-            # Default to chromium if not specified
-            browser_type = getattr(self.options, "browser_type", "chromium")
-            if browser_type == "chrome":
-                browser_type = "chromium"
+            browser_type = (
+                self.options.browser_type if self.options.browser_type else "chromium"
+            )
 
             # Prepare launch options as a proper dictionary
             launch_options: Dict[str, Any] = {
                 "headless": self.options.headless,
             }
-
-            # Add slow_mo if it exists
-            slow_mo = getattr(self.options, "slow_mo", None)
-            if slow_mo is not None:
-                launch_options["slow_mo"] = slow_mo
 
             # Add proxy if specified
             if self.options.proxy:
@@ -388,18 +381,19 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
                 }
 
             # Set locale
-            locale = getattr(self.options, "locale", None)
+            locale = self.options.locale
             if locale:
                 context_options["locale"] = locale
 
             # Set timezone
-            timezone = getattr(self.options, "timezone", None)
+            timezone = self.options.timezone
             if timezone:
                 context_options["timezone_id"] = timezone
 
             # Set user agent
-            if self.options.user_agent:
-                context_options["user_agent"] = self.options.user_agent
+            user_agent = self.options.user_agent
+            if user_agent:
+                context_options["user_agent"] = user_agent
 
             # Merge additional options
             if options:
@@ -725,7 +719,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             return Error(e)
 
     async def click(
-        self, page_id: str, selector: str, options: Optional[ClickOptions] = None
+        self, page_id: str, selector: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
         """Click an element in a page."""
         try:
@@ -745,7 +739,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
                     click_options["click_count"] = options.click_count
 
                 # Set delay if provided
-                delay = getattr(options, "delay_between_ms", None)
+                delay = options.delay_between_ms
                 if delay is not None:
                     click_options["delay"] = delay
 
@@ -754,7 +748,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
                     click_options["timeout"] = options.timeout
 
                 # Set force if provided
-                force = getattr(options, "force", None)
+                force = options.force
                 if force is not None:
                     click_options["force"] = force
 
@@ -769,7 +763,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             return Error(e)
 
     async def double_click(
-        self, page_id: str, selector: str, options: Optional[ClickOptions] = None
+        self, page_id: str, selector: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
         """Double click an element in a page."""
         try:
@@ -930,9 +924,9 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
     async def mouse_move(
         self,
         context_id: str,
-        x: int,
-        y: int,
-        options: Optional[MouseMoveOptions] = None,
+        x: float,
+        y: float,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """Move the mouse to the specified coordinates within a context."""
         try:
@@ -961,7 +955,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
         self,
         context_id: str,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """Press a mouse button within a context."""
         try:
@@ -986,7 +980,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
         self,
         context_id: str,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """Release a mouse button within a context."""
         try:
@@ -1011,7 +1005,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
         self,
         context_id: str,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """Click at the current mouse position within a context."""
         try:
@@ -1038,7 +1032,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
         context_id: str,
         x: int,
         y: int,
-        options: Optional[MouseMoveOptions] = None,
+        options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         """Double click at the specified coordinates within a context."""
         try:
@@ -1112,7 +1106,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             return Error(e)
 
     async def key_press(
-        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+        self, context_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
         """Press a key or key combination within a context."""
         try:
@@ -1139,7 +1133,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             return Error(e)
 
     async def key_down(
-        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+        self, context_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
         """Press and hold a key within a context."""
         try:
@@ -1161,7 +1155,7 @@ class PlaywrightDriver(BrowserDriver[Playwright]):
             return Error(e)
 
     async def key_up(
-        self, context_id: str, key: str, options: Optional[KeyPressOptions] = None
+        self, context_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
         """Release a key within a context."""
         try:

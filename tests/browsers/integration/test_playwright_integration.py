@@ -5,9 +5,7 @@ Tests for the Playwright implementation of the browser driver in Silk.
 import pytest
 
 from silk.browsers.drivers.playwright import PlaywrightDriver
-from silk.models.browser import (
-    BrowserOptions,
-)
+from silk.browsers.types import BrowserOptions
 
 
 @pytest.mark.integration

@@ -1,21 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0]
 
-### Added\
-- added variable aliases for flow functions (ex. branch -> If)
-- added assertion actions, no real use case yet, exploring use cases
-
-### Fixed
-- fix action decorator so its not @action() but @action 
-- build pipeline no longer overides mypy version
 
 ### Changed
-- Refactored actions to be true "pure" functions
-- actions are associative
-- Move WaitForSelector and WaitForFunction from actions.navigation to actions.elements
-- renamed actions.extraction to action.elements
-
+- Complete refactor using [fp-ops](https://github.com/galaddirie/fp-ops/)
 
 
 ## [0.1.6] - 2025-04-08
