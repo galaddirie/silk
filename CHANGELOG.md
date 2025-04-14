@@ -1,10 +1,37 @@
 # Changelog
 
-## [0.2.0]
+## [0.2.0] - 2025-04-13
 
+### Added
+- Complete API reference documentation
+- Enhanced context management with `InitializeContext` and `WithContext`
+- New selector system with improved fallback mechanisms
+- Map operations for collections with `.map()` method
+- Improved type hints throughout the codebase
 
 ### Changed
 - Complete refactor using [fp-ops](https://github.com/galaddirie/fp-ops/)
+- Module restructuring:
+  - Moved extraction actions from `silk.actions.extraction` to `silk.actions.elements`
+  - Moved flow control functions from `silk.actions.flow` to `silk.flow`
+  - Moved composition functions from `silk.actions.composition` to `silk.composition` 
+  - Moved browser options from `silk.models.browser` to `silk.browsers.types`
+- Changed execution model to explicitly use contexts: `action(context)` instead of `action(manager)`
+- Improved error handling with more detailed error types
+- Enhanced retry mechanisms with better backoff strategies
+- Optimized parallel execution for better performance
+
+### Fixed
+- Fixed context propagation issues in nested actions
+- Resolved race conditions in parallel execution
+- Improved error reporting with more descriptive messages
+- Fixed selector resolution in complex DOM structures
+
+### Breaking Changes
+- All actions now require a context parameter instead of a manager
+- Changed import paths for many core components
+- Renamed several functions for consistency
+- Modified function signatures to support the new context-based model
 
 
 ## [0.1.6] - 2025-04-08

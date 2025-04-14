@@ -49,8 +49,8 @@ def purchase_product():
 # Compose the actions
 purchase_flow = get_product >> purchase_product
 
-# Execute the pipeline
-purchase_flow("https://example.com/product")
+# Execute the pipeline with a context
+purchase_flow(context=context)
 ```
 
 ### Declarative API
@@ -104,7 +104,7 @@ The `_` symbol acts as a placeholder for the value passed from the previous acti
 
 ```python
 from silk.placeholder import _
-from silk.actions.extraction import GetText
+from silk.actions.elements import GetText
 from silk.actions.navigation import Navigate
 
 # Extract price and convert to float using placeholder
@@ -142,16 +142,20 @@ pip install silk-scraper[playwright]  # or [selenium], [puppeteer], [all]
 ```python
 import asyncio
 from silk.actions.navigation import Navigate
-from silk.actions.extraction import GetText
+from silk.actions.elements import GetText
 from silk.browsers.manager import BrowserManager
+from silk.actions.manage import InitializeContext
 
 async def main():
     async with BrowserManager() as manager:
+        # Create a context first
+        context = await InitializeContext(manager)
+        
         # Define a scraping pipeline
         pipeline = Navigate("https://example.com") >> GetText("h1")
 
         # Execute the pipeline
-        result = await pipeline(manager)
+        result = await pipeline(context=context)
 
         if result.is_ok():
             print(f"Page title: {result.default_value(None)}")
@@ -230,13 +234,13 @@ Fallback operations are powerful tools for building resilient scraping pipelines
 
 ```python
 from silk.actions.navigation import Navigate
-from silk.actions.extraction import GetText, GetAttribute, QueryAll, ExtractTable
+from silk.actions.elements import GetText, GetAttribute, QueryAll, ExtractTable
 from silk.actions.input import Click
-from silk.actions.flow import wait, retry, fallback
+from silk.flow import wait, retry
 from silk.selectors.selector import SelectorGroup, css, xpath
 
 # Example: Advanced product information scraping with multiple strategies
-async def scrape_product(url, manager):
+async def scrape_product(url, context):
     # Strategy 1: Direct extraction using primary selectors
     primary_strategy = (
         Navigate(url)
@@ -285,8 +289,8 @@ async def scrape_product(url, manager):
     )
 
     # Execute both pipelines
-    title_result = await product_title_pipeline(manager)
-    price_result = await price_pipeline(manager)
+    title_result = await product_title_pipeline(context)
+    price_result = await price_pipeline(context)
 
     return {
         "title": title_result.default_value("Unknown Title"),
@@ -337,15 +341,15 @@ Silk provides a rich set of functions for composing actions that go beyond the b
 Combines multiple actions to execute in sequence, collecting **all** results into a Block.
 
 ```python
-from silk.actions.composition import sequence
-from silk.actions.extraction import GetText
+from silk.flow import sequence
+from silk.actions.elements import GetText
 
 # Extract multiple text elements in sequence
 product_data = await sequence(
     GetText(".product-title"),
     GetText(".product-price"),
     GetText(".product-description")
-)
+)(context)
 
 # product_data contains a Block with all three text values
 titles = product_data.default_value(Block.empty())
@@ -356,16 +360,16 @@ titles = product_data.default_value(Block.empty())
 Executes multiple actions in parallel and collects their results, improving performance for independent operations.
 
 ```python
-from silk.actions.composition import parallel
+from silk.flow import parallel
 from silk.actions.navigation import Navigate
-from silk.actions.extraction import GetText
+from silk.actions.elements import GetText
 
 # Scrape multiple pages in parallel
 results = await parallel(
     Navigate("https://site1.com") >> GetText(".data"),
     Navigate("https://site2.com") >> GetText(".data"),
     Navigate("https://site3.com") >> GetText(".data")
-)
+)(context)
 
 # Each action runs in a separate browser context for true parallelism
 ```
@@ -375,10 +379,10 @@ results = await parallel(
 Creates a pipeline where each action receives the result of the previous action, enabling data transformation chains.
 
 ```python
-from silk.actions.composition import pipe
-from silk.actions.extraction import GetText
+from silk.flow import pipe
+from silk.actions.elements import GetText
 from silk.actions.decorators import action
-from expression.core import Ok
+from expression.core import Ok, Error
 
 @action
 async def parse_price(context, price_text):
@@ -393,7 +397,7 @@ async def parse_price(context, price_text):
 price = await pipe(
     GetText(".price"),        # Returns "$42.99"
     lambda text: parse_price(text)  # Transforms to 42.99
-)
+)(context)
 ```
 
 ### fallback(*actions)
@@ -401,15 +405,15 @@ price = await pipe(
 Tries actions in sequence until one succeeds. This is the functional equivalent of the `|` operator.
 
 ```python
-from silk.actions.composition import fallback
-from silk.actions.extraction import GetText
+from silk.flow import fallback
+from silk.actions.elements import GetText
 
 # Try multiple selectors for price
 price = await fallback(
     GetText(".sale-price"),
     GetText(".regular-price"),
     GetText(".price")
-)
+)(context)
 
 # Returns the first successful extraction
 ```
@@ -419,17 +423,17 @@ price = await fallback(
 Composes actions to execute in sequence, similar to the `>>` operator, but returns only the last result.
 
 ```python
-from silk.actions.composition import compose
+from silk.flow import compose
 from silk.actions.navigation import Navigate
 from silk.actions.input import Click
-from silk.actions.extraction import GetText
+from silk.actions.elements import GetText
 
 # Navigate, click, and extract data
 product_name = await compose(
     Navigate(url),
     Click(".product-link"),
     GetText(".product-title")  # Only this result is returned
-)
+)(context)
 ```
 
 ## Flow Control Functions
@@ -441,15 +445,15 @@ Silk provides robust flow control functions that enable complex scraping logic w
 Conditionally executes different actions based on a condition, similar to an if-else statement.
 
 ```python
-from silk.actions.flow import branch
-from silk.actions.extraction import GetText, ElementExists
+from silk.flow import branch
+from silk.actions.elements import GetText, ElementExists
 
 # Check if an element exists and take different actions
 result = await branch(
     ElementExists(".out-of-stock"),
     GetText(".out-of-stock-message"),  # If out of stock
     GetText(".in-stock-price")         # If in stock
-)
+)(context)
 ```
 
 ### loop_until(condition, body, max_iterations, delay_ms)
@@ -457,9 +461,9 @@ result = await branch(
 Repeatedly executes an action until a condition is met or max iterations reached.
 
 ```python
-from silk.actions.flow import loop_until
+from silk.flow import loop_until
 from silk.actions.input import Click
-from silk.actions.extraction import ElementExists, GetText
+from silk.actions.elements import ElementExists, GetText
 
 # Click "Load More" until a specific product appears
 product_details = await loop_until(
@@ -467,10 +471,10 @@ product_details = await loop_until(
     Click("#load-more-button"),
     max_iterations=10,
     delay_ms=1000
-)
+)(context)
 
 # After finding the element, extract its details
-product_name = await GetText("#target-product .name")
+product_name = await GetText("#target-product .name")(context)
 ```
 
 ### retry(action, max_attempts, delay_ms)
@@ -478,15 +482,15 @@ product_name = await GetText("#target-product .name")
 Retries an action until it succeeds or reaches maximum attempts, perfect for handling intermittent failures.
 
 ```python
-from silk.actions.flow import retry
-from silk.actions.extraction import GetText
+from silk.flow import retry
+from silk.actions.elements import GetText
 
 # Retry text extraction up to 3 times
 price = await retry(
     GetText("#dynamic-price"),
     max_attempts=3,
     delay_ms=1000
-)
+)(context)
 ```
 
 ### retry_with_backoff(action, max_attempts, initial_delay_ms, backoff_factor, jitter)
@@ -494,7 +498,7 @@ price = await retry(
 Implements exponential backoff for retries, reducing server load and improving success rates.
 
 ```python
-from silk.actions.flow import retry_with_backoff
+from silk.flow import retry_with_backoff
 from silk.actions.navigation import Navigate
 
 # Retry with exponential backoff and jitter
@@ -504,7 +508,7 @@ page = await retry_with_backoff(
     initial_delay_ms=1000,
     backoff_factor=2.0,  # Each retry doubles the wait time
     jitter=True          # Adds randomness to prevent request clustering
-)
+)(context)
 ```
 
 ### with_timeout(action, timeout_ms)
@@ -512,15 +516,15 @@ page = await retry_with_backoff(
 Executes an action with a timeout constraint, preventing operations from hanging indefinitely.
 
 ```python
-from silk.actions.flow import with_timeout
-from silk.actions.extraction import GetText
+from silk.flow import with_timeout
+from silk.actions.elements import GetText
 
 # Set a 5-second timeout for extraction
 try:
     result = await with_timeout(
         GetText("#slow-loading-element"),
         timeout_ms=5000
-    )
+    )(context)
 except Exception as e:
     print(f"Extraction timed out: {e}")
 ```
@@ -530,14 +534,14 @@ except Exception as e:
 Executes a main action and a side effect action, returning only the main result.
 
 ```python
-from silk.actions.flow import tap, log
-from silk.actions.extraction import GetText
+from silk.flow import tap, log
+from silk.actions.elements import GetText
 
 # Extract text and log it without affecting the pipeline
 product_name = await tap(
     GetText(".product-title"),
     log("Product title extracted successfully")
-)
+)(context)
 ```
 
 ### wait(ms)
@@ -545,16 +549,16 @@ product_name = await tap(
 Creates a simple delay in the action pipeline, useful for waiting for page elements to load.
 
 ```python
-from silk.actions.flow import wait
+from silk.flow import wait
 from silk.actions.navigation import Navigate
-from silk.actions.extraction import GetText
+from silk.actions.elements import GetText
 
 # Navigate, wait for content to load, then extract
 title = await (
     Navigate("https://example.com")
     >> wait(2000)  # Wait 2 seconds for page to fully load
     >> GetText("h1")
-)
+)(context)
 ```
 
 ## Real-World Example
@@ -571,7 +575,7 @@ extract_product_data = (
 # Complete scraping pipeline with error handling and resilience
 product_scraper = (
     Navigate(product_url)
-    >> Wait(1000)  # Wait for dynamic content
+    >> wait(1000)  # Wait for dynamic content
     >> extract_product_data
     >> ParseProductData()  # Custom transformation
 ).with_retry(max_attempts=3, delay_ms=1000)
@@ -580,6 +584,9 @@ product_scraper = (
 scrape_multiple_products = parallel(*(
     product_scraper(url) for url in product_urls
 ))
+
+# Execute with context
+results = await scrape_multiple_products(context)
 ```
 
 ## Creating Custom Actions
@@ -623,8 +630,9 @@ async def extract_price(context, selector):
 ## Browser Configuration
 
 ```python
-from silk.models.browser import BrowserOptions
+from silk.browsers.types import BrowserOptions
 from silk.browsers.manager import BrowserManager
+from silk.actions.manage import InitializeContext
 
 options = BrowserOptions(
     headless=False,  # Show browser UI for debugging
@@ -633,7 +641,104 @@ options = BrowserOptions(
 )
 
 manager = BrowserManager(driver_type="playwright", default_options=options)
+context = await InitializeContext(manager)
 ```
+
+---
+
+## API Reference
+
+### Module Structure
+
+```
+silk/
+├── actions/         # Core actions for browser interaction
+│   ├── context.py   # Action context definitions
+│   ├── decorators.py # Action decorators
+│   ├── elements.py  # Element interaction (GetText, GetAttribute, etc.)
+│   ├── input.py     # User input simulation (Click, Fill, etc.)
+│   ├── manage.py    # Context management (InitializeContext, WithContext)
+│   └── navigation.py # Page navigation actions
+├── browsers/        # Browser drivers and management
+│   ├── manager.py   # BrowserManager for session handling
+│   └── types.py     # Browser configuration types
+├── flow/            # Flow control and composition utilities
+│   ├── branch.py    # Conditional execution
+│   ├── loop.py      # Iteration control
+│   ├── parallel.py  # Concurrent execution
+│   ├── retry.py     # Retry mechanisms
+│   └── sequence.py  # Sequential composition
+├── placeholder.py   # Placeholder system for composition
+└── selectors/       # Selector definitions and utilities
+    └── selector.py  # Selector types and groups
+```
+
+### Core Actions
+
+#### Navigation Actions
+- `Navigate(url: str)` - Navigate to a URL
+- `Reload()` - Reload the current page
+- `Back()` - Navigate back in history
+- `Forward()` - Navigate forward in history
+- `WaitForSelector(selector)` - Wait for a selector to appear
+- `Screenshot(path: str)` - Take a screenshot of the page
+
+#### Element Actions
+- `GetText(selector)` - Extract text from an element
+- `GetAttribute(selector, attribute: str)` - Get an attribute value
+- `Query(selector)` - Find a single element
+- `QueryAll(selector)` - Find all matching elements
+- `ElementExists(selector)` - Check if an element exists
+- `ExtractTable(selector)` - Extract data from an HTML table
+
+#### Input Actions
+- `Click(selector)` - Click an element
+- `Fill(selector, value: str)` - Fill a form field
+- `Type(selector, text: str)` - Type text into an element
+- `Press(selector, key: str)` - Press a key on an element
+- `Hover(selector)` - Hover over an element
+- `Select(selector, value: str)` - Select an option from a dropdown
+
+#### Context Management
+- `InitializeContext(browser_manager)` - Create a new context
+- `WithContext(context_factory, action)` - Execute an action with a specific context
+
+### Flow Control Functions
+
+#### Composition
+- `sequence(*actions)` - Execute actions in sequence, returning all results
+- `parallel(*actions)` - Execute actions in parallel, returning all results
+- `pipe(*actions)` - Chain actions, passing each result to the next action
+- `compose(*actions)` - Compose actions sequentially, returning only the last result
+- `fallback(*actions)` - Try actions in sequence until one succeeds
+
+#### Control Flow
+- `branch(condition, if_true, if_false)` - Conditional execution based on a condition
+- `loop_until(condition, body, max_iterations, delay_ms)` - Repeat an action until a condition is met
+- `retry(action, max_attempts, delay_ms)` - Retry an action multiple times
+- `retry_with_backoff(action, max_attempts, initial_delay_ms, backoff_factor, jitter)` - Retry with exponential backoff
+- `with_timeout(action, timeout_ms)` - Execute an action with a timeout
+- `tap(main_action, side_effect)` - Execute an action with a side effect
+- `wait(ms)` - Pause execution for a specified time
+
+### Selectors
+
+#### Selector Types
+- `css(selector: str)` - Create a CSS selector
+- `xpath(selector: str)` - Create an XPath selector
+- `text(content: str)` - Create a text content selector
+
+#### Selector Groups
+- `SelectorGroup(name: str, *selectors)` - Create a group of selectors with fallbacks
+
+### Browser Management
+
+#### Configuration
+- `BrowserOptions` - Browser configuration options (headless, viewport, etc.)
+- `NavigationOptions` - Page navigation options (timeout, wait_until, etc.)
+
+#### Browser Manager
+- `BrowserManager(driver_type: str, default_options: BrowserOptions)` - Manage browser sessions
 
 ---
 
