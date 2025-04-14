@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import pytest
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 
 from silk.browsers.driver import BrowserDriver
 from silk.browsers.element import ElementHandle

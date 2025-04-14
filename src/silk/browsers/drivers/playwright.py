@@ -14,7 +14,7 @@ from typing import (
     cast,
 )
 
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 from playwright.async_api import Browser
 from playwright.async_api import BrowserContext as PlaywrightContext
 from playwright.async_api import ElementHandle as PlaywrightNativeElement

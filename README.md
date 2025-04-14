@@ -382,7 +382,7 @@ Creates a pipeline where each action receives the result of the previous action,
 from silk.flow import pipe
 from silk.actions.elements import GetText
 from silk.actions.decorators import action
-from expression.core import Ok, Error
+from expression import Ok, Error
 
 @action
 async def parse_price(context, price_text):
@@ -595,7 +595,7 @@ Extend Silk with your own custom actions:
 
 ```python
 from silk.actions.decorators import action
-from expression.core import Ok, Error
+from expression import Ok, Error
 
 @action
 async def extract_price(context, selector):

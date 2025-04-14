@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 from fp_ops import BaseContext
 from pydantic import Field
 

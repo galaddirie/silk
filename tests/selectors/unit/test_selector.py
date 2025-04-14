@@ -1,5 +1,5 @@
 import pytest
-from expression.core import Error, Ok
+from expression import Error, Ok
 
 from silk.selectors.selector import (
     Selector,

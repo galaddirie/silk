@@ -1,6 +1,6 @@
 from typing import Any, Callable, Optional, Tuple, Union, TypeVar
 
-from expression.core import Error, Result, Ok
+from expression import Error, Result, Ok
 from silk.actions.context import ActionContext
 from silk.browsers.driver import  BrowserDriver
 from silk.browsers.element import ElementHandle

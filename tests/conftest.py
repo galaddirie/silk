@@ -9,7 +9,7 @@ from typing import AsyncGenerator, Dict, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from expression.core import Error, Ok
+from expression import Error, Ok
 
 from silk.actions.context import ActionContext
 from silk.browsers.context import BrowserContext, BrowserPage

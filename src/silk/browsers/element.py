@@ -14,7 +14,7 @@ from typing import (
     runtime_checkable,
 )
 
-from expression.core import Result
+from expression import Result
 
 if TYPE_CHECKING:
     from silk.browsers.driver import BrowserDriver

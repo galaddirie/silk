@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, Optional
 
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 from fp_ops import BaseContext
 
 

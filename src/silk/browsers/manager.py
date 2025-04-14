@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, TypeVar
 
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 
 from silk.browsers.context import BrowserContext
 from silk.browsers.driver import BrowserDriver

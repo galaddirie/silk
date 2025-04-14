@@ -3,7 +3,7 @@ Tests for the ActionContext class.
 """
 
 import pytest
-from expression.core import Error, Ok
+from expression import Error, Ok
 
 from silk.actions.context import ActionContext
 

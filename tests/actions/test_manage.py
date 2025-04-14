@@ -6,7 +6,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 
 from silk.actions.context import ActionContext
 from silk.actions.manage import (

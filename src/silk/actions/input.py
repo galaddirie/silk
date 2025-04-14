@@ -5,7 +5,7 @@ Input actions for interacting with elements via mouse or keyboard in the browser
 import logging
 from typing import Any, List, Optional, Tuple, TypeVar, Union
 
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 from fp_ops import operation
 
 from silk.actions.context import ActionContext

@@ -7,7 +7,7 @@ import asyncio
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 from fp_ops import operation
 
 from silk.actions.context import ActionContext

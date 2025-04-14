@@ -2,7 +2,7 @@ import asyncio
 import time
 from pathlib import Path
 
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 
 from silk.actions.context import ActionContext
 from silk.actions.navigation import Navigate, WaitForSelector, Screenshot

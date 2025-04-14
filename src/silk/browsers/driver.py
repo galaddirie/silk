@@ -3,7 +3,7 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Type, Union
 
-from expression.core import Result
+from expression import Result
 
 from silk.browsers.element import ElementHandle
 from silk.browsers.types import (

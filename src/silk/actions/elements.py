@@ -5,7 +5,7 @@ Extraction actions for retrieving data from web pages.
 import logging
 from typing import Any, Dict, List, Optional, TypeVar, Union
 
-from expression.core import Error, Ok, Result
+from expression import Error, Ok, Result
 from fp_ops import operation
 
 from silk.actions.context import ActionContext

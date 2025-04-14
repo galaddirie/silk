@@ -5,7 +5,7 @@ Tests for the BrowserManager class.
 from unittest.mock import MagicMock, patch
 
 import pytest
-from expression.core import Error, Ok
+from expression import Error, Ok
 
 from silk.browsers.manager import BrowserManager
 from silk.browsers.types import BrowserOptions
