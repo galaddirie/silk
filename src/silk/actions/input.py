@@ -369,8 +369,6 @@ async def Fill(
         return Error(e)
 
 
-
-
 @operation(context=True, context_type=ActionContext)
 async def Type(
     target: Union[str, Selector, SelectorGroup, ElementHandle],
@@ -503,5 +501,65 @@ async def Select(
             return Ok(None)
         else:
             return Error(Exception("No page ID found"))
+    except Exception as e:
+        return Error(e)
+
+
+@operation(context=True, context_type=ActionContext)
+async def Scroll(
+    target: Optional[Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]]] = None,
+    x: Optional[int] = None,
+    y: Optional[int] = None,
+    options: Optional[MouseOptions] = None,
+    **kwargs: Any,
+) -> Result[None, Exception]:
+    """
+    Action to scroll the page to an element or specific coordinates
+
+    Args:
+        target: Target selector, element, or coordinates to scroll to
+        x: X coordinate to scroll to (alternative to target)
+        y: Y coordinate to scroll to (alternative to target)
+        options: Additional scrolling options
+    """
+    context: ActionContext = kwargs["context"]
+
+    try:
+        driver_result = await validate_driver(context)
+        if driver_result.is_error():
+            return Error(driver_result.error)
+        driver = driver_result.default_value(None)
+        if driver is None:
+            return Error(Exception("No browser driver found"))
+
+        if context.page_id is None:
+            return Error(Exception("No page ID found"))
+
+        # If target is specified, scroll to the element
+        if target is not None:
+            if isinstance(target, tuple) and len(target) == 2:
+                x_int, y_int = int(target[0]), int(target[1])
+                return await driver.scroll(context.page_id, x=x_int, y=y_int)
+            else:
+                element_result = await resolve_target(context, target)
+                if element_result.is_error():
+                    return Error(element_result.error)
+
+                element = element_result.default_value(None)
+                if element is None:
+                    return Error(Exception("Target not found"))
+
+                selector = element.get_selector()
+                if not selector:
+                    return Error(Exception("Target has no selector"))
+
+                # Scroll element into view
+                return await driver.scroll(context.page_id, selector=selector)
+        # If coordinates are specified, scroll to the position
+        elif x is not None or y is not None:
+            return await driver.scroll(context.page_id, x=x, y=y)
+        else:
+            return Error(Exception("Either target or scroll coordinates (x, y) must be specified"))
+
     except Exception as e:
         return Error(e)

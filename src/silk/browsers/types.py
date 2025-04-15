@@ -164,6 +164,7 @@ class BrowserOptions(BaseModel):
     extra_args: Dict[str, Any] = Field(default_factory=dict)
     locale: Optional[str] = None
     timezone: Optional[str] = None
+    remote_url: Optional[str] = None  # URL for connecting to a remote CDP browser
 
 
     @model_validator(mode="after")

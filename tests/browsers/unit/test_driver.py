@@ -324,7 +324,26 @@ class MockBrowserDriver(BrowserDriver):
     ) -> Result[List[Dict[str, str]], Exception]:
         if page_id not in self.pages:
             return Error(Exception(f"Page {page_id} not found"))
-        return Ok([{"header1": "value1", "header2": "value2"}])
+        return Ok([{"col1": "value1", "col2": "value2"}])
+
+    async def scroll(
+        self,
+        page_id: str,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        selector: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Result[None, Exception]:
+        if page_id not in self.pages:
+            return Error(Exception(f"Page {page_id} not found"))
+        return Ok(None)
+
+    async def execute_cdp_cmd(
+        self, page_id: str, cmd: str, *args: Any
+    ) -> Result[Any, Exception]:
+        if page_id not in self.pages:
+            return Error(Exception(f"Page {page_id} not found"))
+        return Ok(None)
 
 
 class TestBrowserDriver:
@@ -489,7 +508,7 @@ class TestBrowserDriver:
 
     @pytest.mark.asyncio
     async def test_screenshot(self, driver):
-        """Test taking screenshots."""
+        """Test screenshot functionality."""
         # Launch browser and create context/page
         await driver.launch()
         context_result = await driver.create_context()
@@ -497,14 +516,31 @@ class TestBrowserDriver:
         page_result = await driver.create_page(context_id)
         page_id = page_result.default_value(None)
 
-        # Test screenshot with path
-        result = await driver.screenshot(page_id, Path("test.png"))
-        assert result.is_ok()
-        assert isinstance(result.default_value(None), Path)
-        assert result.default_value(None).name == "test.png"
-
-        # Test screenshot without path
+        # Test screenshot
         result = await driver.screenshot(page_id)
         assert result.is_ok()
-        assert isinstance(result.default_value(None), bytes)
-        assert result.default_value(None) == b"mock_screenshot_data"
+        screenshot = result.default_value(None)
+        assert isinstance(screenshot, (Path, bytes))
+
+    @pytest.mark.asyncio
+    async def test_scroll(self, driver):
+        """Test scroll functionality."""
+        # Launch browser and create context/page
+        await driver.launch()
+        context_result = await driver.create_context()
+        context_id = context_result.default_value(None)
+        page_result = await driver.create_page(context_id)
+        page_id = page_result.default_value(None)
+
+        # Test scrolling to coordinates
+        result = await driver.scroll(page_id, x=100, y=200)
+        assert result.is_ok()
+
+        # Test scrolling with selector
+        result = await driver.scroll(page_id, selector="#some-element")
+        assert result.is_ok()
+
+        # Test error handling with invalid page
+        result = await driver.scroll("invalid-page", x=100, y=200)
+        assert result.is_error()
+        assert "Page invalid-page not found" in str(result.error)

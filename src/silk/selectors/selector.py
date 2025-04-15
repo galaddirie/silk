@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Awaitable, Callable, List, Optional, Tuple, TypeVar, Union
+from typing import Awaitable, Callable, List, Optional, Tuple, TypeVar, Union, Iterator
 
 from expression import Error, Result
 
@@ -101,6 +101,26 @@ class SelectorGroup:
                 return result
 
         return Error(Exception(f"All selectors in group '{self.name}' failed"))
+    
+    def __iter__(self) -> Iterator[Selector]:
+        return iter(self.selectors)
+    
+    def __len__(self) -> int:
+        return len(self.selectors)
+    
+    def __getitem__(self, index: int) -> Selector:
+        return self.selectors[index]
+    
+    def __contains__(self, item: Selector) -> bool:
+        return item in self.selectors
+    
+    def __repr__(self) -> str:
+        return f"SelectorGroup(name={self.name}, selectors={self.selectors})"
+    
+    def __str__(self) -> str:
+        return f"SelectorGroup(name={self.name}, selectors={self.selectors})"
+    
+    
 
 
 class css(Selector):

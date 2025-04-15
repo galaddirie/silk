@@ -1,6 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, TypeVar, Union
 
 from expression import Error, Ok, Result
 
@@ -27,20 +27,30 @@ class BrowserManager:
         self,
         driver_type: Optional[ValidDriverTypes] = "playwright",
         default_options: Optional[BrowserOptions] = None,
+        remote_url: Optional[str] = None,
     ):
         """
         Initialize the browser manager
 
         Args:
             driver_type: The type of driver to use. Valid values are
-            'playwright'. Defaults to 'playwright'
+            'playwright', 'cdp'. Defaults to 'playwright'
             default_options: Default browser options
+            remote_url: URL for connecting to a remote CDP browser. Setting this will 
+                        automatically use the 'cdp' driver type.
         """
         self.default_options = default_options or BrowserOptions()
+        
+        # If remote_url is provided, set it in options and use cdp driver
+        if remote_url:
+            self.default_options.remote_url = remote_url
+            self.driver_type: ValidDriverTypes = "cdp"
+        else:
+            self.driver_type = driver_type or "playwright"
+            
         self.drivers: Dict[str, BrowserDriver] = {}
         self.contexts: Dict[str, "BrowserContext"] = {}
         self.default_context_id: Optional[str] = None
-        self.driver_type = driver_type
 
     async def __aenter__(self) -> "BrowserManager":
         """Allow usage as async context manager"""

@@ -614,7 +614,8 @@ async def test_element_exists_false():
     result = await element_exists(context=context)
     
     # Assert
-    assert result.is_error()
+    assert result.is_ok()
+    assert result.default_value(True) is False
 
 
 # -------------------- Error Case Tests --------------------
@@ -674,8 +675,8 @@ async def test_get_text_element_not_found():
     result = await get_text(context=context)
     
     # Assert
-    assert result.is_error()
-    assert "No element found" in str(result.error)
+    assert result.is_ok()
+    assert result.default_value("default") is None
 
 
 @pytest.mark.asyncio

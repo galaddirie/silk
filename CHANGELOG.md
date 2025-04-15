@@ -1,4 +1,19 @@
 # Changelog
+## [0.2.5] - 2025-04-15
+
+### Fixed
+- patch fill and type
+- support patchwright driver
+- fix scroll
+- add proper scroll method to BrowserDriver protocol and implement in PlaywrightDriver
+- add SelectorGroup iterator, len, getitem, contains, repr, str
+- QueryAll now returns empty list instead of throwing an error
+- Query now returns None instead of throwing an error
+- ElementExists now returns False instead of throwing an error
+- GetAttribute now returns None instead of throwing an error
+- GetText now returns empty string instead of throwing an error
+- GetInnerText now returns empty string instead of throwing an error
+- GetHtml now returns empty string instead of throwing an error
 
 ## [0.2.3] - 2025-04-14
 

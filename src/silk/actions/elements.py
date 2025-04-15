@@ -69,7 +69,7 @@ async def Query(
             for sel in selector.selectors:
                 sub_result = await page.query_selector(sel.value)
                 if sub_result.is_error():
-                    return Error(sub_result.error)
+                    continue
                 element = sub_result.default_value(None)
                 if element is not None:
                     return Ok(element)
@@ -78,7 +78,6 @@ async def Query(
         return Error(Exception(f"Unsupported selector type: {type(selector)}"))
     except Exception as e:
         return Error(e)
-
 
 @operation(context=True, context_type=ActionContext)
 async def QueryAll(
@@ -132,10 +131,10 @@ async def QueryAll(
             for sel in selector.selectors:
                 sub_result = await page.query_selector_all(sel.value)
                 if sub_result.is_error():
-                    return Error(sub_result.error)
+                    continue
                 elements = sub_result.default_value(None)
                 if elements is None:
-                    return Error(Exception("No elements found"))
+                    continue
                 all_elements.extend(elements)
             return Ok(all_elements)
 
@@ -148,7 +147,7 @@ async def QueryAll(
 async def GetText(
     selector: Union[str, Selector, SelectorGroup, ElementHandle],
     **kwargs: Any,
-) -> Result[str, Exception]:
+) -> Result[Optional[str], Exception]:
     """
     Action to get text from an element
 
@@ -156,7 +155,7 @@ async def GetText(
         selector: Selector to find element
 
     Returns:
-        Text content of the element
+        Text content of the element or None if element not found
     """
     context: ActionContext = kwargs["context"]
 
@@ -176,11 +175,11 @@ async def GetText(
 
         element_result = await resolve_target(context, selector)
         if element_result.is_error():
-            return Error(element_result.error)
+            return Ok(None)
 
         element = element_result.default_value(None)
         if element is None:
-            return Error(Exception("Element not found"))
+            return Ok(None)
 
         text_result = await element.get_text()
         if text_result.is_error():
@@ -206,7 +205,7 @@ async def GetAttribute(
         attribute: Attribute name to get
 
     Returns:
-        Attribute value or None if not found
+        Attribute value or None if element not found or attribute not present
     """
     context: ActionContext = kwargs["context"]
 
@@ -217,11 +216,11 @@ async def GetAttribute(
 
         element_result = await resolve_target(context, selector)
         if element_result.is_error():
-            return Error(element_result.error)
+            return Ok(None)
 
         element = element_result.default_value(None)
         if element is None:
-            return Error(Exception("Element not found"))
+            return Ok(None)
 
         attr_result = await element.get_attribute(attribute)
         if attr_result.is_error():
@@ -238,7 +237,7 @@ async def GetHtml(
     selector: Union[str, Selector, SelectorGroup, ElementHandle],
     outer: bool = True,
     **kwargs: Any,
-) -> Result[str, Exception]:
+) -> Result[Optional[str], Exception]:
     """
     Action to get HTML content from an element
 
@@ -247,7 +246,7 @@ async def GetHtml(
         outer: Whether to include the element's outer HTML
 
     Returns:
-        HTML content of the element
+        HTML content of the element or None if element not found
     """
     context: ActionContext = kwargs["context"]
 
@@ -258,11 +257,11 @@ async def GetHtml(
 
         element_result = await resolve_target(context, selector)
         if element_result.is_error():
-            return Error(element_result.error)
+            return Ok(None)
 
         element = element_result.default_value(None)
         if element is None:
-            return Error(Exception("Element not found"))
+            return Ok(None)
 
         html_result = await element.get_html(outer=outer)
 
@@ -279,7 +278,7 @@ async def GetHtml(
 async def GetInnerText(
     selector: Union[str, Selector, SelectorGroup, ElementHandle],
     **kwargs: Any,
-) -> Result[str, Exception]:
+) -> Result[Optional[str], Exception]:
     """
     Action to get the innerText from an element (visible text only)
 
@@ -287,7 +286,7 @@ async def GetInnerText(
         selector: Selector to find element
 
     Returns:
-        Inner text of the element
+        Inner text of the element or None if element not found
     """
     context: ActionContext = kwargs["context"]
 
@@ -298,11 +297,11 @@ async def GetInnerText(
 
         element_result = await resolve_target(context, selector)
         if element_result.is_error():
-            return Error(element_result.error)
+            return Ok(None)
 
         element = element_result.default_value(None)
         if element is None:
-            return Error(Exception("Element not found"))
+            return Ok(None)
 
         # Inner text is different from text content - it only includes visible text
         # We need to use evaluate to get it
@@ -577,9 +576,9 @@ async def ElementExists(
     try:
         query_result = await Query(selector, **kwargs)
         if query_result.is_error():
-            return Error(query_result.error)
+            return Ok(False)
 
         element = query_result.default_value(None)
         return Ok(element is not None)
     except Exception as e:
-        return Error(e)
+        return Ok(False)
