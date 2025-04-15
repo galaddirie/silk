@@ -7,7 +7,6 @@ from pathlib import Path
 import random
 import asyncio
 import string
-import importlib.util
 from typing import (
     Any,
     Dict,
@@ -46,13 +45,9 @@ logger = logging.getLogger(__name__)
 ContextEntry = Tuple[str, Any]  # PlaywrightContext
 PageEntry = Tuple[str, Any]  # Page
 
-# Check if patchright is installed
-def is_patchright_available() -> bool:
-    """Check if patchright is available to import"""
-    return importlib.util.find_spec("patchright") is not None
 
 # Determine which driver to use
-if is_patchright_available():
+try:
     logger.info("Using patchright as the browser automation library")
     from patchright.async_api import Browser  # type: ignore
     from patchright.async_api import BrowserContext as PlaywrightContext  # type: ignore
@@ -60,14 +55,14 @@ if is_patchright_available():
     from patchright.async_api import Page, Playwright  # type: ignore
     from patchright.async_api import TimeoutError as PlaywrightTimeoutError  # type: ignore
     from patchright.async_api import async_playwright  # type: ignore
-else:
+except ImportError:
     logger.info("Using playwright as the browser automation library")
-    from playwright.async_api import Browser
-    from playwright.async_api import BrowserContext as PlaywrightContext
-    from playwright.async_api import ElementHandle as PlaywrightNativeElement
-    from playwright.async_api import Page, Playwright
-    from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-    from playwright.async_api import async_playwright
+    from playwright.async_api import Browser  # type: ignore
+    from playwright.async_api import BrowserContext as PlaywrightContext  # type: ignore
+    from playwright.async_api import ElementHandle as PlaywrightNativeElement  # type: ignore
+    from playwright.async_api import Page, Playwright  # type: ignore
+    from playwright.async_api import TimeoutError as PlaywrightTimeoutError  # type: ignore
+    from playwright.async_api import async_playwright  # type: ignore
 
 # TODO for ease of access all methods should accept both context and page,
 # this avoids situations where some automation libraries need a page and others need a context
@@ -183,59 +178,106 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
                 return Error(Exception(f"Page with ID '{self.page_id}' not found"))
             
             # Create CDP session
-            cdp_client = await page.context.new_cdp_session(page)
-            if not cdp_client:
-                return Error(Exception("Failed to create CDP session"))
-            
-            # Special characters that require shift key
-            shift_chars = '~!@#$%^&*()_+{}|:"<>?ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-            
-            # Type each character with random delays
-            for char in text:
-                # Check if we need to hold shift
-                if char in shift_chars:
-                    # Send keyDown for Shift
+            cdp_client = None  # Initialize cdp_client to None
+            try:
+                cdp_client = await page.context.new_cdp_session(page)
+                if not cdp_client:
+                    return Error(Exception("Failed to create CDP session"))
+
+                # Characters requiring special keys
+                shift_needed = ["!", '"', "#", "$", "%", "&", "'", "(", ")", "=", "?", "^", "*", "_", ":", ";", ">", "{", "}", "|", "~", "<", "+"]
+                control_needed = ["@", "£", "€", "\\"]
+                
+                # Type each character with random delays
+                for char in text:
+                    special_key = None
+                    
+                    # Determine if we need a special key
+                    if char in control_needed:
+                        special_key = "Control"
+                    elif char in shift_needed or char.isupper():
+                        special_key = "Shift"
+                    
+                    # Press special key if needed
+                    if special_key:
+                        await cdp_client.send("Input.dispatchKeyEvent", {
+                            "type": "keyDown",
+                            "key": special_key,
+                            "code": "ShiftLeft" if special_key == "Shift" else "ControlLeft",
+                            "modifiers": 8 if special_key == "Shift" else 2
+                        })
+                        await asyncio.sleep(random.randint(50, 100) / 1000)
+                    
+                    # Key down event
                     await cdp_client.send("Input.dispatchKeyEvent", {
                         "type": "keyDown",
-                        "modifiers": 8,  # 8 is the code for Shift
-                        "windowsVirtualKeyCode": 16,  # Virtual key code for Shift
-                        "code": "ShiftLeft",
-                        "key": "Shift",
-                        "unmodifiedText": "",
-                        "text": ""
+                        "text": char
                     })
-                
-                # Key down event
-                await cdp_client.send("Input.dispatchKeyEvent", {
-                    "type": "keyDown",
-                    "text": char
-                })
-                
-                # Char event (actual typing)
-                await cdp_client.send("Input.dispatchKeyEvent", {
-                    "type": "char",
-                    "text": char
-                })
-                
-                # Key up event
-                await cdp_client.send("Input.dispatchKeyEvent", {
-                    "type": "keyUp",
-                    "text": char
-                })
-                
-                # Release shift if needed
-                if char in shift_chars:
+                    
+                    # Char event (actual typing)
+                    await cdp_client.send("Input.dispatchKeyEvent", {
+                        "type": "char",
+                        "text": char
+                    })
+                    
+                    # Hold key briefly
+                    await asyncio.sleep(random.randint(50, 100) / 1000)
+                    
+                    # Key up event
                     await cdp_client.send("Input.dispatchKeyEvent", {
                         "type": "keyUp",
-                        "modifiers": 8,
-                        "key": "Shift",
-                        "code": "ShiftLeft"
+                        "text": char
                     })
+                    
+                    # Release special key if needed
+                    if special_key:
+                        await cdp_client.send("Input.dispatchKeyEvent", {
+                            "type": "keyUp",
+                            "key": special_key,
+                            "code": "ShiftLeft" if special_key == "Shift" else "ControlLeft",
+                            "modifiers": 8 if special_key == "Shift" else 2
+                        })
+                        await asyncio.sleep(random.randint(50, 100) / 1000)
+                    
+                    # Random delay between keystrokes
+                    await asyncio.sleep(random.randint(50, 150) / 1000)
                 
-                # Random delay between keystrokes (100-200ms)
-                await asyncio.sleep(random.randint(100, 200) / 1000)
-            
-            return Ok(None)
+                return Ok(None)
+
+            except Exception as e:
+                logger.warning(f"CDP typing failed: {e}, falling back to standard fill")
+                # Attempt fallback using standard fill, but re-query the element first
+                if not self.selector:
+                    logger.error("Cannot fallback to standard fill: Element selector is unknown.")
+                    return Error(Exception("CDP fill failed and element selector is unknown for fallback."))
+
+                try:
+                    # Re-get the page in case the context changed subtly
+                    driver = cast(PlaywrightDriver, self.driver)
+                    page = driver.pages.get(self.page_id)
+                    if not page:
+                         return Error(Exception(f"Page with ID '{self.page_id}' not found for fallback fill"))
+
+                    # Re-query the element using the stored selector
+                    fresh_element = await page.query_selector(self.selector)
+                    if not fresh_element:
+                        logger.error(f"Cannot fallback to standard fill: Element '{self.selector}' not found after CDP failure.")
+                        return Error(Exception(f"Element '{self.selector}' not found after CDP failure."))
+
+                    # Use the fresh element handle for the standard fill
+                    await fresh_element.fill(text)
+                    return Ok(None)
+                except Exception as inner_e:
+                    logger.error(f"Fallback standard fill failed for element '{self.selector}': {inner_e}")
+                    # Return the inner exception from the fallback attempt
+                    return Error(inner_e)
+            finally:
+                # Ensure CDP session is detached regardless of success or failure
+                if cdp_client:
+                    try:
+                        await cdp_client.detach()
+                    except Exception as detach_e:
+                        logger.warning(f"Failed to detach CDP session: {detach_e}")
         except Exception as e:
             logger.error(f"Error filling element: {e}")
             return Error(e)
@@ -387,12 +429,7 @@ class PlaywrightDriver(BrowserDriver):
         self.pages: Dict[str, Page] = {}
         self.initialized = False
         self.options = options
-        self.using_patchright = is_patchright_available()
-        
-    @property
-    def library_name(self) -> str:
-        """Get the name of the browser automation library being used."""
-        return "patchright" if self.using_patchright else "playwright"
+
 
     async def launch(self) -> Result[None, Exception]:
         """Launch the Playwright browser."""
@@ -400,7 +437,6 @@ class PlaywrightDriver(BrowserDriver):
             return Ok(None)
 
         try:
-            logger.info(f"Launching browser using {self.library_name}")
             self.playwright = await async_playwright().start()
 
             browser_type = (
@@ -416,15 +452,31 @@ class PlaywrightDriver(BrowserDriver):
             if self.options.proxy:
                 launch_options["proxy"] = {"server": self.options.proxy}
 
-            # Launch the appropriate browser
-            if browser_type == "chromium":
-                self.browser = await self.playwright.chromium.launch(**launch_options)
-            elif browser_type == "firefox":
-                self.browser = await self.playwright.firefox.launch(**launch_options)
-            elif browser_type == "webkit":
-                self.browser = await self.playwright.webkit.launch(**launch_options)
+            # Check if we need to connect to a remote browser
+            if self.options.remote_url:
+                logger.info(f"Connecting to remote browser at {self.options.remote_url}")
+                if browser_type != "chromium":
+                    logger.warning(f"Remote CDP connections only support Chromium. Ignoring browser_type={browser_type}")
+                
+                try:
+                    # Connect to the remote browser via CDP
+                    self.browser = await self.playwright.chromium.connect_over_cdp(
+                        endpoint_url=self.options.remote_url,
+                        timeout=self.options.timeout
+                    )
+                    logger.info("Successfully connected to remote browser")
+                except Exception as e:
+                    return Error(Exception(f"Failed to connect to remote browser: {e}"))
             else:
-                return Error(Exception(f"Unsupported browser type: {browser_type}"))
+                # Launch the appropriate browser
+                if browser_type == "chromium":
+                    self.browser = await self.playwright.chromium.launch(**launch_options)
+                elif browser_type == "firefox":
+                    self.browser = await self.playwright.firefox.launch(**launch_options)
+                elif browser_type == "webkit":
+                    self.browser = await self.playwright.webkit.launch(**launch_options)
+                else:
+                    return Error(Exception(f"Unsupported browser type: {browser_type}"))
 
             self.initialized = True
             return Ok(None)

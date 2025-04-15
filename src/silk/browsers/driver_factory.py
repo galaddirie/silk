@@ -9,7 +9,7 @@ from silk.browsers.driver import BrowserDriver, BrowserOptions
 
 T = TypeVar("T")
 
-ValidDriverTypes = Literal["playwright"]
+ValidDriverTypes = Literal["playwright", "cdp"]
 
 
 class DriverFactory:
@@ -23,7 +23,7 @@ class DriverFactory:
         Create a browser driver instance of the specified type.
 
         Args:
-            driver_type: Type of driver to create ('playwright')
+            driver_type: Type of driver to create ('playwright', 'cdp')
             options: Browser options (will use defaults if None)
 
         Returns:
@@ -35,8 +35,13 @@ class DriverFactory:
         """
         options = options or BrowserOptions()
 
+        # For CDP, we'll use the playwright driver with remote connection
+        if driver_type == "cdp" and options.remote_url is None:
+            raise ValueError("remote_url must be provided for CDP driver type")
+
         driver_classes = {
             "playwright": ("silk.browsers.drivers.playwright", "PlaywrightDriver"),
+            "cdp": ("silk.browsers.drivers.playwright", "PlaywrightDriver"),
         }
 
         if driver_type not in driver_classes:
@@ -53,9 +58,10 @@ class DriverFactory:
         except ImportError as e:
             package_names = {
                 "playwright": "playwright",
-                "patchright": "patchright",
+                "patchright": "playwright",
                 "selenium": "selenium",
                 "puppeteer": "pyppeteer",
+                "cdp": "playwright",
             }
             package = package_names.get(driver_type, driver_type)
             raise ImportError(
@@ -69,5 +75,10 @@ class DriverFactory:
 def create_driver(
     driver_type: ValidDriverTypes, options: Optional[BrowserOptions] = None
 ) -> BrowserDriver:
-    """Shorthand function to create a browser driver instance"""
+    """
+    Shorthand function to create a browser driver instance
+    
+    For CDP connections, options.remote_url must be set with the CDP endpoint URL.
+    Example: options.remote_url = "http://localhost:9222"
+    """
     return DriverFactory.create_driver(driver_type, options)
