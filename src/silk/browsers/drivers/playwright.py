@@ -4,6 +4,10 @@ Playwright implementation of the browser driver and element handle for Silk.
 
 import logging
 from pathlib import Path
+import random
+import asyncio
+import string
+import importlib.util
 from typing import (
     Any,
     Dict,
@@ -15,12 +19,13 @@ from typing import (
 )
 
 from expression import Error, Ok, Result
-from playwright.async_api import Browser
-from playwright.async_api import BrowserContext as PlaywrightContext
-from playwright.async_api import ElementHandle as PlaywrightNativeElement
-from playwright.async_api import Page, Playwright
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import async_playwright
+# We'll import these conditionally based on what's installed
+# from playwright.async_api import Browser
+# from playwright.async_api import BrowserContext as PlaywrightContext
+# from playwright.async_api import ElementHandle as PlaywrightNativeElement
+# from playwright.async_api import Page, Playwright
+# from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+# from playwright.async_api import async_playwright
 
 from silk.browsers.driver import BrowserDriver
 from silk.browsers.element import ElementHandle
@@ -38,9 +43,31 @@ from silk.browsers.types import (
 
 logger = logging.getLogger(__name__)
 
-ContextEntry = Tuple[str, PlaywrightContext]
-PageEntry = Tuple[str, Page]
+ContextEntry = Tuple[str, Any]  # PlaywrightContext
+PageEntry = Tuple[str, Any]  # Page
 
+# Check if patchright is installed
+def is_patchright_available() -> bool:
+    """Check if patchright is available to import"""
+    return importlib.util.find_spec("patchright") is not None
+
+# Determine which driver to use
+if is_patchright_available():
+    logger.info("Using patchright as the browser automation library")
+    from patchright.async_api import Browser  # type: ignore
+    from patchright.async_api import BrowserContext as PlaywrightContext  # type: ignore
+    from patchright.async_api import ElementHandle as PlaywrightNativeElement  # type: ignore
+    from patchright.async_api import Page, Playwright  # type: ignore
+    from patchright.async_api import TimeoutError as PlaywrightTimeoutError  # type: ignore
+    from patchright.async_api import async_playwright  # type: ignore
+else:
+    logger.info("Using playwright as the browser automation library")
+    from playwright.async_api import Browser
+    from playwright.async_api import BrowserContext as PlaywrightContext
+    from playwright.async_api import ElementHandle as PlaywrightNativeElement
+    from playwright.async_api import Page, Playwright
+    from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+    from playwright.async_api import async_playwright
 
 # TODO for ease of access all methods should accept both context and page,
 # this avoids situations where some automation libraries need a page and others need a context
@@ -66,7 +93,8 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
     async def get_text(self) -> Result[str, Exception]:
         """Get the text content of this element."""
         try:
-            text = await self.element_ref.text_content()
+            # Use evaluate to get just this element's text content
+            text = await self.element_ref.evaluate("el => el.textContent.trim()")
             return Ok(text or "")
         except Exception as e:
             logger.error(f"Error getting text: {e}")
@@ -145,8 +173,68 @@ class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
     ) -> Result[None, Exception]:
         """Fill this element with the given text."""
         try:
-            # Playwright's fill doesn't take a delay parameter, only a timeout
-            await self.element_ref.fill(text)
+            # First click on the element to ensure it's focused
+            await self.element_ref.click()
+            
+            # Get the page associated with this element
+            driver = cast(PlaywrightDriver, self.driver)
+            page = driver.pages.get(self.page_id)
+            if not page:
+                return Error(Exception(f"Page with ID '{self.page_id}' not found"))
+            
+            # Create CDP session
+            cdp_client = await page.context.new_cdp_session(page)
+            if not cdp_client:
+                return Error(Exception("Failed to create CDP session"))
+            
+            # Special characters that require shift key
+            shift_chars = '~!@#$%^&*()_+{}|:"<>?ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+            
+            # Type each character with random delays
+            for char in text:
+                # Check if we need to hold shift
+                if char in shift_chars:
+                    # Send keyDown for Shift
+                    await cdp_client.send("Input.dispatchKeyEvent", {
+                        "type": "keyDown",
+                        "modifiers": 8,  # 8 is the code for Shift
+                        "windowsVirtualKeyCode": 16,  # Virtual key code for Shift
+                        "code": "ShiftLeft",
+                        "key": "Shift",
+                        "unmodifiedText": "",
+                        "text": ""
+                    })
+                
+                # Key down event
+                await cdp_client.send("Input.dispatchKeyEvent", {
+                    "type": "keyDown",
+                    "text": char
+                })
+                
+                # Char event (actual typing)
+                await cdp_client.send("Input.dispatchKeyEvent", {
+                    "type": "char",
+                    "text": char
+                })
+                
+                # Key up event
+                await cdp_client.send("Input.dispatchKeyEvent", {
+                    "type": "keyUp",
+                    "text": char
+                })
+                
+                # Release shift if needed
+                if char in shift_chars:
+                    await cdp_client.send("Input.dispatchKeyEvent", {
+                        "type": "keyUp",
+                        "modifiers": 8,
+                        "key": "Shift",
+                        "code": "ShiftLeft"
+                    })
+                
+                # Random delay between keystrokes (100-200ms)
+                await asyncio.sleep(random.randint(100, 200) / 1000)
+            
             return Ok(None)
         except Exception as e:
             logger.error(f"Error filling element: {e}")
@@ -299,6 +387,12 @@ class PlaywrightDriver(BrowserDriver):
         self.pages: Dict[str, Page] = {}
         self.initialized = False
         self.options = options
+        self.using_patchright = is_patchright_available()
+        
+    @property
+    def library_name(self) -> str:
+        """Get the name of the browser automation library being used."""
+        return "patchright" if self.using_patchright else "playwright"
 
     async def launch(self) -> Result[None, Exception]:
         """Launch the Playwright browser."""
@@ -306,6 +400,7 @@ class PlaywrightDriver(BrowserDriver):
             return Ok(None)
 
         try:
+            logger.info(f"Launching browser using {self.library_name}")
             self.playwright = await async_playwright().start()
 
             browser_type = (
