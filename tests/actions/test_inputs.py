@@ -11,7 +11,7 @@ from expression import Error, Ok, Result
 from silk.actions.context import ActionContext
 from silk.actions.input import (
     Click, DoubleClick, Drag, Fill, KeyPress, MouseDown, 
-    MouseMove, MouseUp, Select, Type
+    MouseMove, MouseUp, Select, Type, Scroll
 )
 from silk.browsers.element import ElementHandle
 from silk.browsers.types import MouseOptions, TypeOptions, KeyModifier
@@ -503,3 +503,224 @@ async def test_fill_then_click_sequential_composition():
     mock_driver.click.assert_called_once_with(
         "test-page-id", "#submit-button", None
     )
+
+
+# -------------------- Subclass Tests --------------------
+
+@pytest.mark.asyncio
+async def test_subclass_element():
+    """Test actions with a subclass of ElementHandle"""
+    # Setup mocks
+    mock_driver = MagicMock()
+    mock_page = MagicMock()
+    mock_element = MagicMock(spec=ElementHandle)
+    
+    # Test with a subclass of ElementHandle
+    class CustomElementHandle(ElementHandle):
+        pass
+    
+    mock_subclass_element = MagicMock(spec=CustomElementHandle)
+    
+    # Configure mocks
+    mock_driver.mouse_move = AsyncMock(return_value=Ok(None))
+    mock_page.query_selector = AsyncMock(return_value=Ok(mock_subclass_element))
+    mock_subclass_element.get_bounding_box = AsyncMock(return_value=Ok({"x": 10, "y": 20, "width": 100, "height": 50}))
+    
+    # Create context with mocked methods
+    context = await create_test_action_context(mock_driver, mock_page)
+    
+    # Execute
+    mouse_move = MouseMove(target="#test-selector")
+    result = await mouse_move(context=context)
+    
+    # Assert
+    assert result.is_ok()
+    mock_driver.mouse_move.assert_called_once_with("test-page-id", 10.0, 20.0)
+
+
+@pytest.mark.asyncio
+async def test_click_with_subclass_element():
+    """Test Click action with a subclass of ElementHandle"""
+    # Setup mocks
+    mock_driver = MagicMock()
+    mock_page = MagicMock()
+    
+    # Test with a subclass of ElementHandle
+    class CustomElementHandle(ElementHandle):
+        pass
+    
+    mock_subclass_element = MagicMock(spec=CustomElementHandle)
+    
+    # Configure mocks
+    mock_driver.click = AsyncMock(return_value=Ok(None))
+    mock_page.query_selector = AsyncMock(return_value=Ok(mock_subclass_element))
+    mock_subclass_element.get_selector = MagicMock(return_value="#test-selector")
+    
+    # Create context with mocked methods
+    context = await create_test_action_context(mock_driver, mock_page)
+    
+    # Execute
+    click = Click(target="#test-selector")
+    result = await click(context=context)
+    
+    # Assert
+    assert result.is_ok()
+    mock_driver.click.assert_called_once_with("test-page-id", "#test-selector", None)
+
+
+@pytest.mark.asyncio
+async def test_fill_with_subclass_element():
+    """Test Fill action with a subclass of ElementHandle"""
+    # Setup mocks
+    mock_driver = MagicMock()
+    mock_page = MagicMock()
+    
+    # Test with a subclass of ElementHandle
+    class CustomElementHandle(ElementHandle):
+        pass
+    
+    mock_subclass_element = MagicMock(spec=CustomElementHandle)
+    
+    # Configure mocks
+    mock_driver.fill = AsyncMock(return_value=Ok(None))
+    mock_page.query_selector = AsyncMock(return_value=Ok(mock_subclass_element))
+    mock_subclass_element.get_selector = MagicMock(return_value="#input-field")
+    
+    # Create context with mocked methods
+    context = await create_test_action_context(mock_driver, mock_page)
+    
+    # Execute
+    fill = Fill(target="#input-field", text="test text")
+    result = await fill(context=context)
+    
+    # Assert
+    assert result.is_ok()
+    mock_driver.fill.assert_called_once_with(
+        "test-page-id", "#input-field", "test text", None
+    )
+
+
+@pytest.mark.asyncio
+async def test_drag_with_subclass_elements():
+    """Test Drag action between two subclassed elements"""
+    # Setup mocks
+    mock_driver = MagicMock()
+    mock_page = MagicMock()
+    
+    # Test with a subclass of ElementHandle
+    class CustomElementHandle(ElementHandle):
+        pass
+    
+    source_element = MagicMock(spec=CustomElementHandle)
+    target_element = MagicMock(spec=CustomElementHandle)
+    
+    # Configure mocks
+    mock_driver.mouse_drag = AsyncMock(return_value=Ok(None))
+    # Prepare query_selector to return different elements
+    mock_page.query_selector = AsyncMock()
+    mock_page.query_selector.side_effect = [
+        Ok(source_element),
+        Ok(target_element)
+    ]
+    
+    # Configure elements
+    source_element.get_bounding_box = AsyncMock(return_value=Ok({"x": 10, "y": 20, "width": 100, "height": 50}))
+    target_element.get_bounding_box = AsyncMock(return_value=Ok({"x": 100, "y": 200, "width": 100, "height": 50}))
+    
+    # Create context with mocked methods
+    context = await create_test_action_context(mock_driver, mock_page)
+    
+    # Execute
+    drag = Drag(source="#source", target="#target")
+    result = await drag(context=context)
+    
+    # Assert
+    assert result.is_ok()
+    mock_driver.mouse_drag.assert_called_once_with(
+        "test-page-id", (10, 20), (100, 200), None
+    )
+
+
+@pytest.mark.asyncio
+async def test_scroll_to_coordinates():
+    """Test Scroll action with coordinates"""
+    # Setup mocks
+    mock_driver = MagicMock()
+    
+    # Configure mocks
+    mock_driver.scroll = AsyncMock(return_value=Ok(None))
+    
+    # Create context with mocked driver
+    context = await create_test_action_context(mock_driver)
+    
+    # Execute
+    scroll = Scroll(x=100, y=200)
+    result = await scroll(context=context)
+    
+    # Assert
+    assert result.is_ok()
+    mock_driver.scroll.assert_called_once_with("test-page-id", x=100, y=200)
+
+
+@pytest.mark.asyncio
+async def test_scroll_to_element():
+    """Test Scroll action with element selector"""
+    # Setup mocks
+    mock_driver = MagicMock()
+    mock_page = MagicMock()
+    mock_element = MagicMock(spec=ElementHandle)
+    
+    # Configure mocks
+    mock_driver.scroll = AsyncMock(return_value=Ok(None))
+    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
+    mock_element.get_selector = MagicMock(return_value="#test-element")
+    
+    # Create context with mocked methods
+    context = await create_test_action_context(mock_driver, mock_page)
+    
+    # Execute
+    scroll = Scroll(target="#test-element")
+    result = await scroll(context=context)
+    
+    # Assert
+    assert result.is_ok()
+    mock_driver.scroll.assert_called_once_with("test-page-id", selector="#test-element")
+
+
+@pytest.mark.asyncio
+async def test_scroll_with_tuple_coordinates():
+    """Test Scroll action with coordinate tuple"""
+    # Setup mocks
+    mock_driver = MagicMock()
+    
+    # Configure mocks
+    mock_driver.scroll = AsyncMock(return_value=Ok(None))
+    
+    # Create context with mocked driver
+    context = await create_test_action_context(mock_driver)
+    
+    # Execute
+    scroll = Scroll(target=(150, 250))
+    result = await scroll(context=context)
+    
+    # Assert
+    assert result.is_ok()
+    mock_driver.scroll.assert_called_once_with("test-page-id", x=150, y=250)
+
+
+@pytest.mark.asyncio
+async def test_scroll_error_no_target():
+    """Test Scroll action with no target or coordinates"""
+    # Setup mocks
+    mock_driver = MagicMock()
+    
+    # Create context with mocked driver
+    context = await create_test_action_context(mock_driver)
+    
+    # Execute
+    scroll = Scroll()  # No target or coordinates
+    result = await scroll(context=context)
+    
+    # Assert
+    assert result.is_error()
+    assert "Either target or scroll coordinates" in str(result.error)

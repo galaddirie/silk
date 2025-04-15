@@ -1426,6 +1426,53 @@ class PlaywrightDriver(BrowserDriver):
             logger.error(f"Error extracting table data: {e}")
             return Error(e)
 
+    async def scroll(
+        self,
+        page_id: str,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        selector: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Result[None, Exception]:
+        """
+        Scroll the page to specific coordinates or scroll an element into view.
+
+        Args:
+            page_id: ID of the page to scroll
+            x: Optional X coordinate to scroll to
+            y: Optional Y coordinate to scroll to
+            selector: Optional CSS selector of element to scroll into view
+            options: Optional scroll behavior options
+
+        Returns:
+            Result indicating success or failure
+        """
+        try:
+            page = self.pages.get(page_id)
+            if not page:
+                return Error(Exception(f"Page with ID '{page_id}' not found"))
+
+            if selector is not None:
+                # Scroll element into view
+                element = await page.query_selector(selector)
+                if element is None:
+                    return Error(Exception(f"Element with selector '{selector}' not found"))
+                
+                await element.scroll_into_view_if_needed()
+                return Ok(None)
+            elif x is not None or y is not None:
+                # Scroll to coordinates
+                x_value = x if x is not None else 0
+                y_value = y if y is not None else 0
+                
+                await page.evaluate(f"window.scrollTo({x_value}, {y_value});")
+                return Ok(None)
+            else:
+                return Error(Exception("Either selector or coordinates (x, y) must be provided"))
+        except Exception as e:
+            logger.error(f"Error scrolling: {e}")
+            return Error(e)
+
     async def _get_coordinates(
         self, page: Page, target: Union[str, ElementHandle, CoordinateType]
     ) -> Tuple[Optional[int], Optional[int]]:
@@ -1465,3 +1512,20 @@ class PlaywrightDriver(BrowserDriver):
             return int(box["x"] + box["width"] / 2), int(box["y"] + box["height"] / 2)
 
         return None, None
+
+    async def execute_cdp_cmd(
+        self, page_id: str, cmd: str, *args: Any
+    ) -> Result[Any, Exception]:
+        """
+        Execute a CDP command
+        """
+        page = self.pages.get(page_id)
+        if not page:
+            return Error(Exception(f"Page with ID '{page_id}' not found"))
+
+        cdp_client = await page.context.new_cdp_session(page)
+        if not cdp_client:
+            return Error(Exception("Failed to create CDP session"))
+
+        result = await cdp_client.send(cmd, *args)
+        return Ok(result)

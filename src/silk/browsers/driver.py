@@ -1,9 +1,11 @@
 import logging
+import asyncio
+import random
 from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Type, Union
 
-from expression import Result
+from expression import Result, Error
 
 from silk.browsers.element import ElementHandle
 from silk.browsers.types import (
@@ -711,3 +713,36 @@ class BrowserDriver(Protocol):
             Result containing table data as list of dictionaries
         """
         pass
+
+    @abstractmethod
+    async def scroll(
+        self,
+        page_id: str,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        selector: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Result[None, Exception]:
+        """
+        Scroll the page to specific coordinates or scroll an element into view
+
+        Args:
+            page_id: ID of the page to scroll
+            x: Optional X coordinate to scroll to
+            y: Optional Y coordinate to scroll to
+            selector: Optional CSS selector of element to scroll into view
+            options: Optional scroll behavior options
+
+        Returns:
+            Result indicating success or failure
+        """
+        pass
+
+    async def execute_cdp_cmd(
+        self, page_id: str, cmd: str, *args: Any
+    ) -> Result[Any, Exception]:
+        """
+        Execute a CDP command
+        """
+        # Default implementation returns Error since not all drivers support CDP
+        return Error(Exception("CDP commands not supported by this driver"))

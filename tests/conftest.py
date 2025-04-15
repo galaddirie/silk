@@ -125,6 +125,7 @@ def mock_browser_driver() -> MagicMock:
     mock.extract_table = AsyncMock(
         return_value=Ok([{"header1": "value1", "header2": "value2"}])
     )
+    mock.scroll = AsyncMock(return_value=Ok(None))
 
     return mock
 
