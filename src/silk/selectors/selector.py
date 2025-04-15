@@ -101,6 +101,26 @@ class SelectorGroup:
                 return result
 
         return Error(Exception(f"All selectors in group '{self.name}' failed"))
+    
+    def __iter__(self):
+        return iter(self.selectors)
+    
+    def __len__(self):
+        return len(self.selectors)
+    
+    def __getitem__(self, index: int):
+        return self.selectors[index]
+    
+    def __contains__(self, item: Selector):
+        return item in self.selectors
+    
+    def __repr__(self):
+        return f"SelectorGroup(name={self.name}, selectors={self.selectors})"
+    
+    def __str__(self):
+        return f"SelectorGroup(name={self.name}, selectors={self.selectors})"
+    
+    
 
 
 class css(Selector):

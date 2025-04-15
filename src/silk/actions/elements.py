@@ -69,7 +69,7 @@ async def Query(
             for sel in selector.selectors:
                 sub_result = await page.query_selector(sel.value)
                 if sub_result.is_error():
-                    return Error(sub_result.error)
+                    continue
                 element = sub_result.default_value(None)
                 if element is not None:
                     return Ok(element)
@@ -78,7 +78,6 @@ async def Query(
         return Error(Exception(f"Unsupported selector type: {type(selector)}"))
     except Exception as e:
         return Error(e)
-
 
 @operation(context=True, context_type=ActionContext)
 async def QueryAll(
@@ -132,10 +131,10 @@ async def QueryAll(
             for sel in selector.selectors:
                 sub_result = await page.query_selector_all(sel.value)
                 if sub_result.is_error():
-                    return Error(sub_result.error)
+                    continue
                 elements = sub_result.default_value(None)
                 if elements is None:
-                    return Error(Exception("No elements found"))
+                    continue
                 all_elements.extend(elements)
             return Ok(all_elements)
 
@@ -577,9 +576,9 @@ async def ElementExists(
     try:
         query_result = await Query(selector, **kwargs)
         if query_result.is_error():
-            return Error(query_result.error)
+            return Ok(False)
 
         element = query_result.default_value(None)
         return Ok(element is not None)
     except Exception as e:
-        return Error(e)
+        return Ok(False)
