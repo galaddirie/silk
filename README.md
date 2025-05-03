@@ -2,7 +2,7 @@
   <img src="https://github.com/user-attachments/assets/49798c93-66b4-448b-8450-0d9233f915e3" alt="Silk">
 </p>
 <p align="center">
-    <em><b>Silk</b> a declative web scraping library for building resiliant web automations in Python.
+    <em><b>Silk</b> a declative web scraping library for building resilient web automations in Python.
 </em>
 </p>
 
