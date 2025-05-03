@@ -1,13 +1,10 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/0c1c1683-5cbb-4989-837a-4ffade82cff3" alt="Silk">
+  <img src="https://github.com/user-attachments/assets/49798c93-66b4-448b-8450-0d9233f915e3" alt="Silk">
 </p>
 <p align="center">
     <em><b>Silk</b> a declative web scraping framework that transforms how you build web automation in Python.
 </em>
 </p>
-
-
-
 
 ---
 [![PyPI version](https://img.shields.io/badge/pypi-v0.2.5-blue.svg)](https://pypi.org/project/silk-scraper/)
