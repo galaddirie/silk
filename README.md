@@ -1,5 +1,12 @@
-# Silk
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/d64e9cc5-ad7f-44c3-b97f-a85d96d7e613" alt="Silk">
+</p>
+<p align="center">
+    <em><b>Silk</b> a declative web scraping framework that transforms how you build web automation in Python.
+</em>
+</p>
 
+---
 [![PyPI version](https://img.shields.io/badge/pypi-v0.2.5-blue.svg)](https://pypi.org/project/silk-scraper/)
 [![Python versions](https://img.shields.io/badge/python-3.10%2B-blue)](https://pypi.org/project/silk-scraper/)
 [![codecov](https://codecov.io/gh/galaddirie/silk/graph/badge.svg?token=MFTEFWJ4EF)](https://codecov.io/gh/galaddirie/silk)
@@ -8,8 +15,7 @@
 [![Type check: mypy](https://img.shields.io/badge/type%20check-mypy-blue)](https://github.com/python/mypy)
 
 
-**Silk** is a declative web scraping framework that transforms how you build web automation in Python. By leveraging composable "Actions", Silk enables you to craft elegant, resilient scrapers with true functional programming patterns. Built with [expression](https://github.com/dbrattli/Expression) and [fp-ops](https://github.com/galaddirie/fp-ops/)
-
+Silk enables you to craft elegant, resilient scrapers with true functional programming patterns. Built with [expression](https://github.com/dbrattli/Expression) and [fp-ops](https://github.com/galaddirie/fp-ops/)
 ## Key Features
 
 - **Railway-Oriented Programming**: Honest error handling with errors as values.
