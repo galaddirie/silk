@@ -15,7 +15,7 @@
 [![Type check: mypy](https://img.shields.io/badge/type%20check-mypy-blue)](https://github.com/python/mypy)
 
 
-Silk enables you to craft elegant, resilient scrapers with true functional programming patterns. Built with [expression](https://github.com/dbrattli/Expression) and [fp-ops](https://github.com/galaddirie/fp-ops/)
+Silk enables you to craft elegant, resilient scrapers with true functional programming patterns. Built with [expression](https://github.com/dbrattli/Expression) and my ergonomic functional programming library [fp-ops](https://github.com/galaddirie/fp-ops/)
 ## Key Features
 
 - **Railway-Oriented Programming**: Honest error handling with errors as values.
