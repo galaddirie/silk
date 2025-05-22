@@ -1,961 +1,1189 @@
 """
-Playwright implementation of the browser driver and element handle for Silk.
+Playwright implementation of the browser automation protocols.
 """
 
-import logging
-from pathlib import Path
-import random
 import asyncio
-import string
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    Union,
-    cast,
+import uuid
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union, cast
+from contextlib import asynccontextmanager
+
+from playwright.async_api import (
+    async_playwright,
+    Browser,
+    BrowserContext as PWBrowserContext,
+    Page as PWPage,
+    ElementHandle as PWElementHandle,
+    Playwright,
+    Error as PlaywrightError,
 )
-
 from expression import Error, Ok, Result
-# We'll import these conditionally based on what's installed
-# from playwright.async_api import Browser
-# from playwright.async_api import BrowserContext as PlaywrightContext
-# from playwright.async_api import ElementHandle as PlaywrightNativeElement
-# from playwright.async_api import Page, Playwright
-# from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-# from playwright.async_api import async_playwright
 
-from silk.browsers.driver import BrowserDriver
-from silk.browsers.element import ElementHandle
 from silk.browsers.types import (
+    BrowserContext,
     BrowserOptions,
     CoordinateType,
     DragOptions,
+    Driver,
+    ElementHandle,
+    MouseButton,
     MouseButtonLiteral,
     MouseOptions,
     NavigationOptions,
-    NavigationWaitLiteral,
+    Page,
+    SelectOptions,
     TypeOptions,
     WaitOptions,
 )
 
-logger = logging.getLogger(__name__)
+# TODO: store less references to the primitives, use ids + driver ref instead of page.method do driver.method(page_id)
+# many element, page, and context helpers have symmetric counterparts in the driver with id parameters
+# this will make the code more robust to refactoring and changes in the future
+# it will also make the code more readable and easier to maintain
+# it will also make the code more efficient by avoiding unnecessary references to the primitives
 
-ContextEntry = Tuple[str, Any]  # PlaywrightContext
-PageEntry = Tuple[str, Any]  # Page
 
-
-# Determine which driver to use
-try:
-    logger.info("Using patchright as the browser automation library")
-    from patchright.async_api import Browser  # type: ignore
-    from patchright.async_api import BrowserContext as PlaywrightContext  # type: ignore
-    from patchright.async_api import ElementHandle as PlaywrightNativeElement  # type: ignore
-    from patchright.async_api import Page, Playwright  # type: ignore
-    from patchright.async_api import TimeoutError as PlaywrightTimeoutError  # type: ignore
-    from patchright.async_api import async_playwright  # type: ignore
-except ImportError:
-    logger.info("Using playwright as the browser automation library")
-    from playwright.async_api import Browser  # type: ignore
-    from playwright.async_api import BrowserContext as PlaywrightContext  # type: ignore
-    from playwright.async_api import ElementHandle as PlaywrightNativeElement  # type: ignore
-    from playwright.async_api import Page, Playwright  # type: ignore
-    from playwright.async_api import TimeoutError as PlaywrightTimeoutError  # type: ignore
-    from playwright.async_api import async_playwright  # type: ignore
-
-# TODO for ease of access all methods should accept both context and page,
-# this avoids situations where some automation libraries need a page and others need a context
-# ex we have pages[0]  instead of getting the page via page_id
-class PlaywrightElementHandle(ElementHandle[PlaywrightNativeElement]):
-    """
-    Playwright implementation of the element handle.
-
-    This class wraps a Playwright native element handle and implements
-    the ElementHandle interface from Silk.
-    """
+class PlaywrightElementHandle(ElementHandle):
+    """Playwright implementation of ElementHandle protocol."""
 
     def __init__(
         self,
         driver: "PlaywrightDriver",
         page_id: str,
-        element_ref: PlaywrightNativeElement,
+        context_id: str,
+        element: PWElementHandle,
         selector: Optional[str] = None,
     ):
-        """Initialize a Playwright element handle."""
-        super().__init__(driver, page_id, element_ref, selector)
+        self.driver = driver
+        self.page_id = page_id
+        self.context_id = context_id
+        self.element_ref = element
+        self.selector = selector
 
-    async def get_text(self) -> Result[str, Exception]:
-        """Get the text content of this element."""
-        try:
-            # Use evaluate to get just this element's text content
-            text = await self.element_ref.evaluate("el => el.textContent.trim()")
-            return Ok(text or "")
-        except Exception as e:
-            logger.error(f"Error getting text: {e}")
-            return Error(e)
+    def get_page_id(self) -> str:
+        return self.page_id
 
-    async def get_inner_text(self) -> Result[str, Exception]:
-        """Get the innerText of this element."""
-        try:
-            inner_text = await self.element_ref.inner_text()
-            return Ok(inner_text or "")
-        except Exception as e:
-            logger.error(f"Error getting inner text: {e}")
-            return Error(e)
+    def get_context_id(self) -> str:
+        return self.context_id
 
-    async def get_html(self, outer: bool = True) -> Result[str, Exception]:
-        """Get the HTML content of this element."""
-        try:
-            if outer:
-                html = await self.element_ref.evaluate("el => el.outerHTML")
-            else:
-                html = await self.element_ref.evaluate("el => el.innerHTML")
-            return Ok(html or "")
-        except Exception as e:
-            logger.error(f"Error getting HTML: {e}")
-            return Error(e)
+    def get_selector(self) -> Optional[str]:
+        return self.selector
 
-    async def get_attribute(self, name: str) -> Result[Optional[str], Exception]:
-        """Get an attribute value from this element."""
-        try:
-            value = await self.element_ref.get_attribute(name)
-            return Ok(value)
-        except Exception as e:
-            logger.error(f"Error getting attribute '{name}': {e}")
-            return Error(e)
+    def get_element_ref(self) -> PWElementHandle:
+        return self.element_ref
 
-    async def get_property(self, name: str) -> Result[Any, Exception]:
-        """Get a JavaScript property value from this element."""
+    async def click(
+        self, options: Optional[MouseOptions] = None
+    ) -> Result[None, Exception]:
         try:
-            value = await self.element_ref.evaluate(f"el => el.{name}")
-            return Ok(value)
-        except Exception as e:
-            logger.error(f"Error getting property '{name}': {e}")
-            return Error(e)
-
-    async def get_bounding_box(self) -> Result[Dict[str, float], Exception]:
-        """Get the bounding box of this element."""
-        try:
-            box = await self.element_ref.bounding_box()
-            if box is None:
-                return Error(
-                    Exception("Element is not visible or has been removed from DOM")
-                )
-            return Ok(
-                {
-                    "x": box["x"],
-                    "y": box["y"],
-                    "width": box["width"],
-                    "height": box["height"],
-                }
+            opts = options or MouseOptions()
+            await self.element_ref.click(
+                button=opts.button,
+                click_count=opts.click_count,
+                delay=opts.delay_between_ms,
+                timeout=opts.timeout,
+                force=True if opts.force > 0.5 else False,
+                modifiers=self._get_modifiers(opts),
             )
-        except Exception as e:
-            logger.error(f"Error getting bounding box: {e}")
-            return Error(e)
-
-    async def click(self) -> Result[None, Exception]:
-        """Click this element."""
-        try:
-            await self.element_ref.click()
             return Ok(None)
         except Exception as e:
-            logger.error(f"Error clicking element: {e}")
+            return Error(e)
+
+    async def double_click(
+        self, options: Optional[MouseOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or MouseOptions()
+            await self.element_ref.dblclick(
+                button=opts.button,
+                delay=opts.delay_between_ms,
+                timeout=opts.timeout,
+                force=True if opts.force > 0.5 else False,
+                modifiers=self._get_modifiers(opts),
+            )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def type(
+        self, text: str, options: Optional[TypeOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or TypeOptions()
+            await self.element_ref.type(
+                text,
+                delay=opts.delay,
+                timeout=opts.timeout,
+            )
+            return Ok(None)
+        except Exception as e:
             return Error(e)
 
     async def fill(
         self, text: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
-        """Fill this element with the given text."""
         try:
-            # First click on the element to ensure it's focused
-            await self.element_ref.click()
-            
-            # Get the page associated with this element
-            driver = cast(PlaywrightDriver, self.driver)
-            page = driver.pages.get(self.page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{self.page_id}' not found"))
-            
-            # Create CDP session
-            cdp_client = None  # Initialize cdp_client to None
-            try:
-                cdp_client = await page.context.new_cdp_session(page)
-                if not cdp_client:
-                    return Error(Exception("Failed to create CDP session"))
-
-                # Characters requiring special keys
-                shift_needed = ["!", '"', "#", "$", "%", "&", "'", "(", ")", "=", "?", "^", "*", "_", ":", ";", ">", "{", "}", "|", "~", "<", "+"]
-                control_needed = ["@", "£", "€", "\\"]
-                
-                # Type each character with random delays
-                for char in text:
-                    special_key = None
-                    
-                    # Determine if we need a special key
-                    if char in control_needed:
-                        special_key = "Control"
-                    elif char in shift_needed or char.isupper():
-                        special_key = "Shift"
-                    
-                    # Press special key if needed
-                    if special_key:
-                        await cdp_client.send("Input.dispatchKeyEvent", {
-                            "type": "keyDown",
-                            "key": special_key,
-                            "code": "ShiftLeft" if special_key == "Shift" else "ControlLeft",
-                            "modifiers": 8 if special_key == "Shift" else 2
-                        })
-                        await asyncio.sleep(random.randint(50, 100) / 1000)
-                    
-                    # Key down event
-                    await cdp_client.send("Input.dispatchKeyEvent", {
-                        "type": "keyDown",
-                        "text": char
-                    })
-                    
-                    # Char event (actual typing)
-                    await cdp_client.send("Input.dispatchKeyEvent", {
-                        "type": "char",
-                        "text": char
-                    })
-                    
-                    # Hold key briefly
-                    await asyncio.sleep(random.randint(50, 100) / 1000)
-                    
-                    # Key up event
-                    await cdp_client.send("Input.dispatchKeyEvent", {
-                        "type": "keyUp",
-                        "text": char
-                    })
-                    
-                    # Release special key if needed
-                    if special_key:
-                        await cdp_client.send("Input.dispatchKeyEvent", {
-                            "type": "keyUp",
-                            "key": special_key,
-                            "code": "ShiftLeft" if special_key == "Shift" else "ControlLeft",
-                            "modifiers": 8 if special_key == "Shift" else 2
-                        })
-                        await asyncio.sleep(random.randint(50, 100) / 1000)
-                    
-                    # Random delay between keystrokes
-                    await asyncio.sleep(random.randint(50, 150) / 1000)
-                
-                return Ok(None)
-
-            except Exception as e:
-                logger.warning(f"CDP typing failed: {e}, falling back to standard fill")
-                # Attempt fallback using standard fill, but re-query the element first
-                if not self.selector:
-                    logger.error("Cannot fallback to standard fill: Element selector is unknown.")
-                    return Error(Exception("CDP fill failed and element selector is unknown for fallback."))
-
-                try:
-                    # Re-get the page in case the context changed subtly
-                    driver = cast(PlaywrightDriver, self.driver)
-                    page = driver.pages.get(self.page_id)
-                    if not page:
-                         return Error(Exception(f"Page with ID '{self.page_id}' not found for fallback fill"))
-
-                    # Re-query the element using the stored selector
-                    fresh_element = await page.query_selector(self.selector)
-                    if not fresh_element:
-                        logger.error(f"Cannot fallback to standard fill: Element '{self.selector}' not found after CDP failure.")
-                        return Error(Exception(f"Element '{self.selector}' not found after CDP failure."))
-
-                    # Use the fresh element handle for the standard fill
-                    await fresh_element.fill(text)
-                    return Ok(None)
-                except Exception as inner_e:
-                    logger.error(f"Fallback standard fill failed for element '{self.selector}': {inner_e}")
-                    # Return the inner exception from the fallback attempt
-                    return Error(inner_e)
-            finally:
-                # Ensure CDP session is detached regardless of success or failure
-                if cdp_client:
-                    try:
-                        await cdp_client.detach()
-                    except Exception as detach_e:
-                        logger.warning(f"Failed to detach CDP session: {detach_e}")
+            opts = options or TypeOptions()
+            if opts.clear:
+                await self.element_ref.fill("", timeout=opts.timeout)
+            await self.element_ref.fill(text, timeout=opts.timeout)
+            return Ok(None)
         except Exception as e:
-            logger.error(f"Error filling element: {e}")
             return Error(e)
 
     async def select(
         self, value: Optional[str] = None, text: Optional[str] = None
     ) -> Result[None, Exception]:
-        """Select an option from this element."""
         try:
-            if value is not None:
+            if value:
                 await self.element_ref.select_option(value=value)
-            elif text is not None:
+            elif text:
                 await self.element_ref.select_option(label=text)
             else:
-                return Error(Exception("Either value or text must be provided"))
+                return Error(ValueError("Either value or text must be provided"))
             return Ok(None)
         except Exception as e:
-            logger.error(f"Error selecting option: {e}")
+            return Error(e)
+
+    async def get_text(self) -> Result[str, Exception]:
+        try:
+            text = await self.element_ref.text_content()
+            return Ok(text or "")
+        except Exception as e:
+            return Error(e)
+
+    async def text(self) -> str:
+        result = await self.get_text()
+        return result.value if result.is_ok() else ""
+
+    async def get_inner_text(self) -> Result[str, Exception]:
+        try:
+            text = await self.element_ref.inner_text()
+            return Ok(text)
+        except Exception as e:
+            return Error(e)
+
+    async def get_html(self, outer: bool = True) -> Result[str, Exception]:
+        try:
+            if outer:
+                html = await self.element_ref.evaluate("el => el.outerHTML")
+            else:
+                html = await self.element_ref.inner_html()
+            return Ok(html)
+        except Exception as e:
+            return Error(e)
+
+    async def get_attribute(self, name: str) -> Result[Optional[str], Exception]:
+        try:
+            attr = await self.element_ref.get_attribute(name)
+            return Ok(attr)
+        except Exception as e:
+            return Error(e)
+
+    async def attribute(self, name: str, default: str = "") -> str:
+        result = await self.get_attribute(name)
+        if result.is_ok():
+            return result.value or default
+        return default
+
+    async def has_attribute(self, name: str) -> bool:
+        result = await self.get_attribute(name)
+        return result.is_ok() and result.value is not None
+
+    async def get_property(self, name: str) -> Result[Any, Exception]:
+        try:
+            prop = await self.element_ref.get_property(name)
+            value = await prop.json_value()
+            return Ok(value)
+        except Exception as e:
+            return Error(e)
+
+    async def get_bounding_box(self) -> Result[Dict[str, float], Exception]:
+        try:
+            box = await self.element_ref.bounding_box()
+            if box:
+                return Ok(box)
+            return Error(ValueError("Element has no bounding box"))
+        except Exception as e:
             return Error(e)
 
     async def is_visible(self) -> Result[bool, Exception]:
-        """Check if this element is visible."""
         try:
-            return Ok(await self.element_ref.is_visible())
+            visible = await self.element_ref.is_visible()
+            return Ok(visible)
         except Exception as e:
-            logger.error(f"Error checking visibility: {e}")
             return Error(e)
 
     async def is_enabled(self) -> Result[bool, Exception]:
-        """Check if this element is enabled."""
         try:
-            return Ok(await self.element_ref.is_enabled())
+            enabled = await self.element_ref.is_enabled()
+            return Ok(enabled)
         except Exception as e:
-            logger.error(f"Error checking if element is enabled: {e}")
             return Error(e)
 
     async def get_parent(self) -> Result[Optional[ElementHandle], Exception]:
-        """Get the parent element."""
         try:
             parent = await self.element_ref.evaluate_handle("el => el.parentElement")
-            # Check if the handle is null
-            if parent is None or await parent.evaluate("handle => handle === null"):
-                return Ok(None)
-
-            # Cast to the correct type
-            parent_element = cast(PlaywrightNativeElement, parent)
-            return Ok(
-                PlaywrightElementHandle(
-                    driver=cast(PlaywrightDriver, self.driver),
-                    page_id=self.page_id,
-                    element_ref=parent_element,
-                )
-            )
-        except Exception as e:
-            logger.error(f"Error getting parent element: {e}")
-            return Error(e)
-
-    async def get_children(self) -> Result[list[ElementHandle], Exception]:
-        """Get all child elements."""
-        try:
-            children = await self.element_ref.evaluate_handle(
-                "el => Array.from(el.children)"
-            )
-            children_array = await children.evaluate("arr => arr.map((_, i) => i)")
-
-            result_children: list[ElementHandle] = []
-            for i in range(len(children_array)):
-                child_handle = await children.evaluate_handle(f"arr => arr[{i}]")
-                # Cast to the correct type
-                child_element = cast(PlaywrightNativeElement, child_handle)
-                result_children.append(
+            if parent:
+                parent_element = cast(PWElementHandle, parent)
+                return Ok(
                     PlaywrightElementHandle(
-                        driver=cast(PlaywrightDriver, self.driver),
-                        page_id=self.page_id,
-                        element_ref=child_element,
+                        self.driver,
+                        self.page_id,
+                        self.context_id,
+                        parent_element,
                     )
                 )
-
-            return Ok(result_children)
+            return Ok(None)
         except Exception as e:
-            logger.error(f"Error getting child elements: {e}")
+            return Error(e)
+
+    async def get_children(self) -> Result[List[ElementHandle], Exception]:
+        try:
+            children = await self.element_ref.query_selector_all("*")
+            return Ok(
+                [
+                    PlaywrightElementHandle(
+                        self.driver, self.page_id, self.context_id, child
+                    )
+                    for child in children
+                ]
+            )
+        except Exception as e:
             return Error(e)
 
     async def query_selector(
         self, selector: str
     ) -> Result[Optional[ElementHandle], Exception]:
-        """Find a descendant element matching the selector."""
         try:
             element = await self.element_ref.query_selector(selector)
-            if element is None:
-                return Ok(None)
-
-            return Ok(
-                PlaywrightElementHandle(
-                    driver=cast(PlaywrightDriver, self.driver),
-                    page_id=self.page_id,
-                    element_ref=element,
-                    selector=selector,
+            if element:
+                return Ok(
+                    PlaywrightElementHandle(
+                        self.driver, self.page_id, self.context_id, element, selector
+                    )
                 )
-            )
+            return Ok(None)
         except Exception as e:
-            logger.error(f"Error querying selector '{selector}': {e}")
             return Error(e)
 
     async def query_selector_all(
         self, selector: str
-    ) -> Result[list[ElementHandle], Exception]:
-        """Find all descendant elements matching the selector."""
+    ) -> Result[List[ElementHandle], Exception]:
         try:
             elements = await self.element_ref.query_selector_all(selector)
-            result_elements: list[ElementHandle] = []
-
-            for element in elements:
-                result_elements.append(
+            return Ok(
+                [
                     PlaywrightElementHandle(
-                        driver=cast(PlaywrightDriver, self.driver),
-                        page_id=self.page_id,
-                        element_ref=element,
-                        selector=selector,
+                        self.driver, self.page_id, self.context_id, el, selector
                     )
-                )
-
-            return Ok(result_elements)
+                    for el in elements
+                ]
+            )
         except Exception as e:
-            logger.error(f"Error querying selector all '{selector}': {e}")
             return Error(e)
 
     async def scroll_into_view(self) -> Result[None, Exception]:
-        """Scroll this element into view."""
         try:
             await self.element_ref.scroll_into_view_if_needed()
             return Ok(None)
         except Exception as e:
-            logger.error(f"Error scrolling element into view: {e}")
             return Error(e)
 
+    async def input(
+        self, text: str, options: Optional[TypeOptions] = None
+    ) -> "PlaywrightElementHandle":
+        await self.fill(text, options)
+        return self
 
-class PlaywrightDriver(BrowserDriver):
-    """
-    Playwright implementation of the browser driver.
-    """
+    async def choose(
+        self, value: Optional[str] = None, text: Optional[str] = None
+    ) -> "PlaywrightElementHandle":
+        await self.select(value, text)
+        return self
 
-    def __init__(self, options: BrowserOptions):
-        """Initialize the Playwright driver with options."""
-        super().__init__(options)
-        self.playwright: Optional[Playwright] = None
-        self.browser: Optional[Browser] = None
-        self.contexts: Dict[str, PlaywrightContext] = {}
-        self.pages: Dict[str, Page] = {}
-        self.initialized = False
-        self.options = options
+    @asynccontextmanager
+    async def with_scroll_into_view(self):
+        await self.scroll_into_view()
+        yield self
+
+    def as_native(self) -> PWElementHandle:
+        return self.element_ref
+
+    def _get_modifiers(self, options: MouseOptions) -> List[str]:
+        """Convert KeyModifier enums to Playwright modifier strings."""
+        modifiers = []
+        for mod in options.modifiers:
+            if mod.name == "ALT":
+                modifiers.append("Alt")
+            elif mod.name == "CTRL":
+                modifiers.append("Control")
+            elif mod.name == "COMMAND":
+                modifiers.append("Meta")
+            elif mod.name == "SHIFT":
+                modifiers.append("Shift")
+        return modifiers
 
 
-    async def launch(self) -> Result[None, Exception]:
-        """Launch the Playwright browser."""
-        if self.initialized:
-            return Ok(None)
+class PlaywrightPage(Page):
+    """Playwright implementation of Page protocol."""
 
+    def __init__(
+        self,
+        driver: "PlaywrightDriver",
+        page_id: str,
+        context_id: str,
+        page: PWPage,
+    ):
+        self.driver = driver
+        self.page_id = page_id
+        self.context_id = context_id
+        self.page_ref = page
+
+    def get_page_id(self) -> str:
+        return self.page_id
+
+    async def goto(
+        self, url: str, options: Optional[NavigationOptions] = None
+    ) -> Result[None, Exception]:
         try:
-            self.playwright = await async_playwright().start()
-
-            browser_type = (
-                self.options.browser_type if self.options.browser_type else "chromium"
+            opts = options or NavigationOptions()
+            await self.page_ref.goto(
+                url,
+                wait_until=opts.wait_until,
+                timeout=opts.timeout,
+                referer=opts.referer,
             )
-
-            # Prepare launch options as a proper dictionary
-            launch_options: Dict[str, Any] = {
-                "headless": self.options.headless,
-            }
-
-            # Add proxy if specified
-            if self.options.proxy:
-                launch_options["proxy"] = {"server": self.options.proxy}
-
-            # Check if we need to connect to a remote browser
-            if self.options.remote_url:
-                logger.info(f"Connecting to remote browser at {self.options.remote_url}")
-                if browser_type != "chromium":
-                    logger.warning(f"Remote CDP connections only support Chromium. Ignoring browser_type={browser_type}")
-                
-                try:
-                    # Connect to the remote browser via CDP
-                    self.browser = await self.playwright.chromium.connect_over_cdp(
-                        endpoint_url=self.options.remote_url,
-                        timeout=self.options.timeout
-                    )
-                    logger.info("Successfully connected to remote browser")
-                except Exception as e:
-                    return Error(Exception(f"Failed to connect to remote browser: {e}"))
-            else:
-                # Launch the appropriate browser
-                if browser_type == "chromium":
-                    self.browser = await self.playwright.chromium.launch(**launch_options)
-                elif browser_type == "firefox":
-                    self.browser = await self.playwright.firefox.launch(**launch_options)
-                elif browser_type == "webkit":
-                    self.browser = await self.playwright.webkit.launch(**launch_options)
-                else:
-                    return Error(Exception(f"Unsupported browser type: {browser_type}"))
-
-            self.initialized = True
             return Ok(None)
-
         except Exception as e:
-            logger.error(f"Error launching browser: {e}")
-            if self.playwright:
-                await self.playwright.stop()
-                self.playwright = None
+            return Error(e)
+
+    async def get_url(self) -> Result[str, Exception]:
+        try:
+            return Ok(self.page_ref.url)
+        except Exception as e:
+            return Error(e)
+
+    async def current_url(self) -> Result[str, Exception]:
+        return await self.get_url()
+
+    async def get_title(self) -> Result[str, Exception]:
+        try:
+            title = await self.page_ref.title()
+            return Ok(title)
+        except Exception as e:
+            return Error(e)
+
+    async def get_content(self) -> Result[str, Exception]:
+        try:
+            content = await self.page_ref.content()
+            return Ok(content)
+        except Exception as e:
+            return Error(e)
+
+    async def get_page_source(self) -> Result[str, Exception]:
+        return await self.get_content()
+
+    async def reload(
+        self, options: Optional[NavigationOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or NavigationOptions()
+            await self.page_ref.reload(
+                wait_until=opts.wait_until,
+                timeout=opts.timeout,
+            )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def go_back(
+        self, options: Optional[NavigationOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or NavigationOptions()
+            await self.page_ref.go_back(
+                wait_until=opts.wait_until,
+                timeout=opts.timeout,
+            )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def go_forward(
+        self, options: Optional[NavigationOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or NavigationOptions()
+            await self.page_ref.go_forward(
+                wait_until=opts.wait_until,
+                timeout=opts.timeout,
+            )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def query_selector(
+        self, selector: str
+    ) -> Result[Optional[ElementHandle], Exception]:
+        try:
+            element = await self.page_ref.query_selector(selector)
+            if element:
+                return Ok(
+                    PlaywrightElementHandle(
+                        self.driver, self.page_id, self.context_id, element, selector
+                    )
+                )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def query_selector_all(
+        self, selector: str
+    ) -> Result[List[ElementHandle], Exception]:
+        try:
+            elements = await self.page_ref.query_selector_all(selector)
+            return Ok(
+                [
+                    PlaywrightElementHandle(
+                        self.driver, self.page_id, self.context_id, el, selector
+                    )
+                    for el in elements
+                ]
+            )
+        except Exception as e:
+            return Error(e)
+
+    async def wait_for_selector(
+        self, selector: str, options: Optional[WaitOptions] = None
+    ) -> Result[Optional[ElementHandle], Exception]:
+        try:
+            opts = options or WaitOptions()
+            element = await self.page_ref.wait_for_selector(
+                selector,
+                state=opts.state,
+                timeout=opts.timeout,
+            )
+            if element:
+                return Ok(
+                    PlaywrightElementHandle(
+                        self.driver, self.page_id, self.context_id, element, selector
+                    )
+                )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def wait_for_navigation(
+        self, options: Optional[NavigationOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or NavigationOptions()
+            await self.page_ref.wait_for_load_state(
+                state=opts.wait_until,
+                timeout=opts.timeout,
+            )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def click(
+        self, selector: str, options: Optional[MouseOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or MouseOptions()
+            await self.page_ref.click(
+                selector,
+                button=opts.button,
+                click_count=opts.click_count,
+                delay=opts.delay_between_ms,
+                timeout=opts.timeout,
+                force=True if opts.force > 0.5 else False,
+                modifiers=self._get_modifiers(opts),
+            )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def double_click(
+        self, selector: str, options: Optional[MouseOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or MouseOptions()
+            await self.page_ref.dblclick(
+                selector,
+                button=opts.button,
+                delay=opts.delay_between_ms,
+                timeout=opts.timeout,
+                force=True if opts.force > 0.5 else False,
+                modifiers=self._get_modifiers(opts),
+            )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def type(
+        self, selector: str, text: str, options: Optional[TypeOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or TypeOptions()
+            await self.page_ref.type(
+                selector,
+                text,
+                delay=opts.delay,
+                timeout=opts.timeout,
+            )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def fill(
+        self, selector: str, text: str, options: Optional[TypeOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or TypeOptions()
+            if opts.clear:
+                await self.page_ref.fill(selector, "", timeout=opts.timeout)
+            await self.page_ref.fill(selector, text, timeout=opts.timeout)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def select(
+        self, selector: str, value: Optional[str] = None, text: Optional[str] = None
+    ) -> Result[None, Exception]:
+        try:
+            if value:
+                await self.page_ref.select_option(selector, value=value)
+            elif text:
+                await self.page_ref.select_option(selector, label=text)
+            else:
+                return Error(ValueError("Either value or text must be provided"))
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def execute_script(self, script: str, *args: Any) -> Result[Any, Exception]:
+        try:
+            result = await self.page_ref.evaluate(script, *args)
+            return Ok(result)
+        except Exception as e:
+            return Error(e)
+
+    async def screenshot(
+        self, path: Optional[Path] = None
+    ) -> Result[Union[Path, bytes], Exception]:
+        try:
+            if path:
+                await self.page_ref.screenshot(path=str(path))
+                return Ok(path)
+            else:
+                data = await self.page_ref.screenshot()
+                return Ok(data)
+        except Exception as e:
+            return Error(e)
+
+    async def mouse_move(
+        self, x: float, y: float, options: Optional[MouseOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or MouseOptions()
+            await self.page_ref.mouse.move(x, y, steps=opts.steps)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def mouse_down(
+        self,
+        button: MouseButtonLiteral = "left",
+        options: Optional[MouseOptions] = None,
+    ) -> Result[None, Exception]:
+        try:
+            await self.page_ref.mouse.down(button=button)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def mouse_up(
+        self,
+        button: MouseButtonLiteral = "left",
+        options: Optional[MouseOptions] = None,
+    ) -> Result[None, Exception]:
+        try:
+            await self.page_ref.mouse.up(button=button)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def mouse_click(
+        self,
+        button: MouseButtonLiteral = "left",
+        options: Optional[MouseOptions] = None,
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or MouseOptions()
+            # Get current position
+            pos = await self.page_ref.evaluate("() => ({ x: window.mouseX || 0, y: window.mouseY || 0 })")
+            await self.page_ref.mouse.click(
+                pos["x"], 
+                pos["y"], 
+                button=button,
+                click_count=opts.click_count,
+                delay=opts.delay_between_ms,
+            )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def mouse_drag(
+        self,
+        source: CoordinateType,
+        target: CoordinateType,
+        options: Optional[DragOptions] = None,
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or DragOptions()
+            await self.page_ref.mouse.move(source[0], source[1])
+            await self.page_ref.mouse.down()
+            await self.page_ref.mouse.move(
+                target[0], target[1], steps=opts.steps
+            )
+            await self.page_ref.mouse.up()
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def key_press(
+        self, key: str, options: Optional[TypeOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            await self.page_ref.keyboard.press(key)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def key_down(
+        self, key: str, options: Optional[TypeOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            await self.page_ref.keyboard.down(key)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def key_up(
+        self, key: str, options: Optional[TypeOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            await self.page_ref.keyboard.up(key)
+            return Ok(None)
+        except Exception as e:
             return Error(e)
 
     async def close(self) -> Result[None, Exception]:
-        """Close the Playwright browser."""
         try:
-            for context_id in list(self.contexts.keys()):
-                await self.close_context(context_id)
-
-            if self.browser:
-                await self.browser.close()
-                self.browser = None
-
-            if self.playwright:
-                await self.playwright.stop()
-                self.playwright = None
-
-            self.initialized = False
+            await self.page_ref.close()
             return Ok(None)
         except Exception as e:
-            logger.error(f"Error closing browser: {e}")
+            return Error(e)
+
+    async def scroll(
+        self,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        selector: Optional[str] = None,
+    ) -> Result[None, Exception]:
+        try:
+            if selector:
+                element = await self.page_ref.query_selector(selector)
+                if element:
+                    await element.scroll_into_view_if_needed()
+            else:
+                await self.page_ref.evaluate(
+                    f"window.scrollTo({x or 0}, {y or 0})"
+                )
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    def _get_modifiers(self, options: MouseOptions) -> List[str]:
+        """Convert KeyModifier enums to Playwright modifier strings."""
+        modifiers = []
+        for mod in options.modifiers:
+            if mod.name == "ALT":
+                modifiers.append("Alt")
+            elif mod.name == "CTRL":
+                modifiers.append("Control")
+            elif mod.name == "COMMAND":
+                modifiers.append("Meta")
+            elif mod.name == "SHIFT":
+                modifiers.append("Shift")
+        return modifiers
+
+
+class PlaywrightBrowserContext(BrowserContext):
+    """Playwright implementation of BrowserContext protocol."""
+
+    def __init__(
+        self,
+        driver: "PlaywrightDriver",
+        context_id: str,
+        context: PWBrowserContext,
+    ):
+        self.driver = driver
+        self.context_id = context_id
+        self.context_ref = context
+        self.page_id = ""  # Not used for context
+
+    def get_page_id(self) -> str:
+        return self.page_id
+
+    async def new_page(self) -> Result[Page, Exception]:
+        try:
+            pw_page = await self.context_ref.new_page()
+            page_id = str(uuid.uuid4())
+            page = PlaywrightPage(self.driver, page_id, self.context_id, pw_page)
+            self.driver._pages[page_id] = page
+            return Ok(page)
+        except Exception as e:
+            return Error(e)
+
+    async def create_page(
+        self, nickname: Optional[str] = None
+    ) -> Result[Page, Exception]:
+        return await self.new_page()
+
+    # todo: improve this
+    async def pages(self) -> Result[List[Page], Exception]:
+        try:
+            pw_pages = self.context_ref.pages
+            pages = []
+            for pw_page in pw_pages:
+                # Find or create page wrapper
+                page_found = False
+                for page_id, page in self.driver._pages.items():
+                    if page.page_ref == pw_page:
+                        pages.append(page)
+                        page_found = True
+                        break
+                if not page_found:
+                    # Create new wrapper for untracked page
+                    page_id = str(uuid.uuid4())
+                    page = PlaywrightPage(
+                        self.driver, page_id, self.context_id, pw_page
+                    )
+                    self.driver._pages[page_id] = page
+                    pages.append(page)
+            return Ok(pages)
+        except Exception as e:
+            return Error(e)
+
+    async def get_page(
+        self, page_id: Optional[str] = None
+    ) -> Result[Page, Exception]:
+        try:
+            if page_id:
+                page = self.driver._pages.get(page_id)
+                if page:
+                    return Ok(page)
+                return Error(ValueError(f"Page {page_id} not found"))
+            else:
+                # Return first page
+                pages_result = await self.pages()
+                if pages_result.is_error():
+                    return pages_result
+                pages = pages_result.value
+                if pages:
+                    return Ok(pages[0])
+                return Error(ValueError("No pages available"))
+        except Exception as e:
+            return Error(e)
+
+    async def close_page(
+        self, page_id: Optional[str] = None
+    ) -> Result[None, Exception]:
+        try:
+            if page_id:
+                page = self.driver._pages.get(page_id)
+                if page:
+                    await page.close()
+                    del self.driver._pages[page_id]
+                    return Ok(None)
+                return Error(ValueError(f"Page {page_id} not found"))
+            else:
+                # Close all pages
+                for page in list(self.driver._pages.values()):
+                    if page.context_id == self.context_id:
+                        await page.close()
+                        del self.driver._pages[page.page_id]
+                return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def get_cookies(self) -> Result[List[Dict[str, Any]], Exception]:
+        try:
+            cookies = await self.context_ref.cookies()
+            return Ok(cookies)
+        except Exception as e:
+            return Error(e)
+
+    async def set_cookies(
+        self, cookies: List[Dict[str, Any]]
+    ) -> Result[None, Exception]:
+        try:
+            await self.context_ref.add_cookies(cookies)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def clear_cookies(self) -> Result[None, Exception]:
+        try:
+            await self.context_ref.clear_cookies()
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def add_init_script(self, script: str) -> Result[None, Exception]:
+        try:
+            await self.context_ref.add_init_script(script)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def mouse_move(
+        self, x: int, y: int, options: Optional[MouseOptions] = None
+    ) -> Result[None, Exception]:
+        # Get the first page to perform mouse operations
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return page_result
+        page = page_result.value
+        return await page.mouse_move(x, y, options)
+
+    async def mouse_down(
+        self,
+        button: MouseButtonLiteral = "left",
+        options: Optional[MouseOptions] = None,
+    ) -> Result[None, Exception]:
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return page_result
+        page = page_result.value
+        return await page.mouse_down(button, options)
+
+    async def mouse_up(
+        self,
+        button: MouseButtonLiteral = "left",
+        options: Optional[MouseOptions] = None,
+    ) -> Result[None, Exception]:
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return page_result
+        page = page_result.value
+        return await page.mouse_up(button, options)
+
+    async def mouse_click(
+        self,
+        button: MouseButtonLiteral = "left",
+        options: Optional[MouseOptions] = None,
+    ) -> Result[None, Exception]:
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return page_result
+        page = page_result.value
+        return await page.mouse_click(button, options)
+
+    async def mouse_double_click(
+        self, x: int, y: int, options: Optional[MouseOptions] = None
+    ) -> Result[None, Exception]:
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return page_result
+        page = page_result.value
+        await page.mouse_move(x, y, options)
+        opts = options or MouseOptions()
+        opts.click_count = 2
+        return await page.mouse_click("left", opts)
+
+    async def mouse_drag(
+        self,
+        source: CoordinateType,
+        target: CoordinateType,
+        options: Optional[DragOptions] = None,
+    ) -> Result[None, Exception]:
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return page_result
+        page = page_result.value
+        return await page.mouse_drag(source, target, options)
+
+    async def key_press(
+        self, key: str, options: Optional[TypeOptions] = None
+    ) -> Result[None, Exception]:
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return page_result
+        page = page_result.value
+        return await page.key_press(key, options)
+
+    async def key_down(
+        self, key: str, options: Optional[TypeOptions] = None
+    ) -> Result[None, Exception]:
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return page_result
+        page = page_result.value
+        return await page.key_down(key, options)
+
+    async def key_up(
+        self, key: str, options: Optional[TypeOptions] = None
+    ) -> Result[None, Exception]:
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return page_result
+        page = page_result.value
+        return await page.key_up(key, options)
+
+    async def close(self) -> Result[None, Exception]:
+        try:
+            # Close all pages first
+            await self.close_page()
+            # Then close context
+            await self.context_ref.close()
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+
+class PlaywrightDriver(Driver):
+    """Playwright implementation of Driver protocol."""
+
+    def __init__(self):
+        self.driver_ref: Optional[Playwright] = None
+        self.browser: Optional[Browser] = None
+        self.contexts: Dict[str, PlaywrightBrowserContext] = {}
+        self._pages: Dict[str, PlaywrightPage] = {}
+        self._playwright_manager = None
+
+    def get_driver_ref(self) -> Optional[Playwright]:
+        return self.driver_ref
+
+    async def launch(
+        self, options: Optional[BrowserOptions] = None
+    ) -> Result[None, Exception]:
+        try:
+            opts = options or BrowserOptions()
+            
+            # Start playwright
+            self._playwright_manager = async_playwright()
+            self.driver_ref = await self._playwright_manager.start()
+
+            # Choose browser
+            browser_launcher = {
+                "chrome": self.driver_ref.chromium,
+                "chromium": self.driver_ref.chromium,
+                "firefox": self.driver_ref.firefox,
+                "edge": self.driver_ref.chromium,
+            }.get(opts.browser_type, self.driver_ref.chromium)
+
+            # Launch browser
+            launch_args = {
+                "headless": opts.headless,
+                "args": opts.browser_args,
+            }
+            
+            if opts.proxy:
+                launch_args["proxy"] = {"server": opts.proxy}
+            
+            if opts.remote_url:
+                # Connect to remote browser
+                self.browser = await browser_launcher.connect(
+                    opts.remote_url,
+                    **launch_args
+                )
+            else:
+                # Launch local browser
+                self.browser = await browser_launcher.launch(**launch_args)
+            
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+    async def new_context(
+        self, options: Optional[Dict[str, Any]] = None
+    ) -> Result[BrowserContext, Exception]:
+        try:
+            if not self.browser:
+                return Error(ValueError("Browser not launched"))
+            
+            context_options = options or {}
+            
+            # Create browser context
+            pw_context = await self.browser.new_context(**context_options)
+            
+            context_id = str(uuid.uuid4())
+            context = PlaywrightBrowserContext(self, context_id, pw_context)
+            self.contexts[context_id] = context
+            
+            return Ok(context)
+        except Exception as e:
             return Error(e)
 
     async def create_context(
         self, options: Optional[Dict[str, Any]] = None
     ) -> Result[str, Exception]:
-        """Create a new browser context with isolated storage."""
-        if not self.initialized or not self.browser:
-            launch_result = await self.launch()
-            if launch_result.is_error():
-                return Error(launch_result.error)
+        result = await self.new_context(options)
+        if result.is_error():
+            return Error(result.error)
+        return Ok(result.value.context_id)
 
+    async def contexts(self) -> Result[List[BrowserContext], Exception]:
         try:
-            context_options: Dict[str, Any] = {}
-
-            # Set viewport
-            if self.options.viewport_width and self.options.viewport_height:
-                context_options["viewport"] = {
-                    "width": self.options.viewport_width,
-                    "height": self.options.viewport_height,
-                }
-
-            # Set locale
-            locale = self.options.locale
-            if locale:
-                context_options["locale"] = locale
-
-            # Set timezone
-            timezone = self.options.timezone
-            if timezone:
-                context_options["timezone_id"] = timezone
-
-            # Set user agent
-            user_agent = self.options.user_agent
-            if user_agent:
-                context_options["user_agent"] = user_agent
-
-            # Merge additional options
-            if options:
-                context_options.update(options)
-
-            # Create the context
-            if not self.browser:
-                return Error(Exception("Browser is not initialized"))
-
-            context = await self.browser.new_context(**context_options)
-
-            # Set default timeout
-            if self.options.timeout:
-                context.set_default_timeout(self.options.timeout)
-
-            # Generate unique context ID
-            context_id = f"context-{len(self.contexts) + 1}"
-            self.contexts[context_id] = context
-
-            return Ok(context_id)
+            return Ok(list(self.contexts.values()))
         except Exception as e:
-            logger.error(f"Error creating context: {e}")
             return Error(e)
 
     async def close_context(self, context_id: str) -> Result[None, Exception]:
-        """Close a browser context."""
         try:
             context = self.contexts.get(context_id)
             if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            # Remove all pages associated with this context
-            pages_to_remove = []
-            for page_id, page in self.pages.items():
-                if page.context == context:
-                    pages_to_remove.append(page_id)
-
-            for page_id in pages_to_remove:
-                self.pages.pop(page_id, None)
-
-            # Close the context
+                return Error(ValueError(f"Context {context_id} not found"))
+            
             await context.close()
-            self.contexts.pop(context_id, None)
-
+            del self.contexts[context_id]
+            
+            # Remove pages associated with this context
+            pages_to_remove = [
+                page_id
+                for page_id, page in self._pages.items()
+                if page.context_id == context_id
+            ]
+            for page_id in pages_to_remove:
+                del self._pages[page_id]
+            
             return Ok(None)
         except Exception as e:
-            logger.error(f"Error closing context: {e}")
             return Error(e)
 
     async def create_page(self, context_id: str) -> Result[str, Exception]:
-        """Create a new page in the specified context."""
         try:
             context = self.contexts.get(context_id)
             if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            # Create new page
-            page = await context.new_page()
-
-            # Set default timeout
-            if self.options.timeout:
-                page.set_default_timeout(self.options.timeout)
-
-            # Generate unique page ID
-            page_id = f"page-{len(self.pages) + 1}"
-            self.pages[page_id] = page
-
-            return Ok(page_id)
+                return Error(ValueError(f"Context {context_id} not found"))
+            
+            page_result = await context.new_page()
+            if page_result.is_error():
+                return Error(page_result.error)
+            
+            return Ok(page_result.value.page_id)
         except Exception as e:
-            logger.error(f"Error creating page: {e}")
             return Error(e)
 
     async def close_page(self, page_id: str) -> Result[None, Exception]:
-        """Close a page."""
         try:
-            page = self.pages.get(page_id)
+            page = self._pages.get(page_id)
             if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            # Close the page
+                return Error(ValueError(f"Page {page_id} not found"))
+            
             await page.close()
-            self.pages.pop(page_id, None)
-
+            del self._pages[page_id]
             return Ok(None)
         except Exception as e:
-            logger.error(f"Error closing page: {e}")
             return Error(e)
 
     async def goto(
         self, page_id: str, url: str, options: Optional[NavigationOptions] = None
     ) -> Result[None, Exception]:
-        """Navigate a page to a URL."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            goto_options: Dict[str, Any] = {}
-
-            if options:
-                # Set timeout if provided
-                if options.timeout:
-                    goto_options["timeout"] = options.timeout
-
-                # Set wait_until if provided
-                if options.wait_until:
-                    # Map wait_until values to Playwright's expected values
-                    goto_options["wait_until"] = options.wait_until
-
-                # Set referer if provided
-                if options.referer:
-                    goto_options["referer"] = options.referer
-
-            # Navigate to URL
-            await page.goto(url, **goto_options)
-            return Ok(None)
-        except PlaywrightTimeoutError as e:
-            logger.error(f"Timeout navigating to {url}: {e}")
-            return Error(e)
-        except Exception as e:
-            logger.error(f"Error navigating to {url}: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.goto(url, options)
 
     async def current_url(self, page_id: str) -> Result[str, Exception]:
-        """Get the current URL of a page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            return Ok(page.url)
-        except Exception as e:
-            logger.error(f"Error getting current URL: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.get_url()
 
     async def get_source(self, page_id: str) -> Result[str, Exception]:
-        """Get the current page HTML source."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            html = await page.content()
-            return Ok(html)
-        except Exception as e:
-            logger.error(f"Error getting page source: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.get_content()
 
     async def screenshot(
         self, page_id: str, path: Optional[Path] = None
     ) -> Result[Union[Path, bytes], Exception]:
-        """Take a screenshot of a page and save it to the specified path."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            screenshot_options: Dict[str, Any] = {}
-
-            if path:
-                screenshot_options["path"] = str(path)
-                await page.screenshot(**screenshot_options)
-                return Ok(path)
-            else:
-                screenshot_bytes = await page.screenshot()
-                return Ok(screenshot_bytes)
-        except Exception as e:
-            logger.error(f"Error taking screenshot: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.screenshot(path)
 
     async def reload(self, page_id: str) -> Result[None, Exception]:
-        """Reload the current page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            await page.reload()
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error reloading page: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.reload()
 
     async def go_back(self, page_id: str) -> Result[None, Exception]:
-        """Go back to the previous page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            await page.go_back()
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error going back: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.go_back()
 
     async def go_forward(self, page_id: str) -> Result[None, Exception]:
-        """Go forward to the next page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            await page.go_forward()
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error going forward: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.go_forward()
 
     async def query_selector(
         self, page_id: str, selector: str
     ) -> Result[Optional[ElementHandle], Exception]:
-        """Query a single element with the provided selector in a page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            element = await page.query_selector(selector)
-            if element is None:
-                return Ok(None)
-
-            return Ok(
-                PlaywrightElementHandle(
-                    driver=self, page_id=page_id, element_ref=element, selector=selector
-                )
-            )
-        except Exception as e:
-            logger.error(f"Error querying selector '{selector}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.query_selector(selector)
 
     async def query_selector_all(
         self, page_id: str, selector: str
-    ) -> Result[list[ElementHandle], Exception]:
-        """Query all elements that match the provided selector in a page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            elements = await page.query_selector_all(selector)
-            result_elements: list[ElementHandle] = []
-
-            for element in elements:
-                result_elements.append(
-                    PlaywrightElementHandle(
-                        driver=self,
-                        page_id=page_id,
-                        element_ref=element,
-                        selector=selector,
-                    )
-                )
-
-            return Ok(result_elements)
-        except Exception as e:
-            logger.error(f"Error querying selector all '{selector}': {e}")
-            return Error(e)
+    ) -> Result[List[ElementHandle], Exception]:
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.query_selector_all(selector)
 
     async def wait_for_selector(
         self, page_id: str, selector: str, options: Optional[WaitOptions] = None
     ) -> Result[Optional[ElementHandle], Exception]:
-        """Wait for an element matching the selector to appear in a page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            wait_options: Dict[str, Any] = {}
-
-            if options:
-                # Set timeout if provided
-                if options.timeout:
-                    wait_options["timeout"] = options.timeout
-
-                # Set state if provided
-                if options.state:
-                    wait_options["state"] = options.state
-
-            # Wait for selector
-            element = await page.wait_for_selector(selector, **wait_options)
-            if element is None:
-                return Ok(None)
-
-            return Ok(
-                PlaywrightElementHandle(
-                    driver=self, page_id=page_id, element_ref=element, selector=selector
-                )
-            )
-        except PlaywrightTimeoutError as e:
-            logger.error(f"Timeout waiting for selector '{selector}': {e}")
-            return Error(e)
-        except Exception as e:
-            logger.error(f"Error waiting for selector '{selector}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.wait_for_selector(selector, options)
 
     async def wait_for_navigation(
         self, page_id: str, options: Optional[NavigationOptions] = None
     ) -> Result[None, Exception]:
-        """Wait for navigation to complete in a page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            wait_until: NavigationWaitLiteral = "load"
-
-            if options and options.wait_until:
-                wait_until = options.wait_until
-
-            # Set timeout
-            timeout = None
-            if options and options.timeout is not None:
-                timeout = options.timeout
-
-            # Wait for navigation to complete
-            await page.wait_for_load_state(wait_until, timeout=timeout)
-            return Ok(None)
-        except PlaywrightTimeoutError as e:
-            logger.error(f"Timeout waiting for navigation: {e}")
-            return Error(e)
-        except Exception as e:
-            logger.error(f"Error waiting for navigation: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.wait_for_navigation(options)
 
     async def click(
         self, page_id: str, selector: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
-        """Click an element in a page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            click_options: Dict[str, Any] = {}
-
-            if options:
-                # Set button if provided
-                if options.button:
-                    click_options["button"] = options.button
-
-                # Set click_count if provided
-                if hasattr(options, "click_count") and options.click_count is not None:
-                    click_options["click_count"] = options.click_count
-
-                # Set delay if provided
-                delay = options.delay_between_ms
-                if delay is not None:
-                    click_options["delay"] = delay
-
-                # Set timeout if provided
-                if options.timeout:
-                    click_options["timeout"] = options.timeout
-
-                # Set force if provided
-                force = options.force
-                if force is not None:
-                    click_options["force"] = force
-
-            # Click the element
-            await page.click(selector, **click_options)
-            return Ok(None)
-        except PlaywrightTimeoutError as e:
-            logger.error(f"Timeout clicking element '{selector}': {e}")
-            return Error(e)
-        except Exception as e:
-            logger.error(f"Error clicking element '{selector}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.click(selector, options)
 
     async def double_click(
         self, page_id: str, selector: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
-        """Double click an element in a page."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            click_options: Dict[str, Any] = {}
-
-            if options:
-                # Set button if provided
-                if options.button:
-                    click_options["button"] = options.button
-
-                # Set delay if provided
-                delay = getattr(options, "delay_between_ms", None)
-                if delay is not None:
-                    click_options["delay"] = delay
-
-                # Set timeout if provided
-                if options.timeout:
-                    click_options["timeout"] = options.timeout
-
-                # Set force if provided
-                force = getattr(options, "force", None)
-                if force is not None:
-                    click_options["force"] = force
-
-                # Set position_offset if provided
-                position_offset = getattr(options, "position_offset", None)
-                if position_offset is not None:
-                    click_options["position"] = {
-                        "x": position_offset[0],
-                        "y": position_offset[1],
-                    }
-
-            # Double-click the element
-            await page.dblclick(selector, **click_options)
-            return Ok(None)
-        except PlaywrightTimeoutError as e:
-            logger.error(f"Timeout double clicking element '{selector}': {e}")
-            return Error(e)
-        except Exception as e:
-            logger.error(f"Error double clicking element '{selector}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.double_click(selector, options)
 
     async def type(
         self,
@@ -964,32 +1192,10 @@ class PlaywrightDriver(BrowserDriver):
         text: str,
         options: Optional[TypeOptions] = None,
     ) -> Result[None, Exception]:
-        """Type text into an element."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            type_options: Dict[str, Any] = {}
-
-            if options:
-                # Set delay if provided
-                if options.delay is not None:
-                    type_options["delay"] = options.delay
-
-                # Set timeout if provided
-                if options.timeout is not None:
-                    type_options["timeout"] = options.timeout
-
-            # Type the text
-            await page.type(selector, text, **type_options)
-            return Ok(None)
-        except PlaywrightTimeoutError as e:
-            logger.error(f"Timeout typing into element '{selector}': {e}")
-            return Error(e)
-        except Exception as e:
-            logger.error(f"Error typing into element '{selector}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.type(selector, text, options)
 
     async def fill(
         self,
@@ -998,27 +1204,10 @@ class PlaywrightDriver(BrowserDriver):
         text: str,
         options: Optional[TypeOptions] = None,
     ) -> Result[None, Exception]:
-        """Fill an input element with text."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            # Note: Playwright's fill() only accepts one optional parameter: force (boolean)
-            timeout = None
-
-            if options and options.timeout is not None:
-                timeout = options.timeout
-
-            # Fill the element
-            await page.fill(selector, text, timeout=timeout)
-            return Ok(None)
-        except PlaywrightTimeoutError as e:
-            logger.error(f"Timeout filling element '{selector}': {e}")
-            return Error(e)
-        except Exception as e:
-            logger.error(f"Error filling element '{selector}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.fill(selector, text, options)
 
     async def select(
         self,
@@ -1027,379 +1216,144 @@ class PlaywrightDriver(BrowserDriver):
         value: Optional[str] = None,
         text: Optional[str] = None,
     ) -> Result[None, Exception]:
-        """Select an option in a <select> element."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            select_options: Dict[str, Any] = {}
-
-            if value is not None:
-                select_options["value"] = value
-            elif text is not None:
-                select_options["label"] = text
-            else:
-                return Error(Exception("Either value or text must be provided"))
-
-            # Select the option
-            await page.select_option(selector, **select_options)
-            return Ok(None)
-        except PlaywrightTimeoutError as e:
-            logger.error(f"Timeout selecting option in element '{selector}': {e}")
-            return Error(e)
-        except Exception as e:
-            logger.error(f"Error selecting option in element '{selector}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.select(selector, value, text)
 
     async def execute_script(
         self, page_id: str, script: str, *args: Any
     ) -> Result[Any, Exception]:
-        """Execute JavaScript in the page context."""
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            # Execute the script
-            result = await page.evaluate(script, *args)
-            return Ok(result)
-        except Exception as e:
-            logger.error(f"Error executing script: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.execute_script(script, *args)
 
     async def mouse_move(
         self,
-        context_id: str,
+        page_id: str,
         x: float,
         y: float,
         options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
-        """Move the mouse to the specified coordinates within a context."""
-        try:
-            context = self.contexts.get(context_id)
-            if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            pages = context.pages
-            if not pages:
-                return Error(Exception(f"No pages in context '{context_id}'"))
-
-            page = pages[0]
-
-            move_options: Dict[str, Any] = {}
-            if options and options.steps:
-                move_options["steps"] = options.steps
-
-            # Move the mouse
-            await page.mouse.move(x, y, **move_options)
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error moving mouse to ({x}, {y}): {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.mouse_move(x, y, options)
 
     async def mouse_down(
         self,
-        context_id: str,
+        page_id: str,
         button: MouseButtonLiteral = "left",
         options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
-        """Press a mouse button within a context."""
-        try:
-            context = self.contexts.get(context_id)
-            if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            pages = context.pages
-            if not pages:
-                return Error(Exception(f"No pages in context '{context_id}'"))
-
-            page = pages[0]
-
-            # Press the mouse button
-            await page.mouse.down(button=button)
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error pressing mouse button '{button}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.mouse_down(button, options)
 
     async def mouse_up(
         self,
-        context_id: str,
+        page_id: str,
         button: MouseButtonLiteral = "left",
         options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
-        """Release a mouse button within a context."""
-        try:
-            context = self.contexts.get(context_id)
-            if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            pages = context.pages
-            if not pages:
-                return Error(Exception(f"No pages in context '{context_id}'"))
-
-            page = pages[0]
-
-            # Release the mouse button
-            await page.mouse.up(button=button)
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error releasing mouse button '{button}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.mouse_up(button, options)
 
     async def mouse_click(
         self,
-        context_id: str,
+        page_id: str,
         button: MouseButtonLiteral = "left",
         options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
-        """Click at the current mouse position within a context."""
-        try:
-            context = self.contexts.get(context_id)
-            if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            pages = context.pages
-            if not pages:
-                return Error(Exception(f"No pages in context '{context_id}'"))
-
-            page = pages[0]
-
-            # Press and release the mouse button
-            await page.mouse.down(button=button)
-            await page.mouse.up(button=button)
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error clicking mouse button '{button}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.mouse_click(button, options)
 
     async def mouse_double_click(
         self,
-        context_id: str,
+        page_id: str,
         x: int,
         y: int,
         options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
-        """Double click at the specified coordinates within a context."""
-        try:
-            context = self.contexts.get(context_id)
-            if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            pages = context.pages
-            if not pages:
-                return Error(Exception(f"No pages in context '{context_id}'"))
-
-            page = pages[0]
-
-            move_options: Dict[str, Any] = {}
-            if options and options.steps:
-                move_options["steps"] = options.steps
-
-            # Move the mouse to the specified coordinates
-            await page.mouse.move(x, y, **move_options)
-
-            # Double click
-            await page.mouse.dblclick(button="left", x=x, y=y)
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error double clicking at ({x}, {y}): {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        await page.mouse_move(x, y, options)
+        opts = options or MouseOptions()
+        opts.click_count = 2
+        return await page.mouse_click("left", opts)
 
     async def mouse_drag(
         self,
-        context_id: str,
-        source: Union[str, ElementHandle, CoordinateType],
-        target: Union[str, ElementHandle, CoordinateType],
+        page_id: str,
+        source: CoordinateType,
+        target: CoordinateType,
         options: Optional[DragOptions] = None,
     ) -> Result[None, Exception]:
-        """Drag from one element or position to another within a context."""
-        try:
-            context = self.contexts.get(context_id)
-            if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            pages = context.pages
-            if not pages:
-                return Error(Exception(f"No pages in context '{context_id}'"))
-
-            page = pages[0]
-
-            # Get source coordinates
-            source_x, source_y = await self._get_coordinates(page, source)
-            if source_x is None or source_y is None:
-                return Error(Exception("Could not determine source coordinates"))
-
-            # Get target coordinates
-            target_x, target_y = await self._get_coordinates(page, target)
-            if target_x is None or target_y is None:
-                return Error(Exception("Could not determine target coordinates"))
-
-            # Get steps
-            steps = 1
-            if options and options.steps is not None:
-                steps = options.steps
-
-            # Perform the drag operation
-            await page.mouse.move(source_x, source_y, steps=steps)
-            await page.mouse.down()
-            await page.mouse.move(target_x, target_y, steps=steps)
-            await page.mouse.up()
-
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error dragging: {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.mouse_drag(source, target, options)
 
     async def key_press(
-        self, context_id: str, key: str, options: Optional[TypeOptions] = None
+        self, page_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
-        """Press a key or key combination within a context."""
-        try:
-            context = self.contexts.get(context_id)
-            if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            pages = context.pages
-            if not pages:
-                return Error(Exception(f"No pages in context '{context_id}'"))
-
-            page = pages[0]
-
-            press_options: Dict[str, Any] = {}
-            # Set delay if provided
-            if options and hasattr(options, "delay") and options.delay is not None:
-                press_options["delay"] = options.delay
-
-            # Press the key
-            await page.keyboard.press(key, **press_options)
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error pressing key '{key}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.key_press(key, options)
 
     async def key_down(
-        self, context_id: str, key: str, options: Optional[TypeOptions] = None
+        self, page_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
-        """Press and hold a key within a context."""
-        try:
-            context = self.contexts.get(context_id)
-            if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            pages = context.pages
-            if not pages:
-                return Error(Exception(f"No pages in context '{context_id}'"))
-
-            page = pages[0]
-
-            # Press and hold the key
-            await page.keyboard.down(key)
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error pressing down key '{key}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.key_down(key, options)
 
     async def key_up(
-        self, context_id: str, key: str, options: Optional[TypeOptions] = None
+        self, page_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
-        """Release a key within a context."""
-        try:
-            context = self.contexts.get(context_id)
-            if not context:
-                return Error(Exception(f"Context with ID '{context_id}' not found"))
-
-            pages = context.pages
-            if not pages:
-                return Error(Exception(f"No pages in context '{context_id}'"))
-
-            page = pages[0]
-
-            # Release the key
-            await page.keyboard.up(key)
-            return Ok(None)
-        except Exception as e:
-            logger.error(f"Error releasing key '{key}': {e}")
-            return Error(e)
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.key_up(key, options)
 
     async def get_element_text(
         self, page_id: str, element: ElementHandle
     ) -> Result[str, Exception]:
-        """Get the text content of an element."""
-        try:
-            if not isinstance(element, PlaywrightElementHandle):
-                return Error(Exception("Element is not a PlaywrightElementHandle"))
-
-            return await element.get_text()
-        except Exception as e:
-            logger.error(f"Error getting element text: {e}")
-            return Error(e)
+        return await element.get_text()
 
     async def get_element_attribute(
         self, page_id: str, element: ElementHandle, name: str
     ) -> Result[Optional[str], Exception]:
-        """Get an attribute value from an element."""
-        try:
-            if not isinstance(element, PlaywrightElementHandle):
-                return Error(Exception("Element is not a PlaywrightElementHandle"))
-
-            return await element.get_attribute(name)
-        except Exception as e:
-            logger.error(f"Error getting element attribute '{name}': {e}")
-            return Error(e)
+        return await element.get_attribute(name)
 
     async def get_element_bounding_box(
         self, page_id: str, element: ElementHandle
     ) -> Result[Dict[str, float], Exception]:
-        """Get the bounding box of an element."""
-        try:
-            if not isinstance(element, PlaywrightElementHandle):
-                return Error(Exception("Element is not a PlaywrightElementHandle"))
-
-            return await element.get_bounding_box()
-        except Exception as e:
-            logger.error(f"Error getting element bounding box: {e}")
-            return Error(e)
+        return await element.get_bounding_box()
 
     async def click_element(
         self, page_id: str, element: ElementHandle
     ) -> Result[None, Exception]:
-        """Click an element."""
-        try:
-            if not isinstance(element, PlaywrightElementHandle):
-                return Error(Exception("Element is not a PlaywrightElementHandle"))
-
-            return await element.click()
-        except Exception as e:
-            logger.error(f"Error clicking element: {e}")
-            return Error(e)
+        return await element.click()
 
     async def get_element_html(
         self, page_id: str, element: ElementHandle, outer: bool = True
     ) -> Result[str, Exception]:
-        """Get the HTML content of an element."""
-        try:
-            if not isinstance(element, PlaywrightElementHandle):
-                return Error(Exception("Element is not a PlaywrightElementHandle"))
-
-            return await element.get_html(outer)
-        except Exception as e:
-            logger.error(f"Error getting element HTML: {e}")
-            return Error(e)
+        return await element.get_html(outer)
 
     async def get_element_inner_text(
         self, page_id: str, element: ElementHandle
     ) -> Result[str, Exception]:
-        """Get the innerText of an element (visible text only)."""
-        try:
-            if not isinstance(element, PlaywrightElementHandle):
-                return Error(Exception("Element is not a PlaywrightElementHandle"))
-
-            return await element.get_inner_text()
-        except Exception as e:
-            logger.error(f"Error getting element inner text: {e}")
-            return Error(e)
+        return await element.get_inner_text()
 
     async def extract_table(
         self,
@@ -1410,72 +1364,38 @@ class PlaywrightDriver(BrowserDriver):
         row_selector: str = "tr",
         cell_selector: str = "td",
     ) -> Result[List[Dict[str, str]], Exception]:
-        """Extract data from an HTML table element."""
         try:
-            if not isinstance(table_element, PlaywrightElementHandle):
-                return Error(
-                    Exception("Table element is not a PlaywrightElementHandle")
-                )
-
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
+            # Get native element
+            table = table_element.as_native()
+            
+            # Extract headers if needed
             headers = []
             if include_headers:
-                header_elements_result = await table_element.query_selector_all(
-                    header_selector
-                )
-                if header_elements_result.is_error():
-                    return Error(header_elements_result.error)
-
-                header_elements = header_elements_result.default_value([])
-
-                for header_element in header_elements:
-                    text_result = await header_element.get_text()
-                    if text_result.is_error():
-                        return Error(text_result.error)
-
-                    header_text = text_result.default_value("").strip()
-                    headers.append(header_text)
-
-            rows_result = await table_element.query_selector_all(row_selector)
-            if rows_result.is_error():
-                return Error(rows_result.error)
-
-            rows = rows_result.default_value([])
-
-            table_data = []
+                header_elements = await table.query_selector_all(header_selector)
+                for header in header_elements:
+                    text = await header.text_content()
+                    headers.append(text.strip() if text else "")
+            
+            # Extract rows
+            rows = await table.query_selector_all(row_selector)
+            data = []
+            
             for row in rows:
-                cells_result = await row.query_selector_all(cell_selector)
-                if cells_result.is_error():
-                    return Error(cells_result.error)
-
-                cells = cells_result.default_value([])
-
-                if len(cells) == 0:
+                cells = await row.query_selector_all(cell_selector)
+                if not cells:
                     continue
-
+                
                 row_data = {}
                 for i, cell in enumerate(cells):
-                    text_result = await cell.get_text()
-                    if text_result.is_error():
-                        return Error(text_result.error)
-
-                    cell_text = text_result.default_value("").strip()
-
-                    if include_headers and i < len(headers):
-                        key = headers[i]
-                    else:
-                        key = f"col{i}"
-
-                    row_data[key] = cell_text
-
-                table_data.append(row_data)
-
-            return Ok(table_data)
+                    text = await cell.text_content()
+                    key = headers[i] if i < len(headers) else f"column_{i}"
+                    row_data[key] = text.strip() if text else ""
+                
+                if row_data:
+                    data.append(row_data)
+            
+            return Ok(data)
         except Exception as e:
-            logger.error(f"Error extracting table data: {e}")
             return Error(e)
 
     async def scroll(
@@ -1484,86 +1404,12 @@ class PlaywrightDriver(BrowserDriver):
         x: Optional[int] = None,
         y: Optional[int] = None,
         selector: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> Result[None, Exception]:
-        """
-        Scroll the page to specific coordinates or scroll an element into view.
-
-        Args:
-            page_id: ID of the page to scroll
-            x: Optional X coordinate to scroll to
-            y: Optional Y coordinate to scroll to
-            selector: Optional CSS selector of element to scroll into view
-            options: Optional scroll behavior options
-
-        Returns:
-            Result indicating success or failure
-        """
-        try:
-            page = self.pages.get(page_id)
-            if not page:
-                return Error(Exception(f"Page with ID '{page_id}' not found"))
-
-            if selector is not None:
-                # Scroll element into view
-                element = await page.query_selector(selector)
-                if element is None:
-                    return Error(Exception(f"Element with selector '{selector}' not found"))
-                
-                await element.scroll_into_view_if_needed()
-                return Ok(None)
-            elif x is not None or y is not None:
-                # Scroll to coordinates
-                x_value = x if x is not None else 0
-                y_value = y if y is not None else 0
-                
-                await page.evaluate(f"window.scrollTo({x_value}, {y_value});")
-                return Ok(None)
-            else:
-                return Error(Exception("Either selector or coordinates (x, y) must be provided"))
-        except Exception as e:
-            logger.error(f"Error scrolling: {e}")
-            return Error(e)
-
-    async def _get_coordinates(
-        self, page: Page, target: Union[str, ElementHandle, CoordinateType]
-    ) -> Tuple[Optional[int], Optional[int]]:
-        """
-        Helper method to get coordinates from various source types.
-
-        Args:
-            page: The page to work with
-            target: A selector, element handle, or coordinate pair
-
-        Returns:
-            A tuple of (x, y) coordinates
-        """
-        if isinstance(target, tuple) and len(target) == 2:
-            return target[0], target[1]
-
-        elif isinstance(target, str):
-            element = await page.query_selector(target)
-            if element is None:
-                return None, None
-
-            box = await element.bounding_box()
-            if box is None:
-                return None, None
-
-            return int(box["x"] + box["width"] / 2), int(box["y"] + box["height"] / 2)
-
-        elif isinstance(target, ElementHandle):
-            if not isinstance(target, PlaywrightElementHandle):
-                return None, None
-
-            element_ref = target.element_ref
-            box = await element_ref.bounding_box()
-            if box is None:
-                return None, None
-
-            return int(box["x"] + box["width"] / 2), int(box["y"] + box["height"] / 2)
-
-        return None, None
+        page = self._pages.get(page_id)
+        if not page:
+            return Error(ValueError(f"Page {page_id} not found"))
+        return await page.scroll(x, y, selector)
 
     async def execute_cdp_cmd(
         self, page_id: str, cmd: str, *args: Any
@@ -1571,13 +1417,43 @@ class PlaywrightDriver(BrowserDriver):
         """
         Execute a CDP command
         """
-        page = self.pages.get(page_id)
+        page = self._pages.get(page_id)
         if not page:
             return Error(Exception(f"Page with ID '{page_id}' not found"))
 
-        cdp_client = await page.context.new_cdp_session(page)
+        cdp_client = await page.page_ref.context.new_cdp_session(page)
         if not cdp_client:
             return Error(Exception("Failed to create CDP session"))
 
         result = await cdp_client.send(cmd, *args)
         return Ok(result)
+
+    async def close(self) -> Result[None, Exception]:
+        try:
+            # Close all contexts
+            for context in list(self.contexts.values()):
+                await context.close()
+            self.contexts.clear()
+            self._pages.clear()
+            
+            # Close browser
+            if self.browser:
+                await self.browser.close()
+                self.browser = None
+            
+            # Stop playwright
+            if self._playwright_manager:
+                await self._playwright_manager.__aexit__(None, None, None)
+                self._playwright_manager = None
+                self.driver_ref = None
+            
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+
+
+# Register the driver
+def register_playwright_driver():
+    """Register the Playwright driver with the driver registry."""
+    from silk.browsers.registry import DriverRegistry
+    DriverRegistry.register("playwright", PlaywrightDriver)
