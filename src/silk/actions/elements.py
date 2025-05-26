@@ -8,10 +8,8 @@ from typing import Any, Dict, List, Optional, TypeVar, Union
 from expression import Error, Ok, Result
 from fp_ops import operation
 
-from silk.actions.context import ActionContext
 from silk.actions.utils import resolve_target, validate_driver
-from silk.browsers.element import ElementHandle
-from silk.browsers.types import WaitOptions
+from silk.browsers.models import ActionContext, ElementHandle, Page, WaitOptions
 from silk.selectors.selector import Selector, SelectorGroup
 
 T = TypeVar("T")
@@ -39,13 +37,9 @@ async def Query(
         if driver_result.is_error():
             return Error(driver_result.error)
 
-        page_result = await context.get_page()
-        if page_result.is_error():
-            return Error(page_result.error)
-
-        page = page_result.default_value(None)
+        page: Page = context.page
         if page is None:
-            return Error(Exception("No browser page found"))
+            return Error(Exception("No page found"))
 
         if isinstance(selector, str):
             element_result = await page.query_selector(selector)
@@ -100,13 +94,9 @@ async def QueryAll(
         if driver_result.is_error():
             return Error(driver_result.error)
 
-        page_result = await context.get_page()
-        if page_result.is_error():
-            return Error(page_result.error)
-
-        page = page_result.default_value(None)
+        page: Page = context.page
         if page is None:
-            return Error(Exception("No browser page found"))
+            return Error(Exception("No page found"))
 
         if isinstance(selector, str):
             elements_result = await page.query_selector_all(selector)
@@ -358,13 +348,9 @@ async def ExtractTable(
         if driver_result.is_error():
             return Error(driver_result.error)
 
-        page_result = await context.get_page()
-        if page_result.is_error():
-            return Error(page_result.error)
-
-        page = page_result.default_value(None)
+        page: Page = context.page
         if page is None:
-            return Error(Exception("No browser page found"))
+            return Error(Exception("No page found"))
 
         table_element_result = await resolve_target(context, table_selector)
         if table_element_result.is_error():
@@ -574,7 +560,9 @@ async def ElementExists(
     """
 
     try:
-        query_result = await Query(selector, **kwargs)
+        query_result = await Query(selector=selector, **kwargs)
+        # todo we should not nest actions in actions functions 
+        # while possible, its 
         if query_result.is_error():
             return Ok(False)
 

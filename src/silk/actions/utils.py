@@ -1,9 +1,7 @@
 from typing import Any, Callable, Optional, Tuple, Union, TypeVar
 
 from expression import Error, Result, Ok
-from silk.actions.context import ActionContext
-from silk.browsers.driver import  BrowserDriver
-from silk.browsers.element import ElementHandle
+from silk.browsers.models import ActionContext, ElementHandle, Driver, Page
 from silk.selectors import Selector, SelectorGroup
 
 T = TypeVar('T')
@@ -12,13 +10,10 @@ async def resolve_target(
     context: ActionContext, 
     target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]]
 ) -> Result[ElementHandle, Exception]:
-    page_result = await context.get_page()
-    if page_result.is_error():
-        return Error(page_result.error)
+    page: Page = context.page
     
-    page = page_result.default_value(None)
     if page is None:
-        return Error(Exception("No browser page found"))
+        return Error(Exception("No page found"))
     
     if isinstance(target, str):
         element_result = await page.query_selector(target)
@@ -54,18 +49,14 @@ async def resolve_target(
     # If we get here, it's not a valid target
     return Error(Exception(f"Unsupported target type: {type(target)}"))
 
-async def validate_driver(context: ActionContext) -> Result[BrowserDriver, Exception]:
+async def validate_driver(context: ActionContext) -> Result[Driver, Exception]:
     """Helper function to validate and retrieve the driver"""
-    driver_result = await context.get_driver()
-    if driver_result.is_error():
-        return Error(driver_result.error)
-    
-    driver = driver_result.default_value(None)
+    driver: Driver = context.driver
     if driver is None:
-        return Error(Exception("No browser driver found"))
+        return Error(Exception("No driver found"))
     
     if context.page_id is None:
-        return Error(Exception("No browser page found"))
+        return Error(Exception("No page found"))
     
     return Ok(driver)
 

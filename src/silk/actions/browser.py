@@ -2,533 +2,525 @@
 Context management actions for Silk pipelines.
 
 These actions allow creating, switching, and modifying browser contexts and pages
-within action pipelines, making it easier to initialize pipelines from a BrowserManager
-and manage browser contexts throughout a workflow.
+within action pipelines, working directly with the Driver, BrowserContext, and Page
+protocols from the ActionContext.
 """
 
 import logging
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, List
+from uuid import uuid4
 
 from expression import Error, Ok, Result
 from fp_ops import operation
 
-from silk.actions.context import ActionContext
-from silk.browsers.manager import BrowserManager
-
-from silk.operation import Operation
+from silk.browsers.models import ActionContext,  BrowserOptions, NavigationOptions, NavigationWaitLiteral, WaitOptions
 
 logger = logging.getLogger(__name__)
 
 
-# cant be oepration, must be a function
-async def InitializeContext(
-    manager: BrowserManager,
-    context_id: Optional[str] = None,
-    page_nickname: Optional[str] = None,
-    options: Optional[Dict[str, Any]] = None,
-    create_page: bool = True,
-) -> ActionContext: 
-    """
-    Creates a context from a BrowserManager to initialize a pipeline.
-    This is the starting point for most pipelines, converting a BrowserManager
-    into an ActionContext that can be used by other actions.
-
-    Args:
-        manager: The BrowserManager to create a context from
-        context_id: Optional ID for the context, generates one if not provided
-        page_nickname: Optional nickname for the page, uses default if not provided
-        options: Optional browser context options
-        create_page: Whether to create a page automatically
-
-    Returns:
-        ActionContext that can be used with other actions
-    """
-    try:
-        # Check if we're using a specified existing context
-        if context_id is not None and context_id in manager.contexts:
-            context_result = manager.get_context(context_id)
-            if context_result.is_error():
-                raise context_result.error
-            
-            browser_context = context_result.default_value(None)
-
-            if browser_context is None:
-                raise Exception("Context not found")
-
-            if browser_context.id is None:
-                raise Exception("Context ID not found")
-            
-            # Get or create the specified page
-            if page_nickname is not None:
-                if page_nickname in browser_context.pages:
-                    # Use existing page
-                    actual_page_id = page_nickname
-                else:
-                    # Create new page with specified ID
-                    page_result = await browser_context.create_page(nickname=page_nickname)
-                    if page_result.is_error():
-                        raise page_result.error
-                    actual_page_id = page_nickname
-            else:
-                # Use default page or create one
-                if browser_context.pages:
-                    actual_page_id = list(browser_context.pages.keys())[0]
-                elif create_page:
-                    page_result = await browser_context.create_page(nickname=page_nickname)
-                    if page_result.is_error():
-                        raise page_result.error
-                    actual_page_id = list(browser_context.pages.keys())[0]
-                else:
-                    actual_page_id = None
-        else:
-            # Create a new context
-            context_result = await manager.create_context(
-                nickname=context_id, options=options, create_page=create_page
-            )
-            if context_result.is_error():
-                raise context_result.error
-            
-            browser_context = context_result.default_value(None)
-
-            if browser_context is None:
-                raise Exception("Context not found")
-            
-            # Get the page ID if a page was created
-            if create_page and browser_context.pages:
-                actual_page_id = list(browser_context.pages.keys())[0]
-            else:
-                actual_page_id = None
-        
-        # Create the ActionContext
-        action_context = ActionContext(
-            browser_manager=manager,
-            context_id=browser_context.id,
-            page_id=actual_page_id,
-        )
-        
-        return action_context
-    except Exception as e:
-        logger.error(f"Error creating context: {e}")
-        raise e
-
-@operation
-async def WithContext(
-    manager: BrowserManager,
-    context_id: Optional[str] = None,
-    page_nickname: Optional[str] = None,
-    options: Optional[Dict[str, Any]] = None,
-    create_page: bool = True,
-) -> Result[ActionContext, Exception]:
-    """
-    Creates a context from a BrowserManager to initialize a pipeline.
-    This is the starting point for most pipelines, converting a BrowserManager
-    into an ActionContext that can be used by other actions.
-
-    Args:
-        manager: The BrowserManager to create a context from
-        context_id: Optional ID for the context, generates one if not provided
-        page_nickname: Optional nickname for the page, uses default if not provided
-        options: Optional browser context options
-        create_page: Whether to create a page automatically
-
-    Returns:
-        ActionContext that can be used with other actions
-    """
-    try:
-        # Check if we're using a specified existing context
-        if context_id is not None and context_id in manager.contexts:
-            context_result = manager.get_context(context_id)
-            if context_result.is_error():
-                return Error(context_result.error)
-            
-            browser_context = context_result.default_value(None)
-
-            if browser_context is None:
-                return Error(Exception("Context not found"))
-
-            if browser_context.id is None:
-                return Error(Exception("Context ID not found"))
-            
-            # Get or create the specified page
-            if page_nickname is not None:
-                if page_nickname in browser_context.pages:
-                    # Use existing page
-                    actual_page_id = page_nickname
-                else:
-                    # Create new page with specified ID
-                    page_result = await browser_context.create_page(nickname=page_nickname)
-                    if page_result.is_error():
-                        return Error(page_result.error)
-                    actual_page_id = page_nickname
-            else:
-                # Use default page or create one
-                if browser_context.pages:
-                    actual_page_id = list(browser_context.pages.keys())[0]
-                elif create_page:
-                    page_result = await browser_context.create_page(nickname=page_nickname)
-                    if page_result.is_error():
-                        return Error(page_result.error)
-                    actual_page_id = list(browser_context.pages.keys())[0]
-                else:
-                    actual_page_id = None
-        else:
-            # Create a new context
-            context_result = await manager.create_context(
-                nickname=context_id, options=options, create_page=create_page
-            )
-            if context_result.is_error():
-                return Error(context_result.error)
-            
-            browser_context = context_result.default_value(None)
-
-            if browser_context is None:
-                return Error(Exception("Context not found"))
-            
-            # Get the page ID if a page was created
-            if create_page and browser_context.pages:
-                actual_page_id = list(browser_context.pages.keys())[0]
-            else:
-                actual_page_id = None
-        
-        # Create the ActionContext
-        action_context = ActionContext(
-            browser_manager=manager,
-            context_id=browser_context.id,
-            page_id=actual_page_id,
-        )
-        
-        return Ok(action_context)
-    except Exception as e:
-        logger.error(f"Error creating context: {e}")
-        return Error(e)
-
-
 @operation(context=True, context_type=ActionContext)
-async def SwitchContext(
-    context_id: str,
-    options: Optional[Dict[str, Any]] = None,
+async def CreateContext(
+    context_options: Optional[Dict[str, Any]] = None,
     create_page: bool = True,
     **kwargs: Any,
 ) -> Result[ActionContext, Exception]:
     """
-    Switches to a different browser context or creates a new one.
+    Creates a new browser context in the current driver.
 
     Args:
-        context_id: ID of the context to switch to or create
-        options: Optional browser context options when creating
-        create_page: Whether to create a page automatically when creating context
+        context_options: Optional browser context options (viewport, permissions, etc.)
+        create_page: Whether to create a page automatically in the new context
 
     Returns:
-        Updated ActionContext with the new context
+        Updated ActionContext with the new browser context
     """
     context: ActionContext = kwargs["context"]
     
-    if not context.browser_manager:
-        return Error(Exception("No browser manager found in context"))
+    if not context.driver:
+        return Error(Exception("No driver found in context"))
     
     try:
-        manager = context.browser_manager
-        
-        # Check if the context exists
-        if context_id in manager.contexts:
-            # Get existing context
-            context_result = manager.get_context(context_id)
-            if context_result.is_error():
-                return Error(context_result.error)
-            
-            browser_context = context_result.default_value(None)
-
-            if browser_context is None:
-                return Error(Exception("Context not found"))
-            
-            # Get default page ID if any pages exist
-            page_id = None
-            if browser_context.pages:
-                page_id = list(browser_context.pages.keys())[0]
-            elif create_page:
-                # Create a new page if requested
-                page_result = await browser_context.create_page()
-                if page_result.is_error():
-                    return Error(page_result.error)
-                page_id = list(browser_context.pages.keys())[0]
-        else:
-            # Create a new context
-            context_result = await manager.create_context(
-                nickname=context_id, options=options, create_page=create_page
-            )
-            if context_result.is_error():
-                return Error(context_result.error)
-            
-            browser_context = context_result.default_value(None)
-
-            if browser_context is None:
-                return Error(Exception("Context not found"))
-            
-            # Get page ID if created
-            page_id = None
-            if create_page and browser_context.pages:
-                page_id = list(browser_context.pages.keys())[0]
-        
-        # Create new action context with updated values
-        new_context = context.derive(
-            context_id=browser_context.id,
-            page_id=page_id,
-        )
-        
-        return Ok(new_context)
-    except Exception as e:
-        logger.error(f"Error switching context: {e}")
-        return Error(e)
-
-
-@operation(context=True, context_type=ActionContext)
-async def SwitchPage(
-    page_nickname_or_id: Optional[str] = None,
-    create_if_missing: bool = True,
-    **kwargs: Any,
-) -> Result[ActionContext, Exception]:
-    """
-    Switches to a different page within the current context or creates a new one.
-
-    Args:
-        page_nickname_or_id: Nickname or ID of the page to switch to or create, uses auto-generated nickname if None
-        create_if_missing: Whether to create the page if it doesn't exist
-
-    Returns:
-        Updated ActionContext with the new page
-    """
-    context: ActionContext = kwargs["context"]
-    
-    if not context.browser_manager or not context.context_id:
-        return Error(Exception("Browser manager or context ID missing in context"))
-    
-    try:
-        manager = context.browser_manager
-        
-        # Get the current context
-        context_result = manager.get_context(context.context_id)
+        context_result = await context.driver.new_context(context_options)
         if context_result.is_error():
             return Error(context_result.error)
         
         browser_context = context_result.default_value(None)
-        
         if browser_context is None:
-            return Error(Exception("Context not found"))
+            return Error(Exception("No browser context found"))
         
-        # Switch to existing page or create new one
-        if page_nickname_or_id is not None:
-            # Check if the page exists
-            if page_nickname_or_id in browser_context.pages:
-                actual_page_id = page_nickname_or_id
-            elif create_if_missing:
-                # Create a new page with the specified ID
-                page_result = await browser_context.create_page(nickname=page_nickname_or_id)
-                if page_result.is_error():
-                    return Error(page_result.error)
-                actual_page_id = page_nickname_or_id
-            else:
-                return Error(Exception(f"Page '{page_nickname_or_id}' not found and create_if_missing is False"))
-        else:
-            # Create a new page with auto-generated ID
-            page_result = await browser_context.create_page()
+        context_id = getattr(browser_context, 'context_id', None) or f"context_{uuid4().hex[:8]}"
+        
+        page = None
+        page_id = None
+        
+        if create_page:
+            page_result = await browser_context.new_page()
             if page_result.is_error():
                 return Error(page_result.error)
-            actual_page_id = list(browser_context.pages.keys())[-1]
+            
+            page = page_result.default_value(None)
+            if page is None:
+                return Error(Exception("No page found"))
+            
+            page_id = page.page_id or f"page_{uuid4().hex[:8]}"
         
-        # Create new action context with updated page ID
-        new_context = context.derive(page_id=actual_page_id)
+        new_context = context.derive(
+            context=browser_context,
+            page=page,
+            context_id=context_id,
+            page_id=page_id,
+            page_ids={page_id} if page_id else set(),
+            metadata={
+                **context.metadata,
+                "context_options": context_options or {},
+            }
+        )
         
+        logger.info(f"Created new context: {context_id}, page: {page_id}")
         return Ok(new_context)
+        
     except Exception as e:
-        logger.error(f"Error switching page: {e}")
+        logger.error(f"Error creating context: {e}")
         return Error(e)
 
 
 @operation(context=True, context_type=ActionContext)
 async def CreatePage(
-    page_nickname_or_id: Optional[str] = None,
+    page_nickname: Optional[str] = None,
+    switch_to: bool = True,
     **kwargs: Any,
 ) -> Result[ActionContext, Exception]:
     """
-    Creates a new page in the current context and switches to it.
+    Creates a new page in the current browser context.
 
     Args:
-        page_nickname_or_id: Optional nickname or ID for the new page, auto-generates one if not provided
+        page_nickname: Optional nickname for the new page, auto-generates one if not provided
+        switch_to: Whether to switch to the new page after creation
 
     Returns:
-        Updated ActionContext with the new page
+        Updated ActionContext with the new page if switch_to is True
     """
     context: ActionContext = kwargs["context"]
     
-    if not context.browser_manager or not context.context_id:
-        return Error(Exception("Browser manager or context ID missing in context"))
+    if not context.context:
+        return Error(Exception("No browser context found in context"))
     
     try:
-        manager = context.browser_manager
-        
-        # Get the current context
-        context_result = manager.get_context(context.context_id)
-        if context_result.is_error():
-            return Error(context_result.error)
-        
-        browser_context = context_result.default_value(None)
-
-        if browser_context is None:
-            return Error(Exception("Context not found"))
-        
-        # Create a new page
-        page_result = await browser_context.create_page(nickname=page_nickname_or_id)
+        page_result = await context.context.new_page()
         if page_result.is_error():
             return Error(page_result.error)
         
-        # Get the ID of the created page
-        if page_nickname_or_id is not None:
-            actual_page_id = page_nickname_or_id
-        else:
-            actual_page_id = list(browser_context.pages.keys())[-1]
+        page = page_result.default_value(None)
+        if page is None:
+            return Error(Exception("No page found"))
         
-        # Create new action context with updated page ID
-        new_context = context.derive(page_id=actual_page_id)
+        page_id = page_nickname or page.page_id or f"page_{uuid4().hex[:8]}"
+        
+        new_page_ids = context.page_ids.copy()
+        new_page_ids.add(page_id)
+        
+        if switch_to:
+            new_context = context.derive(
+                page=page,
+                page_id=page_id,
+                page_ids=new_page_ids,
+                metadata={
+                    **context.metadata,
+                    "previous_page_id": context.page_id,
+                }
+            )
+            logger.info(f"Created and switched to new page: {page_id}")
+        else:
+            new_context = context.derive(page_ids=new_page_ids)
+            logger.info(f"Created new page: {page_id} (not switched)")
         
         return Ok(new_context)
+        
     except Exception as e:
         logger.error(f"Error creating page: {e}")
         return Error(e)
 
 
 @operation(context=True, context_type=ActionContext)
-async def CloseContext(
+async def SwitchToPage(
+    page_id: str,
     **kwargs: Any,
-) -> Result[None, Exception]:
+) -> Result[ActionContext, Exception]:
     """
-    Closes the current browser context.
+    Switches to a different page within the current context.
+    
+    Note: This requires the driver to support page retrieval by ID,
+    which may need to be tracked separately in a real implementation.
+
+    Args:
+        page_id: ID of the page to switch to
 
     Returns:
-        Result with None on success or error on failure
+        Updated ActionContext with the specified page
     """
     context: ActionContext = kwargs["context"]
     
-    if not context.browser_manager or not context.context_id:
-        return Error(Exception("Browser manager or context ID missing in context"))
+    if not context.context:
+        return Error(Exception("No browser context found in context"))
+    
+    if page_id not in context.page_ids:
+        return Error(Exception(f"Page '{page_id}' not found in tracked pages"))
     
     try:
-        manager = context.browser_manager
+        pages_result = await context.context.pages()
+        if pages_result.is_error():
+            return Error(pages_result.error)
         
-        # Close the context
-        close_result = await manager.close_context(context.context_id)
-        if close_result.is_error():
-            return Error(close_result.error)
+        pages = pages_result.default_value([])
         
-        return Ok(None)
+        target_page = None
+        for page in pages:
+            if page.page_id == page_id:
+                target_page = page
+                break
+        
+        if not target_page:
+            try:
+                page_index = int(page_id)
+                if 0 <= page_index < len(pages):
+                    target_page = pages[page_index]
+            except (ValueError, IndexError):
+                pass
+        
+        if not target_page:
+            return Error(Exception(f"Could not find page with ID: {page_id}"))
+        
+        new_context = context.derive(
+            page=target_page,
+            page_id=page_id,
+            metadata={
+                **context.metadata,
+                "previous_page_id": context.page_id,
+            }
+        )
+        
+        logger.info(f"Switched to page: {page_id}")
+        return Ok(new_context)
+        
     except Exception as e:
-        logger.error(f"Error closing context: {e}")
+        logger.error(f"Error switching page: {e}")
         return Error(e)
 
 
 @operation(context=True, context_type=ActionContext)
-async def ClosePage(
+async def CloseCurrentPage(
+    switch_to_last: bool = True,
     **kwargs: Any,
 ) -> Result[ActionContext, Exception]:
     """
-    Closes the current page and switches to another page in the context if available.
+    Closes the current page and optionally switches to another page.
+
+    Args:
+        switch_to_last: Whether to switch to the last available page after closing
 
     Returns:
-        Updated ActionContext with a different page or None for page ID if no pages left
+        Updated ActionContext with a different page or None for page if no pages left
     """
     context: ActionContext = kwargs["context"]
     
-    if (
-        not context.browser_manager or 
-        not context.context_id or 
-        not context.page_id
-    ):
-        return Error(Exception("Browser manager, context ID, or page ID missing in context"))
+    if not context.page:
+        return Error(Exception("No page found in context"))
     
     try:
-        manager = context.browser_manager
-        
-        # Get the current context
-        context_result = manager.get_context(context.context_id)
-        if context_result.is_error():
-            return Error(context_result.error)
-        
-        browser_context = context_result.default_value(None)
-
-        if browser_context is None:
-            return Error(Exception("Context not found"))
-        
-        # Close the current page
-        close_result = await browser_context.close_page(context.page_id)
+        close_result = await context.page.close()
         if close_result.is_error():
             return Error(close_result.error)
         
-        # Find another page to switch to if available
+        new_page_ids = context.page_ids.copy()
+        if context.page_id in new_page_ids:
+            new_page_ids.remove(context.page_id)
+        
+        new_page = None
         new_page_id = None
-        if browser_context.pages:
-            new_page_id = list(browser_context.pages.keys())[0]
         
-        # Create new action context with updated page ID
-        new_context = context.derive(page_id=new_page_id)
+        if switch_to_last and context.context:
+            pages_result = await context.context.pages()
+            pages = pages_result.default_value([])
+            if pages_result.is_ok() and pages:
+                new_page = pages[-1]
+                new_page_id = getattr(new_page, 'page_id', None) or "last_page"
         
+        new_context = context.derive(
+            page=new_page,
+            page_id=new_page_id,
+            page_ids=new_page_ids,
+            metadata={
+                **context.metadata,
+                "closed_page_id": context.page_id,
+            }
+        )
+        
+        logger.info(f"Closed page: {context.page_id}, switched to: {new_page_id}")
         return Ok(new_context)
+        
     except Exception as e:
         logger.error(f"Error closing page: {e}")
         return Error(e)
 
 
 @operation(context=True, context_type=ActionContext)
-async def GetCurrentContext(
-    **kwargs: Any,
-) -> Result[str, Exception]:
-    """
-    Gets the ID of the current browser context.
-
-    Returns:
-        Result with the context ID
-    """
-    context: ActionContext = kwargs["context"]
-    
-    if not context.context_id:
-        return Error(Exception("No context ID in current context"))
-    
-    return Ok(context.context_id)
-
-
-@operation(context=True, context_type=ActionContext)
-async def GetCurrentPage(
-    **kwargs: Any,
-) -> Result[str, Exception]:
-    """
-    Gets the ID of the current page.
-
-    Returns:
-        Result with the page ID
-    """
-    context: ActionContext = kwargs["context"]
-    
-    if not context.page_id:
-        return Error(Exception("No page ID in current context"))
-    
-    return Ok(context.page_id)
-
-
-@operation(context=True, context_type=ActionContext)
-async def WithOptions(
-    options: Dict[str, Any],
+async def CloseContext(
     **kwargs: Any,
 ) -> Result[ActionContext, Exception]:
     """
-    Updates the context with additional options or metadata.
-
-    Args:
-        options: Dictionary of options to add to context metadata
+    Closes the current browser context and all its pages.
 
     Returns:
-        Updated ActionContext with new options
+        Updated ActionContext with no context or pages
     """
     context: ActionContext = kwargs["context"]
     
-    # Create new action context with updated metadata
-    new_context = context.derive(metadata=options)
+    if not context.context:
+        return Error(Exception("No browser context found in context"))
+    
+    try:
+        close_result = await context.context.close()
+        if close_result.is_error():
+            return Error(close_result.error)
+        
+        new_context = context.derive(
+            context=None,
+            page=None,
+            context_id=None,
+            page_id=None,
+            page_ids=set(),
+            metadata={
+                **context.metadata,
+                "closed_context_id": context.context_id,
+            }
+        )
+        
+        logger.info(f"Closed context: {context.context_id}")
+        return Ok(new_context)
+        
+    except Exception as e:
+        logger.error(f"Error closing context: {e}")
+        return Error(e)
+
+@operation(context=True, context_type=ActionContext)
+async def WithNewTab(
+    url: Optional[str] = None,
+    **kwargs: Any,
+) -> Result[ActionContext, Exception]:
+    """
+    Creates a new tab (page) and optionally navigates to a URL.
+    
+    This is a convenience action that combines CreatePage and Navigate.
+
+    Args:
+        url: Optional URL to navigate to in the new tab
+
+    Returns:
+        Updated ActionContext with the new page
+    """
+    context: ActionContext = kwargs["context"]
+    
+    create_result = await CreatePage(switch_to=True, context=context)
+    if create_result.is_error():
+        return create_result
+    
+    new_context = create_result.default_value(None)
+    if new_context is None:
+        return Error(Exception("No new context found"))
+    
+    if url and new_context.page:
+        nav_result = await new_context.page.goto(url)
+        if nav_result.is_error():
+            await new_context.page.close()
+            return Error(nav_result.error)
+        
+        new_context = new_context.derive(
+            metadata={
+                **new_context.metadata,
+                "current_url": url,
+            }
+        )
     
     return Ok(new_context)
+
+
+@operation(context=True, context_type=ActionContext)
+async def GetAllPages(
+    **kwargs: Any,
+) -> Result[List[str], Exception]:
+    """
+    Gets a list of all page IDs in the current context.
+
+    Returns:
+        List of page IDs
+    """
+    context: ActionContext = kwargs["context"]
+    
+    if not context.context:
+        return Error(Exception("No browser context found in context"))
+    
+    try:
+        pages_result = await context.context.pages()
+        if pages_result.is_error():
+            return Error(pages_result.error)
+        
+        pages = pages_result.default_value([])
+        
+        page_ids = []
+        for i, page in enumerate(pages):
+            page_id = page.page_id or f"page_{i}"
+            page_ids.append(page_id)
+        
+        return Ok(page_ids)
+        
+    except Exception as e:
+        logger.error(f"Error getting pages: {e}")
+        return Error(e)
+
+
+@operation(context=True, context_type=ActionContext)
+async def FocusPage(
+    **kwargs: Any,
+) -> Result[ActionContext, Exception]:
+    """
+    Focuses/brings to front the current page.
+    
+    This is useful when working with multiple pages/tabs.
+
+    Returns:
+        The same ActionContext (page is focused as a side effect)
+    """
+    context: ActionContext = kwargs["context"]
+    
+    if not context.page:
+        return Error(Exception("No page found in context"))
+    
+    try:
+        if hasattr(context.page, 'bring_to_front'):
+            result = await context.page.bring_to_front()
+            if hasattr(result, 'is_error') and result.is_error():
+                return Error(result.error)
+        
+        logger.info(f"Focused page: {context.page_id}")
+        return Ok(context)
+        
+    except Exception as e:
+        logger.error(f"Error focusing page: {e}")
+        return Error(e)
+
+
+@operation(context=True, context_type=ActionContext)
+async def ReloadPage(
+    wait_until: NavigationWaitLiteral = "load",
+    **kwargs: Any,
+) -> Result[ActionContext, Exception]:
+    """
+    Reloads the current page.
+
+    Args:
+        wait_until: When to consider the reload complete
+
+    Returns:
+        The same ActionContext (page is reloaded as a side effect)
+    """
+    context: ActionContext = kwargs["context"]
+    
+    if not context.page:
+        return Error(Exception("No page found in context"))
+    
+    try:
+        options = NavigationOptions(wait_until=wait_until)
+        reload_result = await context.page.reload(options)
+        if reload_result.is_error():
+            return Error(reload_result.error)
+        
+        logger.info(f"Reloaded page: {context.page_id}")
+        return Ok(context)
+        
+    except Exception as e:
+        logger.error(f"Error reloading page: {e}")
+        return Error(e)
+
+
+@operation(context=True, context_type=ActionContext)
+async def GetCurrentUrl(
+    **kwargs: Any,
+) -> Result[str, Exception]:
+    """
+    Gets the current URL of the page.
+
+    Returns:
+        The current URL as a string
+    """
+    context: ActionContext = kwargs["context"]
+    
+    if not context.page:
+        return Error(Exception("No page found in context"))
+    
+    try:
+        url_result = await context.page.get_url()
+        if url_result.is_error():
+            return Error(url_result.error)
+        
+        return Ok(url_result.default_value(None))
+        
+    except Exception as e:
+        logger.error(f"Error getting URL: {e}")
+        return Error(e)
+
+
+@operation(context=True, context_type=ActionContext)
+async def GetPageTitle(
+    **kwargs: Any,
+) -> Result[str, Exception]:
+    """
+    Gets the title of the current page.
+
+    Returns:
+        The page title as a string
+    """
+    context: ActionContext = kwargs["context"]
+    
+    if not context.page:
+        return Error(Exception("No page found in context"))
+    
+    try:
+        title_result = await context.page.get_title()
+        if title_result.is_error():
+            return Error(title_result.error)
+        title = title_result.default_value(None)
+        if title is None:
+            return Error(Exception("No title found"))
+        return Ok(title)
+        
+    except Exception as e:
+        logger.error(f"Error getting title: {e}")
+        return Error(e)
+
+
+@operation(context=True, context_type=ActionContext)
+async def WithMetadata(
+    metadata: Dict[str, Any],
+    merge: bool = True,
+    **kwargs: Any,
+) -> Result[ActionContext, Exception]:
+    """
+    Updates the context with additional metadata.
+
+    Args:
+        metadata: Dictionary of metadata to add
+        merge: Whether to merge with existing metadata (True) or replace it (False)
+
+    Returns:
+        Updated ActionContext with new metadata
+    """
+    context: ActionContext = kwargs["context"]
+    
+    if merge:
+        final_metadata = {**context.metadata, **metadata}
+        new_context = context.derive(metadata=final_metadata)
+    else:
+        new_context = context.derive()
+        new_context.metadata = metadata
+    
+    return Ok(new_context) 

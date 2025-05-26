@@ -180,7 +180,7 @@ ElementRef = TypeVar("ElementRef")
 
 
 @runtime_checkable
-class ElementHandle(Protocol, ElementRef):
+class ElementHandle(Protocol):
     """
     Uniform interface for browser elements.
 
@@ -342,7 +342,7 @@ PageRef = TypeVar("PageRef")
 
 
 @runtime_checkable
-class Page(Protocol, PageRef):
+class Page(Protocol):
     """
     Uniform interface for browser pages/tabs.
 
@@ -544,7 +544,7 @@ ContextRef = TypeVar("ContextRef")
 
 
 @runtime_checkable
-class BrowserContext(Protocol, ContextRef):
+class BrowserContext(Protocol):
     """
     Uniform interface for browser contexts.
 
@@ -675,7 +675,7 @@ DriverRef = TypeVar("DriverRef")
 
 
 @runtime_checkable
-class Driver(Protocol, DriverRef):
+class Driver(Protocol):
     """
     Uniform interface for browser automation drivers.
 
@@ -1004,7 +1004,7 @@ class ActionOptions(BaseModel):
     cleanup_after: bool = True
 
 
-class BrowserActionContext(BaseModel):
+class ActionContext(BaseModel):
     """
     Context for browser automation actions.
 
@@ -1035,7 +1035,7 @@ class BrowserActionContext(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def derive(self, **kwargs) -> "BrowserActionContext":
+    def derive(self, **kwargs) -> "ActionContext":
         """Create a new context with updated values."""
         # Special handling for metadata merging
         new_metadata = None
@@ -1065,18 +1065,18 @@ class BrowserActionContext(BaseModel):
         """Check if there's an active page."""
         return self.page is not None
 
-    def with_retry_options(self, **retry_kwargs) -> "BrowserActionContext":
+    def with_retry_options(self, **retry_kwargs) -> "ActionContext":
         """Update retry options and return new context."""
         new_retry = RetryOptions(**{**self.options.retry.model_dump(), **retry_kwargs})
         new_action_options = self.options.model_copy(update={"retry": new_retry})
         return self.derive(options=new_action_options)
 
-    def with_timeout(self, timeout_ms: int) -> "BrowserActionContext":
+    def with_timeout(self, timeout_ms: int) -> "ActionContext":
         """Set action timeout and return new context."""
         new_action_options = self.options.model_copy(update={"timeout_ms": timeout_ms})
         return self.derive(options=new_action_options)
 
-    def increment_retry_count(self) -> "BrowserActionContext":
+    def increment_retry_count(self) -> "ActionContext":
         """Increment retry count and return new context."""
         return self.derive(retry_count=self.retry_count + 1)
 

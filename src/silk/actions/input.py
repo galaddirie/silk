@@ -8,16 +8,16 @@ from typing import Any, List, Optional, Tuple, TypeVar, Union
 from expression import Error, Ok, Result
 from fp_ops import operation
 
-from silk.actions.context import ActionContext
 from silk.actions.utils import get_element_coordinates, resolve_target, validate_driver
-from silk.browsers.element import ElementHandle
-from silk.browsers.types import (
+from silk.browsers.models import (
     DragOptions,
     KeyModifier,
     MouseButtonLiteral,
     MouseOptions,
     SelectOptions,
     TypeOptions,
+    ActionContext,
+    ElementHandle,
 )
 from silk.selectors.selector import Selector, SelectorGroup
 

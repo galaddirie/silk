@@ -37,3 +37,24 @@ Partition = partition
 First = first
 Last = last
 Gather = gather_operations
+
+
+__all__ = [
+    "Compose",
+    "Fallback",
+    "Parallel",
+    "Pipe",
+    "Sequence",
+    "Identity",
+    "Constant",
+    "Map",
+    "Filter",
+    "Reduce",
+    "Zip",
+    "FlatMap",
+    "GroupBy",
+    "Partition",
+    "First",
+    "Last",
+    "Gather",
+]

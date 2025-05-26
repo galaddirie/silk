@@ -5,14 +5,56 @@ This module provides a unified interface for browser automation
 using different browser drivers.
 """
 
-from silk.browsers.driver import BrowserDriver, BrowserOptions
-from silk.browsers.driver_factory import DriverFactory, create_driver
-from silk.browsers.element import ElementHandle
+from silk.browsers.models import (
+    ActionContext,
+    ActionOptions,
+    BaseInputOptions,
+    BrowserContext,
+    BrowserOptions,
+    CoordinateType,
+    DragOptions,
+    Driver,
+    ElementHandle,
+    KeyModifier,
+    MouseButton,
+    MouseButtonLiteral,
+    MouseOptions,
+    NavigationOptions,
+    NavigationWaitLiteral,
+    Page,
+    PointerEventType,
+    RetryOptions,
+    SelectOptions,
+    TypeOptions,
+    WaitOptions,
+    WaitStateLiteral,
+    WaitUntilOptions,
+)
+from silk.browsers.sessions import BrowserSession
 
 __all__ = [
-    "BrowserDriver",
+    "ActionContext",
+    "ActionOptions",
+    "BaseInputOptions",
+    "BrowserContext",
     "BrowserOptions",
+    "BrowserSession",
+    "CoordinateType",
+    "DragOptions",
+    "Driver",
     "ElementHandle",
-    "create_driver",
-    "DriverFactory",
+    "KeyModifier",
+    "MouseButton",
+    "MouseButtonLiteral",
+    "MouseOptions",
+    "NavigationOptions",
+    "NavigationWaitLiteral",
+    "Page",
+    "PointerEventType",
+    "RetryOptions",
+    "SelectOptions",
+    "TypeOptions",
+    "WaitOptions",
+    "WaitStateLiteral",
+    "WaitUntilOptions",
 ]

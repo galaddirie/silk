@@ -606,11 +606,7 @@ from expression import Ok, Error
 @action
 async def extract_price(context, selector):
     """Extract and parse a price from the page"""
-    page_result = await context.get_page()
-    if page_result.is_error():
-        return page_result
-
-    page = page_result.default_value(None)
+    page: Page = context.page
     if page is None:
         return Error("No page found")
 

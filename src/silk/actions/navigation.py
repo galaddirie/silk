@@ -10,9 +10,9 @@ from typing import Any, Optional, Union
 from expression import Error, Ok, Result
 from fp_ops import operation
 
-from silk.actions.context import ActionContext
+from silk.browsers.models import ActionContext
 from silk.actions.utils import validate_driver
-from silk.browsers.types import NavigationOptions, WaitOptions
+from silk.browsers.models import NavigationOptions, WaitOptions
 from silk.selectors.selector import Selector, SelectorGroup
 
 logger = logging.getLogger(__name__)
