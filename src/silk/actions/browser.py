@@ -13,14 +13,14 @@ from uuid import uuid4
 from expression import Error, Ok, Result
 from fp_ops import operation
 
-from silk.browsers.models import ActionContext,  BrowserOptions, NavigationOptions, NavigationWaitLiteral, WaitOptions, BrowserContext
+from silk.browsers.models import ActionContext,  BrowserOptions, NavigationOptions, NavigationWaitLiteral, WaitOptions, BrowserContextOptions
 
 logger = logging.getLogger(__name__)
 
 
 @operation(context=True, context_type=ActionContext)
 async def CreateContext(
-    context_options: Optional[BrowserContext] = None,
+    context_options: Optional[BrowserContextOptions] = None,
     create_page: bool = True,
     **kwargs: Any,
 ) -> Result[ActionContext, Exception]:
@@ -40,6 +40,8 @@ async def CreateContext(
         return Error(Exception("No driver found in context"))
     
     try:
+        if context_options is None:
+            context_options = BrowserContextOptions()
         context_result = await context.driver.new_context(context_options)
         if context_result.is_error():
             return Error(context_result.error)
@@ -320,9 +322,9 @@ async def WithNewTab(
     """
     context: ActionContext = kwargs["context"]
     
-    create_result = await CreatePage(switch_to=True, context=context)
+    create_result: Result[ActionContext, Exception] = await CreatePage(switch_to=True, context=context).execute()
     if create_result.is_error():
-        return create_result
+        return Error(create_result.error)
     
     new_context = create_result.default_value(None)
     if new_context is None:
@@ -461,8 +463,10 @@ async def GetCurrentUrl(
         url_result = await context.page.get_url()
         if url_result.is_error():
             return Error(url_result.error)
-        
-        return Ok(url_result.default_value(None))
+        url = url_result.default_value(None)
+        if url is None:
+            return Error(Exception("No URL found"))
+        return Ok(url)
         
     except Exception as e:
         logger.error(f"Error getting URL: {e}")

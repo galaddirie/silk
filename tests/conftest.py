@@ -93,20 +93,7 @@ def mock_element_handle() -> MagicMock:
     mock.input = AsyncMock(return_value=mock)
     mock.choose = AsyncMock(return_value=mock)
     
-    # For async context managers, mock the __aenter__ and __aexit__ methods
-    # if direct async call is not sufficient.
-    # For simple cases, AsyncMock might be enough if the protocol doesn't strictly enforce it.
-    # If with_scroll_into_view is an async context manager:
-    # mock_context_manager = AsyncMock()
-    # mock_context_manager.__aenter__.return_value = mock
-    # mock_context_manager.__aexit__.return_value = None
-    # mock.with_scroll_into_view = MagicMock(return_value=mock_context_manager)
-    # Or more simply if the context manager itself is awaitable and returns the element
-    
-    async def mock_with_scroll_into_view_gen():
-        yield mock
-    
-    mock.with_scroll_into_view = MagicMock(return_value=asynccontextmanager(mock_with_scroll_into_view_gen)())
+
 
     mock.as_native = MagicMock(return_value="mock-element-ref")
     

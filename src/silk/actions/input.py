@@ -61,7 +61,7 @@ async def MouseMove(
             if element is None:
                 return Error(Exception("Target not found"))
 
-            coords_result = await get_element_coordinates(element, options)
+            coords_result = await get_element_coordinates(element)
             if coords_result.is_error():
                 return Error(coords_result.error)
 
@@ -287,7 +287,7 @@ async def Drag(
             if source_element is None:
                 return Error(Exception("Source not found"))
 
-            source_coords = await get_element_coordinates(source_element, options)
+            source_coords = await get_element_coordinates(source_element)
             if source_coords.is_error():
                 return Error(source_coords.error)
 
@@ -305,7 +305,7 @@ async def Drag(
             if target_element is None:
                 return Error(Exception("Target not found"))
 
-            target_coords = await get_element_coordinates(target_element, options)
+            target_coords = await get_element_coordinates(target_element)
             if target_coords.is_error():
                 return Error(target_coords.error)
 

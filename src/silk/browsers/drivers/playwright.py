@@ -121,13 +121,15 @@ class PlaywrightElementHandle(ElementHandle):
     async def get_attribute(self, name: str) -> Result[Optional[str], Exception]:
         return await self.driver.get_element_attribute(self.page_id, self.element_id, name)
 
-    async def attribute(self, name: str, default: str = "") -> str:
+    async def attribute(self, name: str, default: str = "") -> Optional[str]:
         result = await self.get_attribute(name)
-        return result.default_value("")
+        res: Optional[str] = result.default_value(default)
+        return res
 
     async def has_attribute(self, name: str) -> bool:
         result = await self.get_attribute(name)
-        return result.default_value(False)
+        res: bool = result.default_value(False)
+        return res
 
     async def get_property(self, name: str) -> Result[Any, Exception]:
         return await self.driver.get_element_property(self.page_id, self.element_id, name)
@@ -175,11 +177,6 @@ class PlaywrightElementHandle(ElementHandle):
     ) -> "PlaywrightElementHandle":
         await self.select(value, text)
         return self
-
-    @asynccontextmanager
-    async def with_scroll_into_view(self):
-        await self.scroll_into_view()
-        yield self
 
     def as_native(self) -> PWElementHandle:
         return self.get_element_ref()
@@ -373,6 +370,9 @@ class PlaywrightBrowserContext(BrowserContext):
 
     def get_page_id(self) -> str:
         return self.page_id
+    
+    def get_context_id(self) -> str:
+        return self.context_id
 
     async def new_page(self) -> Result[Page, Exception]:
         page_id_result = await self.driver.create_page(self.context_id)

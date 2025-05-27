@@ -3,7 +3,7 @@ Extraction actions for retrieving data from web pages.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, TypeVar, Union
+from typing import Any, Dict, List, Optional, TypeVar, Union, cast
 
 from expression import Error, Ok, Result
 from fp_ops import operation
@@ -37,7 +37,7 @@ async def Query(
         if driver_result.is_error():
             return Error(driver_result.error)
 
-        page: Page = context.page
+        page = context.page
         if page is None:
             return Error(Exception("No page found"))
 
@@ -54,7 +54,7 @@ async def Query(
             element_result = await page.query_selector(selector.value)
             if element_result.is_error():
                 return Error(element_result.error)
-            element = element_result.default_value(None)
+            element = element_result.default_value(cast(ElementHandle, None))
             if element is None:
                 return Error(Exception("No element found"))
             return Ok(element)
@@ -64,7 +64,7 @@ async def Query(
                 sub_result = await page.query_selector(sel.value)
                 if sub_result.is_error():
                     continue
-                element = sub_result.default_value(None)
+                element = sub_result.default_value(cast(ElementHandle, None))
                 if element is not None:
                     return Ok(element)
             return Ok(None)
@@ -94,7 +94,7 @@ async def QueryAll(
         if driver_result.is_error():
             return Error(driver_result.error)
 
-        page: Page = context.page
+        page = context.page
         if page is None:
             return Error(Exception("No page found"))
 
@@ -344,7 +344,7 @@ async def ExtractTable(
         if driver_result.is_error():
             return Error(driver_result.error)
 
-        page: Page = context.page
+        page = context.page
         if page is None:
             return Error(Exception("No page found"))
 

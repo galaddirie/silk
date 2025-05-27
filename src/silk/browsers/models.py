@@ -10,11 +10,14 @@ from typing import (
     Union,
     ParamSpec,
     Tuple,
+    Generic,
     TypeVar,
     Protocol,
     overload,
     runtime_checkable,
     AsyncGenerator,
+    Callable,
+    Awaitable,
 )
 from pathlib import Path
 
@@ -23,6 +26,8 @@ from enum import Enum
 from expression import Error, Ok, Result
 from pydantic import BaseModel, Field, model_validator
 from contextlib import asynccontextmanager
+
+from fp_ops.context import BaseContext
 
 logger = logging.getLogger(__name__)
 
@@ -80,10 +85,6 @@ class BaseInputOptions(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-class CoordinateOptions(BaseInputOptions):
-    """Options for getting element coordinates"""
-    move_to_center: bool = True
-    offset: Optional[CoordinateType] = None
 
 class MouseOptions(BaseInputOptions):
     """Base options for mouse operations"""
@@ -175,7 +176,7 @@ class BrowserOptions(BaseModel):
 ElementRef = TypeVar("ElementRef")
 
 @runtime_checkable
-class ElementHandle(Protocol):
+class ElementHandle(Protocol, Generic[ElementRef]):
     """
     Uniform interface for browser elements.
 
@@ -320,12 +321,6 @@ class ElementHandle(Protocol):
         """Select an option and return self for chaining."""
         ...
 
-    @asynccontextmanager
-    async def with_scroll_into_view(
-        self
-    ) -> AsyncGenerator["ElementHandle", None]:
-        """Context manager that scrolls element into view."""
-        ...
 
     def as_native(self) -> ElementRef:
         """Get the native element reference."""
@@ -334,7 +329,7 @@ class ElementHandle(Protocol):
 PageRef = TypeVar("PageRef")
 
 @runtime_checkable
-class Page(Protocol):
+class Page(Protocol, Generic[PageRef]):
     """
     Uniform interface for browser pages/tabs.
 
@@ -525,8 +520,23 @@ class Page(Protocol):
 
 ContextRef = TypeVar("ContextRef")
 
+class BrowserContextOptions(BaseModel):
+    """Options for creating a browser context"""
+    viewport: Optional[Dict[str, Any]] = None
+    permissions: Optional[List[str]] = None
+    user_agent: Optional[str] = None
+    extra_http_headers: Optional[Dict[str, str]] = None
+    proxy: Optional[Dict[str, Any]] = None
+    user_data_dir: Optional[str] = None
+    ignore_default_args: bool = False
+    args: Optional[List[str]] = None
+    headless: bool = True
+    slow_mo: Optional[int] = None
+    timeout: Optional[int] = None
+    
+
 @runtime_checkable
-class BrowserContext(Protocol):
+class BrowserContext(Protocol, Generic[ContextRef]):
     """
     Uniform interface for browser contexts.
 
@@ -535,11 +545,16 @@ class BrowserContext(Protocol):
     """
 
     page_id: str
+    context_id: str
     context_ref: ContextRef
 
     def get_page_id(self) -> str:
         """Get the page ID associated with this context"""
         return self.page_id
+    
+    def get_context_id(self) -> str:
+        """Get the context ID associated with this context"""
+        return self.context_id
 
     async def new_page(self) -> Result[Page, Exception]:
         """Create a new page in this context."""
@@ -659,7 +674,7 @@ class BrowserContext(Protocol):
 DriverRef = TypeVar("DriverRef")
 
 @runtime_checkable
-class Driver(Protocol):
+class Driver(Protocol, Generic[DriverRef]):
     """
     Uniform interface for browser automation drivers.
 
@@ -680,13 +695,13 @@ class Driver(Protocol):
         ...
 
     async def new_context(
-        self, options: Optional[Dict[str, Any]] = None
+        self, options: Optional[BrowserContextOptions] = None
     ) -> Result[BrowserContext, Exception]:
         """Create a new browser context."""
         ...
 
     async def create_context(
-        self, options: Optional[Dict[str, Any]] = None
+        self, options: Optional[BrowserContextOptions] = None
     ) -> Result[str, Exception]:
         """Create a new browser context with isolated storage and return its ID."""
         ...
@@ -984,7 +999,7 @@ class ActionOptions(BaseModel):
     validate_result: bool = False
     cleanup_after: bool = True
 
-class ActionContext(BaseModel):
+class ActionContext(BaseContext):
     """
     Context for browser automation actions.
 
@@ -1011,7 +1026,7 @@ class ActionContext(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def derive(self, **kwargs) -> "ActionContext":
+    def derive(self, **kwargs: Any) -> "ActionContext":
         """Create a new context with updated values."""
         new_metadata = None
         if "metadata" in kwargs:
@@ -1037,7 +1052,7 @@ class ActionContext(BaseModel):
         """Check if there's an active page."""
         return self.page is not None
 
-    def with_retry_options(self, **retry_kwargs) -> "ActionContext":
+    def with_retry_options(self, **retry_kwargs: Any) -> "ActionContext":
         """Update retry options and return new context."""
         new_retry = RetryOptions(**{**self.options.retry.model_dump(), **retry_kwargs})
         new_action_options = self.options.model_copy(update={"retry": new_retry})

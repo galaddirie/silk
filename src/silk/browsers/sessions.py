@@ -1,6 +1,7 @@
 import logging
 from typing import Optional, Dict, Any, Type
-from silk.browsers.models import ActionContext, BrowserContext, BrowserOptions, Driver, Page
+from silk.browsers.models import ActionContext, BrowserContext, BrowserContextOptions, BrowserOptions, Driver, Page
+from types import TracebackType
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class BrowserSession:
         driver_class: Optional[Type[Driver]] = None,
         create_context: bool = True,
         create_page: bool = True,
-        context_options: Optional[Dict[str, Any]] = None,
+        context_options: Optional[BrowserContextOptions] = None,
         page_nickname: Optional[str] = None,
     ):
         if driver_class is None:
@@ -136,7 +137,7 @@ class BrowserSession:
             await self._cleanup()
             raise
     
-    async def close(self):
+    async def close(self) -> None:
         """Close the browser session."""
         if not self._started:
             return
@@ -144,7 +145,7 @@ class BrowserSession:
         await self._cleanup()
         self._started = False
     
-    async def _cleanup(self):
+    async def _cleanup(self) -> None:
         """Internal cleanup method."""
         if self.page is not None:
             try:
@@ -172,5 +173,5 @@ class BrowserSession:
     async def __aenter__(self) -> ActionContext:
         return await self.start()
     
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Optional[Type[Exception]], exc_val: Optional[Exception], exc_tb: Optional[TracebackType]) -> None:
         await self.close()

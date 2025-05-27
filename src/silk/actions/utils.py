@@ -1,7 +1,7 @@
-from typing import Any, Callable, Optional, Tuple, Union, TypeVar
+from typing import Any, Callable, Optional, Tuple, Union, TypeVar, cast
 
 from expression import Error, Result, Ok
-from silk.browsers.models import ActionContext, ElementHandle, Driver, Page, CoordinateType, CoordinateOptions
+from silk.browsers.models import ActionContext, ElementHandle, Driver, Page, CoordinateType, MouseOptions
 from silk.selectors import Selector, SelectorGroup
 
 T = TypeVar('T')
@@ -11,7 +11,7 @@ async def resolve_target(
     context: ActionContext, 
     target: Union[str, Selector, SelectorGroup, ElementHandle, CoordinateType]
 ) -> Result[ElementHandle, Exception]:
-    page: Page = context.page
+    page = context.page
     
     if page is None:
         return Error(Exception("No page found"))
@@ -31,7 +31,7 @@ async def resolve_target(
         if element_result.is_error():
             return Error(element_result.error)
         
-        element = element_result.default_value(None)
+        element = element_result.default_value(cast(ElementHandle, None))
         if element is None:
             return Error(Exception("No element found"))
         return Ok(element)
@@ -52,7 +52,7 @@ async def resolve_target(
 
 async def validate_driver(context: ActionContext) -> Result[Driver, Exception]:
     """Helper function to validate and retrieve the driver"""
-    driver: Driver = context.driver
+    driver = context.driver
     if driver is None:
         return Error(Exception("No driver found"))
     
@@ -64,7 +64,7 @@ async def validate_driver(context: ActionContext) -> Result[Driver, Exception]:
 
 async def get_element_coordinates(
     target: Union[ElementHandle, CoordinateType], 
-    options: Optional[CoordinateOptions] = None
+    options: Optional[MouseOptions] = None
 ) -> Result[Tuple[float, float], Exception]:
     """Helper function to get coordinates from an element or coordinate tuple"""
     # Handle tuple directly without using isinstance with a generic type
