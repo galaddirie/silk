@@ -1,4 +1,29 @@
 # Changelog
+
+## [0.3.0] - 2025-05-26
+
+### Added
+- New `silk.actions.browser` module for enhanced context and page management operations like `CreateContext`, `CreatePage`, `SwitchToPage`, `CloseCurrentPage`, `CloseContext`, `WithNewTab`, `GetAllPages`, `FocusPage`, `ReloadPage`, `GetCurrentUrl`, `GetPageTitle`, and `WithMetadata`.
+- `BrowserSession` class in `silk.browsers.sessions` for simplified browser lifecycle management.
+- `Driver`, `BrowserContext`, `Page`, and `ElementHandle` protocols in `silk.browsers.models` are now the source of truth for browser object interactions, promoting a more decoupled architecture.
+- `PlaywrightDriver` now manages Playwright object references (contexts, pages, elements) internally using IDs, reducing direct exposure of Playwright primitives.
+- `PlaywrightElementHandle`, `PlaywrightPage`, and `PlaywrightBrowserContext` are lightweight wrappers delegating calls to the `PlaywrightDriver`.
+- Added `__all__` to `silk.composition`, `silk.operation`, and `silk.placeholder` for better public API definition.
+
+### Changed
+- **Breaking Change**: `silk.actions.context.ActionContext` has been removed. The `ActionContext` is now defined in `silk.browsers.models.ActionContext`. This new `ActionContext` directly holds `Driver`, `BrowserContext`, and `Page` protocol instances instead of IDs and a `BrowserManager`.
+- **Breaking Change**: `silk.actions.manage` module has been removed. Its functionalities are replaced or integrated into the new `silk.actions.browser` module and `BrowserSession`.
+- **Breaking Change**: Actions in `silk.actions.elements`, `silk.actions.input`, and `silk.actions.navigation` now expect an `ActionContext` (from `silk.browsers.models`) that provides direct `driver`, `context`, and `page` attributes.
+- **Breaking Change**: `silk.browsers.driver_factory` has been removed. Driver instantiation is expected to be handled by `BrowserSession` or manually.
+- `PlaywrightDriver` launch and object creation methods now return `Result` objects for consistent error handling.
+- Simplified `PlaywrightElementHandle` to primarily hold IDs and delegate operations to the `PlaywrightDriver`.
+- Updated `silk.actions.elements.ElementExists` to use the `selector` argument explicitly.
+
+### Fixed
+- Potential issues with context and page lifecycles by centralizing their management within `PlaywrightDriver` and `BrowserSession`.
+- Improved clarity of public API.
+
+
 ## [0.2.5] - 2025-04-15
 
 ### Fixed

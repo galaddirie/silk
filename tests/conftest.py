@@ -3,25 +3,33 @@ Pytest fixtures for the Silk browser automation framework.
 """
 
 import asyncio
-import os
 from pathlib import Path
-from typing import AsyncGenerator, Dict, Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import AsyncGenerator, Dict, Any, List, Optional
+from unittest.mock import AsyncMock, MagicMock, create_autospec
+from contextlib import asynccontextmanager
 
 import pytest
-from expression import Error, Ok
+from expression import Error, Ok, Result
 
-from silk.actions.context import ActionContext
-from silk.browsers.context import BrowserContext, BrowserPage
-from silk.browsers.driver import BrowserDriver
-from silk.browsers.drivers.playwright import PlaywrightDriver, PlaywrightElementHandle
-from silk.browsers.element import ElementHandle
-from silk.browsers.manager import BrowserManager
-from silk.browsers.types import BrowserOptions
+from silk.browsers.models import (
+    ActionContext, 
+    BrowserOptions,
+    ElementHandle,
+    Page,
+    BrowserContext,
+    Driver,
+    MouseOptions,
+    TypeOptions,
+    NavigationOptions,
+    WaitOptions,
+    SelectOptions,
+    DragOptions,
+    CoordinateType,
+)
+from silk.browsers.sessions import BrowserSession
 from silk.selectors.selector import Selector, SelectorGroup
 
 
-# Helper functions to create awaitable results
 async def async_ok(value):
     """Create an awaitable Ok result."""
     return Ok(value)
@@ -32,7 +40,6 @@ async def async_error(error):
     return Error(error)
 
 
-# Enable async test support
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an event loop for the test session."""
@@ -44,21 +51,36 @@ def event_loop():
 
 @pytest.fixture
 def mock_element_handle() -> MagicMock:
-    """Fixture to create a mock ElementHandle."""
-    mock = MagicMock(spec=ElementHandle)
-
-    # Mock async methods with awaitable results
+    """Fixture to create a mock ElementHandle that implements the protocol."""
+    mock = create_autospec(ElementHandle, instance=True)
+    
+    mock.driver = create_autospec(Driver, instance=True)
+    mock.page_id = "mock-page-id"
+    mock.context_id = "mock-context-id"
+    mock.selector = "#mock-selector"
+    mock.element_ref = "mock-element-ref"
+    
+    mock.get_page_id = MagicMock(return_value="mock-page-id")
+    mock.get_context_id = MagicMock(return_value="mock-context-id")
+    mock.get_selector = MagicMock(return_value="#mock-selector")
+    mock.get_element_ref = MagicMock(return_value="mock-element-ref")
+    
+    mock.click = AsyncMock(return_value=Ok(None))
+    mock.double_click = AsyncMock(return_value=Ok(None))
+    mock.type = AsyncMock(return_value=Ok(None))
+    mock.fill = AsyncMock(return_value=Ok(None))
+    mock.select = AsyncMock(return_value=Ok(None))
     mock.get_text = AsyncMock(return_value=Ok("Mock Text"))
+    mock.text = AsyncMock(return_value="Mock Text")
     mock.get_inner_text = AsyncMock(return_value=Ok("Mock Inner Text"))
     mock.get_html = AsyncMock(return_value=Ok("<div>Mock HTML</div>"))
     mock.get_attribute = AsyncMock(return_value=Ok("mock-attribute"))
+    mock.attribute = AsyncMock(return_value="mock-attribute")
+    mock.has_attribute = AsyncMock(return_value=True)
     mock.get_property = AsyncMock(return_value=Ok("mock-property"))
     mock.get_bounding_box = AsyncMock(
-        return_value=Ok({"x": 10, "y": 20, "width": 100, "height": 50})
+        return_value=Ok({"x": 10.0, "y": 20.0, "width": 100.0, "height": 50.0})
     )
-    mock.click = AsyncMock(return_value=Ok(None))
-    mock.fill = AsyncMock(return_value=Ok(None))
-    mock.select = AsyncMock(return_value=Ok(None))
     mock.is_visible = AsyncMock(return_value=Ok(True))
     mock.is_enabled = AsyncMock(return_value=Ok(True))
     mock.get_parent = AsyncMock(return_value=Ok(None))
@@ -66,27 +88,123 @@ def mock_element_handle() -> MagicMock:
     mock.query_selector = AsyncMock(return_value=Ok(None))
     mock.query_selector_all = AsyncMock(return_value=Ok([]))
     mock.scroll_into_view = AsyncMock(return_value=Ok(None))
+    
+    # For methods that return `self` (the mock instance itself)
+    mock.input = AsyncMock(return_value=mock)
+    mock.choose = AsyncMock(return_value=mock)
+    
 
-    # Set up non-async methods
-    mock.get_selector.return_value = "#mock-selector"
-    mock.get_page_id.return_value = "mock-page-id"
-    mock.selector = "#mock-selector"
-    mock.page_id = "mock-page-id"
 
+    mock.as_native = MagicMock(return_value="mock-element-ref")
+    
     return mock
 
 
 @pytest.fixture
-def mock_browser_driver() -> MagicMock:
-    """Fixture to create a mock BrowserDriver."""
-    mock = MagicMock(spec=BrowserDriver)
-
-    # Mock async methods with awaitable Result returns
-    mock.launch = AsyncMock(return_value=Ok(None))
+def mock_page(mock_element_handle) -> MagicMock:
+    """Fixture to create a mock Page that implements the protocol."""
+    mock = create_autospec(Page, instance=True)
+    
+    mock.page_id = "mock-page-id"
+    mock.page_ref = "mock-page-ref"
+    
+    mock.get_page_id = MagicMock(return_value="mock-page-id")
+    
+    mock.goto = AsyncMock(return_value=Ok(None))
+    mock.get_url = AsyncMock(return_value=Ok("https://example.com"))
+    mock.current_url = AsyncMock(return_value=Ok("https://example.com"))
+    mock.get_title = AsyncMock(return_value=Ok("Mock Page Title"))
+    mock.get_content = AsyncMock(return_value=Ok("<html><body>Mock page</body></html>"))
+    mock.get_page_source = AsyncMock(return_value=Ok("<html><body>Mock page</body></html>"))
+    mock.reload = AsyncMock(return_value=Ok(None))
+    mock.go_back = AsyncMock(return_value=Ok(None))
+    mock.go_forward = AsyncMock(return_value=Ok(None))
+    mock.query_selector = AsyncMock(return_value=Ok(mock_element_handle))
+    mock.query_selector_all = AsyncMock(return_value=Ok([mock_element_handle]))
+    mock.wait_for_selector = AsyncMock(return_value=Ok(mock_element_handle))
+    mock.wait_for_navigation = AsyncMock(return_value=Ok(None))
+    mock.click = AsyncMock(return_value=Ok(None))
+    mock.double_click = AsyncMock(return_value=Ok(None))
+    mock.type = AsyncMock(return_value=Ok(None))
+    mock.fill = AsyncMock(return_value=Ok(None))
+    mock.select = AsyncMock(return_value=Ok(None))
+    mock.execute_script = AsyncMock(return_value=Ok({"result": "mock-result"}))
+    mock.screenshot = AsyncMock(return_value=Ok(Path("mock_screenshot.png")))
+    mock.mouse_move = AsyncMock(return_value=Ok(None))
+    mock.mouse_down = AsyncMock(return_value=Ok(None))
+    mock.mouse_up = AsyncMock(return_value=Ok(None))
+    mock.mouse_click = AsyncMock(return_value=Ok(None))
+    mock.mouse_drag = AsyncMock(return_value=Ok(None))
+    mock.key_press = AsyncMock(return_value=Ok(None))
+    mock.key_down = AsyncMock(return_value=Ok(None))
+    mock.key_up = AsyncMock(return_value=Ok(None))
     mock.close = AsyncMock(return_value=Ok(None))
+    mock.scroll = AsyncMock(return_value=Ok(None))
+    
+    return mock
+
+
+@pytest.fixture
+def mock_browser_context(mock_page) -> MagicMock:
+    """Fixture to create a mock BrowserContext that implements the protocol."""
+    mock = create_autospec(BrowserContext, instance=True)
+    
+    # Attributes defined in the BrowserContext protocol (src/silk/browsers/models.py)
+    mock.page_id = "mock-context-page-id"  # As per current protocol (BrowserContext.page_id)
+    mock.context_ref = "mock-context-ref" # As per current protocol (BrowserContext.context_ref)
+
+    # Add the 'context_id' attribute that the CreateContext action expects.
+    # This is the primary fix for the "Mock object has no attribute 'context_id'" error.
+    mock.context_id = "mock-context-id" 
+    
+    # Configure return values for methods defined in the BrowserContext protocol.
+    # create_autospec stubs these methods, but their return_values need to be set.
+    mock.get_page_id.return_value = "mock-context-page-id" # Corresponds to BrowserContext.get_page_id()
+
+    mock.new_page.return_value = Ok(mock_page)
+    mock.create_page.return_value = Ok(mock_page)
+    mock.pages.return_value = Ok([mock_page])
+    mock.get_page.return_value = Ok(mock_page)
+    mock.close_page.return_value = Ok(None)
+    mock.get_cookies.return_value = Ok([])
+    mock.set_cookies.return_value = Ok(None)
+    mock.clear_cookies.return_value = Ok(None)
+    mock.add_init_script.return_value = Ok(None)
+    mock.set_content.return_value = Ok(None)  # Added as it's in the protocol
+
+    # Mouse methods
+    mock.mouse_move.return_value = Ok(None)
+    mock.mouse_down.return_value = Ok(None)
+    mock.mouse_up.return_value = Ok(None)
+    mock.mouse_click.return_value = Ok(None)
+    mock.mouse_double_click.return_value = Ok(None)
+    mock.mouse_drag.return_value = Ok(None)
+
+    # Key methods
+    mock.key_press.return_value = Ok(None)
+    mock.key_down.return_value = Ok(None)
+    mock.key_up.return_value = Ok(None)
+    
+    mock.close.return_value = Ok(None)
+    
+    return mock
+
+
+@pytest.fixture
+def mock_driver(mock_browser_context, mock_page, mock_element_handle) -> MagicMock:
+    """Fixture to create a mock Driver that implements the protocol."""
+    mock = create_autospec(Driver, instance=True)
+    
+    mock.driver_ref = "mock-driver-ref"
+    
+    mock.get_driver_ref = MagicMock(return_value="mock-driver-ref")
+    
+    mock.launch = AsyncMock(return_value=Ok(None))
+    mock.new_context = AsyncMock(return_value=Ok(mock_browser_context))
     mock.create_context = AsyncMock(return_value=Ok("mock-context-id"))
+    mock.contexts = AsyncMock(return_value=Ok([mock_browser_context]))
     mock.close_context = AsyncMock(return_value=Ok(None))
-    mock.create_page = AsyncMock(return_value=Ok("mock-page-ref"))
+    mock.create_page = AsyncMock(return_value=Ok("mock-page-id"))
     mock.close_page = AsyncMock(return_value=Ok(None))
     mock.goto = AsyncMock(return_value=Ok(None))
     mock.current_url = AsyncMock(return_value=Ok("https://example.com"))
@@ -95,9 +213,9 @@ def mock_browser_driver() -> MagicMock:
     mock.reload = AsyncMock(return_value=Ok(None))
     mock.go_back = AsyncMock(return_value=Ok(None))
     mock.go_forward = AsyncMock(return_value=Ok(None))
-    mock.query_selector = AsyncMock(return_value=Ok(None))
-    mock.query_selector_all = AsyncMock(return_value=Ok([]))
-    mock.wait_for_selector = AsyncMock(return_value=Ok(None))
+    mock.query_selector = AsyncMock(return_value=Ok(mock_element_handle))
+    mock.query_selector_all = AsyncMock(return_value=Ok([mock_element_handle]))
+    mock.wait_for_selector = AsyncMock(return_value=Ok(mock_element_handle))
     mock.wait_for_navigation = AsyncMock(return_value=Ok(None))
     mock.click = AsyncMock(return_value=Ok(None))
     mock.double_click = AsyncMock(return_value=Ok(None))
@@ -117,25 +235,24 @@ def mock_browser_driver() -> MagicMock:
     mock.get_element_text = AsyncMock(return_value=Ok("Mock Element Text"))
     mock.get_element_attribute = AsyncMock(return_value=Ok("mock-element-attribute"))
     mock.get_element_bounding_box = AsyncMock(
-        return_value=Ok({"x": 10, "y": 20, "width": 100, "height": 50})
+        return_value=Ok({"x": 10.0, "y": 20.0, "width": 100.0, "height": 50.0})
     )
     mock.click_element = AsyncMock(return_value=Ok(None))
     mock.get_element_html = AsyncMock(return_value=Ok("<div>Mock Element HTML</div>"))
     mock.get_element_inner_text = AsyncMock(return_value=Ok("Mock Element Inner Text"))
-    mock.extract_table = AsyncMock(
-        return_value=Ok([{"header1": "value1", "header2": "value2"}])
-    )
+
     mock.scroll = AsyncMock(return_value=Ok(None))
-
+    mock.execute_cdp_cmd = AsyncMock(return_value=Ok({"result": "mock-cdp-result"}))
+    mock.close = AsyncMock(return_value=Ok(None))
+    
     return mock
-
 
 @pytest.fixture
 def browser_options() -> BrowserOptions:
     """Fixture to create browser options for testing."""
     return BrowserOptions(
         headless=True,
-        timeout=5000,  # Short timeout for tests
+        timeout=5000,
         viewport_width=1280,
         viewport_height=720,
         stealth_mode=False,
@@ -143,126 +260,93 @@ def browser_options() -> BrowserOptions:
 
 
 @pytest.fixture
-def mock_browser_page(mock_browser_driver) -> MagicMock:
-    """Fixture to create a mock BrowserPage."""
-    mock = MagicMock(spec=BrowserPage)
-    mock.id = "mock-page-id"
-    mock.context_id = "mock-context-id"
-    mock.driver = mock_browser_driver
-    mock.page_ref = "mock-page-ref"
-
-    # Mock the async methods with awaitable results
-    mock.goto = AsyncMock(return_value=Ok(None))
-    mock.current_url = AsyncMock(return_value=Ok("https://example.com"))
-    mock.reload = AsyncMock(return_value=Ok(None))
-    mock.go_back = AsyncMock(return_value=Ok(None))
-    mock.go_forward = AsyncMock(return_value=Ok(None))
-    mock.close = AsyncMock(return_value=Ok(None))
-    mock.query_selector = AsyncMock(return_value=Ok(None))
-    mock.query_selector_all = AsyncMock(return_value=Ok([]))
-    mock.execute_script = AsyncMock(return_value=Ok({"result": "mock-result"}))
-    mock.wait_for_selector = AsyncMock(return_value=Ok(None))
-    mock.wait_for_navigation = AsyncMock(return_value=Ok(None))
-    mock.screenshot = AsyncMock(return_value=Ok(Path("mock_screenshot.png")))
-    mock.get_page_source = AsyncMock(
-        return_value=Ok("<html><body>Mock page</body></html>")
-    )
-    mock.click = AsyncMock(return_value=Ok(None))
-    mock.fill = AsyncMock(return_value=Ok(None))
-    mock.double_click = AsyncMock(return_value=Ok(None))
-    mock.type = AsyncMock(return_value=Ok(None))
-    mock.select = AsyncMock(return_value=Ok(None))
-
-    return mock
-
-
-@pytest.fixture
-def mock_browser_context(mock_browser_driver, mock_browser_page) -> MagicMock:
-    """Fixture to create a mock BrowserContext."""
-    mock = MagicMock(spec=BrowserContext)
-    mock.id = "mock-context-id"
-    mock.driver = mock_browser_driver
-    mock.options = {}
-    mock.context_ref = "mock-context-ref"
-    mock.pages = {"mock-page-id": mock_browser_page}
-    mock.default_page_id = "mock-page-id"
-    mock.nickname = "mock-context-id"
-
-    # Mock the async methods with awaitable results
-    mock.create_page = AsyncMock(return_value=Ok(mock_browser_page))
-    mock.get_page.return_value = Ok(mock_browser_page)  # This one is not async
-    mock.mouse_move = AsyncMock(return_value=Ok(None))
-    mock.mouse_down = AsyncMock(return_value=Ok(None))
-    mock.mouse_up = AsyncMock(return_value=Ok(None))
-    mock.mouse_click = AsyncMock(return_value=Ok(None))
-    mock.mouse_double_click = AsyncMock(return_value=Ok(None))
-    mock.mouse_drag = AsyncMock(return_value=Ok(None))
-    mock.key_press = AsyncMock(return_value=Ok(None))
-    mock.key_down = AsyncMock(return_value=Ok(None))
-    mock.key_up = AsyncMock(return_value=Ok(None))
-    mock.close = AsyncMock(return_value=Ok(None))
-
-    return mock
-
-
-@pytest.fixture
-def mock_browser_manager(mock_browser_driver, mock_browser_context) -> MagicMock:
-    """Fixture to create a mock BrowserManager."""
-    mock = MagicMock(spec=BrowserManager)
-    mock.default_options = BrowserOptions()
-    mock.drivers = {"mock-driver-id": mock_browser_driver}
-    mock.contexts = {"mock-context-id": mock_browser_context}
-    mock.default_context_id = "mock-context-id"
-
-    # Mock the async methods with awaitable results
-    mock.create_context = AsyncMock(return_value=Ok(mock_browser_context))
-    mock.get_context.return_value = Ok(mock_browser_context)  # This one is not async
-    mock.close_context = AsyncMock(return_value=Ok(None))
-    mock.close_all = AsyncMock(return_value=Ok(None))
-
-    return mock
-
-
-class MockActionContext(ActionContext):
-    """A subclass of ActionContext that allows mocking methods for testing."""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._mock_responses: Dict[str, Any] = {}
-    
-    async def get_page(self):
-        """Mock implementation of get_page that can be configured in tests."""
-        if "get_page" in self._mock_responses:
-            return self._mock_responses["get_page"]
-        return await super().get_page()
-    
-    async def get_driver(self):
-        """Mock implementation of get_driver that can be configured in tests."""
-        if "get_driver" in self._mock_responses:
-            return self._mock_responses["get_driver"]
-        return await super().get_driver()
-    
-    def set_mock_response(self, method_name: str, response: Any):
-        """Configure a mock response for a method."""
-        self._mock_responses[method_name] = response
-
-
-@pytest.fixture
-def action_context(mock_browser_manager, mock_browser_page, mock_browser_driver) -> MockActionContext:
-    """Fixture to create a MockActionContext for testing."""
-    context = MockActionContext(
-        browser_manager=mock_browser_manager,
+def action_context(mock_driver, mock_browser_context, mock_page) -> ActionContext:
+    """Fixture to create an ActionContext for testing."""
+    return ActionContext(
+        driver=mock_driver,
+        context=mock_browser_context,
+        page=mock_page,
+        driver_type="mock",
         context_id="mock-context-id",
         page_id="mock-page-id",
-        retry_count=0,
-        max_retries=3,
-        retry_delay_ms=100,
-        timeout_ms=5000,
+        page_ids={"mock-page-id"},
+        metadata={
+            "browser_options": BrowserOptions().model_dump(),
+            "context_options": {},
+        }
     )
-    # Set up default mock responses
-    context.set_mock_response("get_page", Ok(mock_browser_page))
-    context.set_mock_response("get_driver", Ok(mock_browser_driver))
-    return context
+
+
+@pytest.fixture
+async def mock_browser_session(
+    browser_options, 
+    mock_driver, 
+    mock_browser_context, 
+    mock_page,
+    action_context
+) -> AsyncGenerator[BrowserSession, None]:
+    """Fixture to create a mock BrowserSession."""
+    mock_driver_class = MagicMock()
+    mock_driver_class.return_value = mock_driver
+    
+    session = BrowserSession(
+        options=browser_options,
+        driver_class=mock_driver_class,
+        create_context=True,
+        create_page=True,
+    )
+    
+    session.driver = mock_driver
+    session.browser_context = mock_browser_context
+    session.page = mock_page
+    session.context = action_context
+    session._started = True
+    
+    yield session
+    
+    await session.close()
+
+
+@pytest.fixture
+def mock_mouse_options() -> MouseOptions:
+    """Fixture to create MouseOptions for testing."""
+    return MouseOptions(
+        button="left",
+        modifiers=[],
+        steps=1,
+        smooth=True,
+        total_time=0.5,
+        timeout=5000,
+    )
+
+
+@pytest.fixture
+def mock_type_options() -> TypeOptions:
+    """Fixture to create TypeOptions for testing."""
+    return TypeOptions(
+        delay=10,
+        clear=False,
+        timeout=5000,
+    )
+
+
+@pytest.fixture
+def mock_navigation_options() -> NavigationOptions:
+    """Fixture to create NavigationOptions for testing."""
+    return NavigationOptions(
+        wait_until="load",
+        timeout=5000,
+    )
+
+
+@pytest.fixture
+def mock_wait_options() -> WaitOptions:
+    """Fixture to create WaitOptions for testing."""
+    return WaitOptions(
+        state="visible",
+        poll_interval=100,
+        timeout=5000,
+    )
 
 
 @pytest.fixture
@@ -321,4 +405,30 @@ def mock_selector_group() -> SelectorGroup:
         Selector("css", "#primary-selector"),
         Selector("css", "#secondary-selector")
     )
-    
+
+
+@pytest.fixture
+def failed_result() -> Result[None, Exception]:
+    """Fixture that returns a failed Result."""
+    return Error(Exception("Mock error"))
+
+
+@pytest.fixture
+def success_result() -> Result[None, Exception]:
+    """Fixture that returns a successful Result."""
+    return Ok(None)
+
+
+@pytest.fixture
+def mock_coordinates() -> CoordinateType:
+    """Fixture for mock coordinates."""
+    return (100, 200)
+
+
+@pytest.fixture
+def mock_driver_class(mock_driver):
+    """Fixture to create a mock driver class."""
+    mock_class = MagicMock()
+    mock_class.return_value = mock_driver
+    mock_class.__name__ = "MockDriver"
+    return mock_class

@@ -6,3 +6,4 @@ from fp_ops.operator import Operation # noqa
 
 
 
+__all__ = ["operation", "Operation"]

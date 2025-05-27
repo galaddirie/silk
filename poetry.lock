@@ -122,14 +122,14 @@ pydantic = ["pydantic (>=2.6.2,<3.0.0)"]
 
 [[package]]
 name = "fp-ops"
-version = "0.1.4"
+version = "0.2.5"
 description = "an ergonomic wrapper around the expression library"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "fp_ops-0.1.4-py3-none-any.whl", hash = "sha256:727eee0459fd61ec45ecbc8be4a23b77d067df08dd4726bbd3925e18c46ac84b"},
-    {file = "fp_ops-0.1.4.tar.gz", hash = "sha256:0b87ea12dc11a8fdbcc84d5bf585013a73aabb6e34d3830cb03572d65cfd3788"},
+    {file = "fp_ops-0.2.5-py3-none-any.whl", hash = "sha256:9b9e0ef5bf1276ded445f93f8bed66b374df629bc8f104c9990ad26fc175cfde"},
+    {file = "fp_ops-0.2.5.tar.gz", hash = "sha256:212435ded25b4d176f27c55a760b902b7afb450db065422d96f48e6b9e44e043"},
 ]
 
 [package.dependencies]
@@ -653,4 +653,4 @@ playwright = ["playwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "93c0e140f9b6cd99d7ae17f8c122b0c30e35a6075f2d8ae571dfdcd63e42f21a"
+content-hash = "07454be5fadeba5784ff6a9c712270d0cfec27cf001354538a2285ffe42bb686"

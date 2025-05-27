@@ -1,24 +1,20 @@
-from typing import Any, Callable, Optional, Tuple, Union, TypeVar
+from typing import Any, Callable, Optional, Tuple, Union, TypeVar, cast
 
 from expression import Error, Result, Ok
-from silk.actions.context import ActionContext
-from silk.browsers.driver import  BrowserDriver
-from silk.browsers.element import ElementHandle
+from silk.browsers.models import ActionContext, ElementHandle, Driver, Page, CoordinateType, MouseOptions
 from silk.selectors import Selector, SelectorGroup
 
 T = TypeVar('T')
 
+
 async def resolve_target(
     context: ActionContext, 
-    target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]]
+    target: Union[str, Selector, SelectorGroup, ElementHandle, CoordinateType]
 ) -> Result[ElementHandle, Exception]:
-    page_result = await context.get_page()
-    if page_result.is_error():
-        return Error(page_result.error)
+    page = context.page
     
-    page = page_result.default_value(None)
     if page is None:
-        return Error(Exception("No browser page found"))
+        return Error(Exception("No page found"))
     
     if isinstance(target, str):
         element_result = await page.query_selector(target)
@@ -35,7 +31,7 @@ async def resolve_target(
         if element_result.is_error():
             return Error(element_result.error)
         
-        element = element_result.default_value(None)
+        element = element_result.default_value(cast(ElementHandle, None))
         if element is None:
             return Error(Exception("No element found"))
         return Ok(element)
@@ -54,32 +50,27 @@ async def resolve_target(
     # If we get here, it's not a valid target
     return Error(Exception(f"Unsupported target type: {type(target)}"))
 
-async def validate_driver(context: ActionContext) -> Result[BrowserDriver, Exception]:
+async def validate_driver(context: ActionContext) -> Result[Driver, Exception]:
     """Helper function to validate and retrieve the driver"""
-    driver_result = await context.get_driver()
-    if driver_result.is_error():
-        return Error(driver_result.error)
-    
-    driver = driver_result.default_value(None)
+    driver = context.driver
     if driver is None:
-        return Error(Exception("No browser driver found"))
+        return Error(Exception("No driver found"))
     
     if context.page_id is None:
-        return Error(Exception("No browser page found"))
+        return Error(Exception("No page found"))
     
     return Ok(driver)
 
 
 async def get_element_coordinates(
-    target: Union[ElementHandle, Tuple[int, int]], 
-    options: Optional[Any] = None
+    target: Union[ElementHandle, CoordinateType], 
+    options: Optional[MouseOptions] = None
 ) -> Result[Tuple[float, float], Exception]:
     """Helper function to get coordinates from an element or coordinate tuple"""
     # Handle tuple directly without using isinstance with a generic type
     if isinstance(target, tuple) and len(target) == 2:  # Coordinate type
         return Ok((float(target[0]), float(target[1])))
     
-    # Element handle
     result = await target.get_bounding_box()
     if result.is_error():
         return Error(result.error)
@@ -90,7 +81,7 @@ async def get_element_coordinates(
     
     x, y = bounding_box["x"], bounding_box["y"]
     
-    if options and getattr(options, "move_to_center", False):
+    if options and options.move_to_center:
         x += bounding_box["width"] / 2
         y += bounding_box["height"] / 2
     

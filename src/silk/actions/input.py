@@ -8,16 +8,16 @@ from typing import Any, List, Optional, Tuple, TypeVar, Union
 from expression import Error, Ok, Result
 from fp_ops import operation
 
-from silk.actions.context import ActionContext
 from silk.actions.utils import get_element_coordinates, resolve_target, validate_driver
-from silk.browsers.element import ElementHandle
-from silk.browsers.types import (
+from silk.browsers.models import (
     DragOptions,
     KeyModifier,
     MouseButtonLiteral,
     MouseOptions,
     SelectOptions,
     TypeOptions,
+    ActionContext,
+    ElementHandle,
 )
 from silk.selectors.selector import Selector, SelectorGroup
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def MouseMove(
     target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
     offset_x: int = 0,
@@ -61,7 +61,7 @@ async def MouseMove(
             if element is None:
                 return Error(Exception("Target not found"))
 
-            coords_result = await get_element_coordinates(element, options)
+            coords_result = await get_element_coordinates(element)
             if coords_result.is_error():
                 return Error(coords_result.error)
 
@@ -79,7 +79,7 @@ async def MouseMove(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Click(
     target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
     options: Optional[MouseOptions] = None,
@@ -105,7 +105,7 @@ async def Click(
         if isinstance(target, tuple) and len(target) == 2:
             x_int, y_int = int(target[0]), int(target[1])
             if context.page_id is not None:
-                await driver.mouse_move(context.page_id, x_int, y_int, options)
+                await driver.mouse_move(context.page_id, x_int, y_int)
                 await driver.mouse_click(context.page_id, "left", options)
                 return Ok(None)
             else:
@@ -132,7 +132,7 @@ async def Click(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def DoubleClick(
     target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
     options: Optional[MouseOptions] = None,
@@ -185,7 +185,7 @@ async def DoubleClick(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def MouseDown(
     button: MouseButtonLiteral = "left",
     options: Optional[MouseOptions] = None,
@@ -218,7 +218,7 @@ async def MouseDown(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def MouseUp(
     button: MouseButtonLiteral = "left",
     options: Optional[MouseOptions] = None,
@@ -251,7 +251,7 @@ async def MouseUp(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Drag(
     source: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
     target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
@@ -287,7 +287,7 @@ async def Drag(
             if source_element is None:
                 return Error(Exception("Source not found"))
 
-            source_coords = await get_element_coordinates(source_element, options)
+            source_coords = await get_element_coordinates(source_element)
             if source_coords.is_error():
                 return Error(source_coords.error)
 
@@ -305,7 +305,7 @@ async def Drag(
             if target_element is None:
                 return Error(Exception("Target not found"))
 
-            target_coords = await get_element_coordinates(target_element, options)
+            target_coords = await get_element_coordinates(target_element)
             if target_coords.is_error():
                 return Error(target_coords.error)
 
@@ -323,7 +323,7 @@ async def Drag(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Fill(
     target: Union[str, Selector, SelectorGroup, ElementHandle],
     text: str,
@@ -369,7 +369,7 @@ async def Fill(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Type(
     target: Union[str, Selector, SelectorGroup, ElementHandle],
     text: str,
@@ -415,7 +415,7 @@ async def Type(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def KeyPress(
     key: str,
     modifiers: Optional[List[KeyModifier]] = None,
@@ -457,7 +457,7 @@ async def KeyPress(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Select(
     target: Union[str, Selector, SelectorGroup, ElementHandle],
     value: Optional[str] = None,
@@ -505,7 +505,7 @@ async def Select(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Scroll(
     target: Optional[Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]]] = None,
     x: Optional[int] = None,
@@ -535,7 +535,6 @@ async def Scroll(
         if context.page_id is None:
             return Error(Exception("No page ID found"))
 
-        # If target is specified, scroll to the element
         if target is not None:
             if isinstance(target, tuple) and len(target) == 2:
                 x_int, y_int = int(target[0]), int(target[1])
@@ -553,7 +552,6 @@ async def Scroll(
                 if not selector:
                     return Error(Exception("Target has no selector"))
 
-                # Scroll element into view
                 return await driver.scroll(context.page_id, selector=selector)
         # If coordinates are specified, scroll to the position
         elif x is not None or y is not None:
