@@ -149,14 +149,18 @@ pip install silk-scraper[playwright]  # or [selenium], [puppeteer], [all]
 import asyncio
 from silk.actions.navigation import Navigate
 from silk.actions.elements import GetText
-from silk.browsers.manager import BrowserManager
-from silk.actions.manage import InitializeContext
+from silk.browsers.sessions import BrowserSession
+from silk.browsers.drivers.playwright import PlaywrightDriver
 
 async def main():
-    async with BrowserManager() as manager:
-        # Create a context first
-        context = await InitializeContext(manager)
-        
+    options = BrowserOptions(
+        headless=False,  # Show browser UI for debugging
+        browser_type="chromium",
+        viewport={"width": 1280, "height": 800}
+    )
+
+    # Use BrowserSession for easy setup and teardown
+    async with BrowserSession(options=options, driver_class=PlaywrightDriver) as context:
         # Define a scraping pipeline
         pipeline = Navigate("https://example.com") >> GetText("h1")
 
@@ -632,18 +636,21 @@ async def extract_price(context, selector):
 ## Browser Configuration
 
 ```python
-from silk.browsers.types import BrowserOptions
-from silk.browsers.manager import BrowserManager
-from silk.actions.manage import InitializeContext
+from silk.browsers.models import BrowserOptions
+from silk.browsers.sessions import BrowserSession
+from silk.browsers.drivers.playwright import PlaywrightDriver
 
 options = BrowserOptions(
     headless=False,  # Show browser UI for debugging
-    browser_name="chromium",
+    browser_type="chromium",
     viewport={"width": 1280, "height": 800}
 )
 
-manager = BrowserManager(driver_type="playwright", default_options=options)
-context = await InitializeContext(manager)
+# Use BrowserSession for context management
+async with BrowserSession(options=options, driver_class=PlaywrightDriver) as context:
+    # 'context' is now an ActionContext ready for use
+    # await YourAction(...)(context=context)
+    pass
 ```
 
 ---
@@ -655,21 +662,19 @@ context = await InitializeContext(manager)
 ```
 silk/
 ├── actions/         # Core actions for browser interaction
-│   ├── context.py   # Action context definitions
+│   ├── browser.py   # NEW: Context and page management (CreateContext, CreatePage, etc.)
 │   ├── decorators.py # Action decorators
 │   ├── elements.py  # Element interaction (GetText, GetAttribute, etc.)
 │   ├── input.py     # User input simulation (Click, Fill, etc.)
-│   ├── manage.py    # Context management (InitializeContext, WithContext)
 │   └── navigation.py # Page navigation actions
 ├── browsers/        # Browser drivers and management
-│   ├── manager.py   # BrowserManager for session handling
-│   └── types.py     # Browser configuration types
-├── flow/            # Flow control and composition utilities
-│   ├── branch.py    # Conditional execution
-│   ├── loop.py      # Iteration control
-│   ├── parallel.py  # Concurrent execution
-│   ├── retry.py     # Retry mechanisms
-│   └── sequence.py  # Sequential composition
+│   ├── drivers/       # Specific driver implementations (e.g., PlaywrightDriver)
+│   │   └── playwright.py
+│   ├── models.py    # Browser configuration, ActionContext, Driver/Page/Context/Element protocols
+│   └── sessions.py  # BrowserSession for lifecycle management
+├── flow.py          # Flow control and composition utilities (branch, loop_until, retry,tap, wait, etc.)
+├── composition.py   # Composition utilities (pipe, parallel, compose, fallback, etc.)
+├── operation.py     # fp-ops operation decorator and class
 ├── placeholder.py   # Placeholder system for composition
 └── selectors/       # Selector definitions and utilities
     └── selector.py  # Selector types and groups
@@ -702,8 +707,12 @@ silk/
 - `Select(selector, value: str)` - Select an option from a dropdown
 
 #### Context Management
-- `InitializeContext(browser_manager)` - Create a new context
-- `WithContext(context_factory, action)` - Execute an action with a specific context
+- `silk.actions.browser.CreateContext(...)` - Creates a new browser context.
+- `silk.actions.browser.CreatePage(...)` - Creates a new page in the current context.
+- `silk.actions.browser.SwitchToPage(...)` - Switches to a different page.
+- `silk.actions.browser.CloseCurrentPage(...)` - Closes the current page.
+- `silk.actions.browser.CloseContext(...)` - Closes the current browser context.
+- `silk.browsers.sessions.BrowserSession` - Manages browser lifecycle and initial context creation.
 
 ### Flow Control Functions
 
@@ -736,11 +745,12 @@ silk/
 ### Browser Management
 
 #### Configuration
-- `BrowserOptions` - Browser configuration options (headless, viewport, etc.)
-- `NavigationOptions` - Page navigation options (timeout, wait_until, etc.)
+- `silk.browsers.models.BrowserOptions` - Browser configuration options (headless, viewport, etc.)
+- `silk.browsers.models.NavigationOptions` - Page navigation options (timeout, wait_until, etc.)
 
-#### Browser Manager
-- `BrowserManager(driver_type: str, default_options: BrowserOptions)` - Manage browser sessions
+#### Browser Session Management
+- `silk.browsers.sessions.BrowserSession` - High-level manager for browser instances, contexts, and pages. 
+  Provides an `ActionContext` via `async with session as context:`.
 
 ---
 

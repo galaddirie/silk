@@ -13,7 +13,6 @@ from silk.selectors.selector import (
 
 class TestSelector:
     def test_selector_create(self):
-        # Test basic selector creation
         selector = Selector(type=SelectorType.CSS, value=".my-class")
 
         assert selector.type == SelectorType.CSS
@@ -21,7 +20,6 @@ class TestSelector:
         assert selector.timeout is None
 
     def test_selector_methods(self):
-        # Test selector getter methods
         selector = Selector(type=SelectorType.CSS, value=".my-class", timeout=10)
 
         assert selector.get_type() == SelectorType.CSS
@@ -31,14 +29,12 @@ class TestSelector:
         assert selector.is_xpath() is False
 
     def test_selector_string_representation(self):
-        # Test string representations
         selector = Selector(type=SelectorType.CSS, value=".my-class")
 
         assert str(selector) == "css-.my-class"
         assert repr(selector) == "Selector(type=SelectorType.CSS, value=.my-class)"
 
     def test_specialized_selectors(self):
-        # Test specialized selector classes
         css_selector = css(".my-class")
         xpath_selector = xpath("//div[@class='my-class']")
         text_selector = text("Find me")
@@ -55,7 +51,6 @@ class TestSelector:
 
 class TestSelectorGroup:
     def test_selector_group_constructor(self):
-        # Test the new constructor with variable selectors
         selector1 = css(".class1")
         selector2 = xpath("//div[@id='id1']")
 
@@ -67,7 +62,6 @@ class TestSelectorGroup:
         assert group.selectors[1] == selector2
 
     def test_selector_group_create(self):
-        # Test create factory method
         selector1 = css(".class1")
         selector2 = xpath("//div[@id='id1']")
 
@@ -79,13 +73,12 @@ class TestSelectorGroup:
         assert group.selectors[1] == selector2
 
     def test_selector_group_create_mixed(self):
-        # Test create_mixed with different input types
         group = SelectorGroup(
             "mixed-group",
-            css(".class1"),  # Selector object
-            ".class2",  # String (CSS)
-            ("//div[@id='id1']", "xpath"),  # Tuple (value, type as string)
-            ("Button text", SelectorType.TEXT),  # Tuple (value, type as enum)
+            css(".class1"),
+            ".class2",
+            ("//div[@id='id1']", "xpath"),
+            ("Button text", SelectorType.TEXT),
         )
 
         assert group.name == "mixed-group"
@@ -105,13 +98,11 @@ class TestSelectorGroup:
 
     @pytest.mark.asyncio
     async def test_selector_group_execute(self):
-        # Test execute with simulated find_element function
         selector1 = css(".not-found")
         selector2 = xpath("//div[@id='found']")
 
         group = SelectorGroup("test-group", selector1, selector2)
 
-        # Mock find_element function that fails for first selector, succeeds for second
         async def mock_find_element(selector: Selector):
             if selector.value == ".not-found":
                 return Error(Exception("Element not found"))
@@ -126,13 +117,11 @@ class TestSelectorGroup:
 
     @pytest.mark.asyncio
     async def test_selector_group_execute_all_fail(self):
-        # Test execute when all selectors fail
         selector1 = css(".not-found1")
         selector2 = css(".not-found2")
 
         group = SelectorGroup("test-group", selector1, selector2)
 
-        # Mock find_element function that fails for all selectors
         async def mock_find_element(selector: Selector):
             return Error(Exception("Element not found"))
 

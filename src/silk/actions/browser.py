@@ -13,14 +13,14 @@ from uuid import uuid4
 from expression import Error, Ok, Result
 from fp_ops import operation
 
-from silk.browsers.models import ActionContext,  BrowserOptions, NavigationOptions, NavigationWaitLiteral, WaitOptions
+from silk.browsers.models import ActionContext,  BrowserOptions, NavigationOptions, NavigationWaitLiteral, WaitOptions, BrowserContext
 
 logger = logging.getLogger(__name__)
 
 
 @operation(context=True, context_type=ActionContext)
 async def CreateContext(
-    context_options: Optional[Dict[str, Any]] = None,
+    context_options: Optional[BrowserContext] = None,
     create_page: bool = True,
     **kwargs: Any,
 ) -> Result[ActionContext, Exception]:
@@ -48,7 +48,7 @@ async def CreateContext(
         if browser_context is None:
             return Error(Exception("No browser context found"))
         
-        context_id = getattr(browser_context, 'context_id', None) or f"context_{uuid4().hex[:8]}"
+        context_id = browser_context.context_id or f"context_{uuid4().hex[:8]}"
         
         page = None
         page_id = None
@@ -243,7 +243,7 @@ async def CloseCurrentPage(
             pages = pages_result.default_value([])
             if pages_result.is_ok() and pages:
                 new_page = pages[-1]
-                new_page_id = getattr(new_page, 'page_id', None) or "last_page"
+                new_page_id = new_page.page_id or "last_page"
         
         new_context = context.derive(
             page=new_page,

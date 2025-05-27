@@ -94,21 +94,26 @@ class BrowserSession:
             page_id = None
             
             if self.create_context:
-                # Create browser context
                 context_result = await self.driver.new_context(self.context_options)
                 if context_result.is_error():
                     raise context_result.error
                 
-                self.browser_context = context_result.value
-                context_id = getattr(self.browser_context, 'context_id', None) or "default"
+                self.browser_context = context_result.default_value(None)
+                if self.browser_context is None:
+                    raise Exception("Context creation failed")
+                
+                context_id = self.browser_context.context_id or "default"
                 
                 if self.create_page:
                     page_result = await self.browser_context.new_page()
                     if page_result.is_error():
                         raise page_result.error
                     
-                    self.page = page_result.value
-                    page_id = self.page_nickname or getattr(self.page, 'page_id', None) or "default"
+                    self.page = page_result.default_value(None)
+                    if self.page is None:
+                        raise Exception("Page creation failed")
+                    
+                    page_id = self.page_nickname or self.page.page_id or "default"
             
             self.context = ActionContext(
                 driver=self.driver,

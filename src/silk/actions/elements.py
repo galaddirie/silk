@@ -150,7 +150,6 @@ async def GetText(
     context: ActionContext = kwargs["context"]
 
     try:
-        # If we already have an ElementHandle, use it directly
         if isinstance(selector, ElementHandle):
             text_result = await selector.get_text()
             if text_result.is_error():
@@ -158,7 +157,6 @@ async def GetText(
             text = text_result.default_value("")
             return Ok(text)
             
-        # Otherwise, resolve the element using the selector
         driver_result = await validate_driver(context)
         if driver_result.is_error():
             return Error(driver_result.error)
@@ -293,8 +291,6 @@ async def GetInnerText(
         if element is None:
             return Ok(None)
 
-        # Inner text is different from text content - it only includes visible text
-        # We need to use evaluate to get it
         if context.page_id is None:
             return Error(Exception("No page ID found"))
 
@@ -360,17 +356,14 @@ async def ExtractTable(
         if table_element is None:
             return Error(Exception("Table element not found"))
 
-        # Default selectors if not provided
         actual_header_selector = header_selector or "thead th, th"
         actual_row_selector = row_selector or "tbody tr, tr"
         actual_cell_selector = cell_selector or "td"
 
-        # Get the table selector string
         table_sel_str = table_element.get_selector()
         if not table_sel_str:
             return Error(Exception("Could not get table selector"))
 
-        # Get headers if needed
         headers = []
         if include_headers:
             header_elements_result = await page.query_selector_all(
@@ -391,7 +384,6 @@ async def ExtractTable(
                 header_text = text_result.default_value("").strip()
                 headers.append(header_text)
 
-        # Get rows
         row_elements_result = await page.query_selector_all(
             f"{table_sel_str} {actual_row_selector}"
         )
@@ -402,7 +394,6 @@ async def ExtractTable(
         if row_elements is None:
             return Error(Exception("No row elements found"))
 
-        # Process rows
         table_data = []
         for row_element in row_elements:
             cell_elements_result = await row_element.query_selector_all(
@@ -415,7 +406,6 @@ async def ExtractTable(
             if cell_elements is None:
                 return Error(Exception("No cell elements found"))
 
-            # If we have no headers, create a simple array row
             if not include_headers or not headers:
                 row_data = {}
                 for i, cell_element in enumerate(cell_elements):
@@ -426,7 +416,6 @@ async def ExtractTable(
                     cell_text = text_result.default_value("").strip()
                     row_data[f"column_{i}"] = cell_text
             else:
-                # Map cells to headers
                 row_data = {}
                 for i, cell_element in enumerate(cell_elements):
                     if i >= len(headers):
@@ -439,7 +428,7 @@ async def ExtractTable(
                     cell_text = text_result.default_value("").strip()
                     row_data[headers[i]] = cell_text
 
-            if row_data:  # Only add non-empty rows
+            if row_data:
                 table_data.append(row_data)
 
         return Ok(table_data)
@@ -477,15 +466,12 @@ async def WaitForSelector(
         if context.page_id is None:
             return Error(Exception("No page ID found"))
 
-        # Handle different selector types
         selector_str = ""
         if isinstance(selector, str):
             selector_str = selector
         elif isinstance(selector, Selector):
             selector_str = selector.value
         elif isinstance(selector, SelectorGroup):
-            # For selector groups, wait for any of the selectors to match
-            # This is done by using Promise.race in JavaScript
             selector_promises = []
             for sel in selector.selectors:
                 if isinstance(sel, str):
@@ -495,8 +481,7 @@ async def WaitForSelector(
 
             if not selector_promises:
                 return Error(Exception("Empty selector group"))
-
-            # Create a JavaScript function that resolves when any selector is found
+            # todo: review this
             function_body = f"""
             () => new Promise((resolve, reject) => {{
                 const checkSelectors = () => {{
@@ -534,7 +519,6 @@ async def WaitForSelector(
         else:
             return Error(Exception(f"Unsupported selector type: {type(selector)}"))
 
-        # For simple selectors, use the driver's wait_for_selector method
         result = await driver.wait_for_selector(context.page_id, selector_str, options)
         if result.is_error():
             return Error(result.error)
@@ -561,8 +545,6 @@ async def ElementExists(
 
     try:
         query_result = await Query(selector=selector, **kwargs)
-        # todo we should not nest actions in actions functions 
-        # while possible, its 
         if query_result.is_error():
             return Ok(False)
 

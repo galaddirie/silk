@@ -105,8 +105,7 @@ async def Click(
         if isinstance(target, tuple) and len(target) == 2:
             x_int, y_int = int(target[0]), int(target[1])
             if context.page_id is not None:
-                await driver.mouse_move(context.page_id, x_int, y_int, options)
-                await driver.mouse_click(context.page_id, "left", options)
+                await driver.mouse_click(context.page_id, (x_int, y_int), "left", options)
                 return Ok(None)
             else:
                 return Error(Exception("No page ID found"))
@@ -535,7 +534,6 @@ async def Scroll(
         if context.page_id is None:
             return Error(Exception("No page ID found"))
 
-        # If target is specified, scroll to the element
         if target is not None:
             if isinstance(target, tuple) and len(target) == 2:
                 x_int, y_int = int(target[0]), int(target[1])
@@ -553,7 +551,6 @@ async def Scroll(
                 if not selector:
                     return Error(Exception("Target has no selector"))
 
-                # Scroll element into view
                 return await driver.scroll(context.page_id, selector=selector)
         # If coordinates are specified, scroll to the position
         elif x is not None or y is not None:

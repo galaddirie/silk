@@ -18,7 +18,6 @@ from typing import (
 )
 from pathlib import Path
 
-
 import logging
 from enum import Enum
 from expression import Error, Ok, Result
@@ -38,13 +37,15 @@ WaitStateLiteral = Literal["visible", "hidden", "attached", "detached"]
 NavigationWaitLiteral = Literal["load", "domcontentloaded", "networkidle"]
 
 
+    
+
+
 class MouseButton(Enum):
     """Enum representing mouse buttons for mouse actions"""
 
     LEFT = "left"
     MIDDLE = "middle"
     RIGHT = "right"
-
 
 class KeyModifier(Enum):
     """Enum representing keyboard modifiers"""
@@ -63,7 +64,6 @@ class KeyModifier(Enum):
             value |= modifier.value
         return value
 
-
 class PointerEventType(Enum):
     """Enum representing pointer event types"""
 
@@ -71,7 +71,6 @@ class PointerEventType(Enum):
     DOWN = "mousePressed"
     UP = "mouseReleased"
     WHEEL = "mouseWheel"
-
 
 class BaseInputOptions(BaseModel):
     """Base model for all operation options"""
@@ -81,6 +80,10 @@ class BaseInputOptions(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+class CoordinateOptions(BaseInputOptions):
+    """Options for getting element coordinates"""
+    move_to_center: bool = True
+    offset: Optional[CoordinateType] = None
 
 class MouseOptions(BaseInputOptions):
     """Base options for mouse operations"""
@@ -102,7 +105,6 @@ class MouseOptions(BaseInputOptions):
         """Get the combined value of all modifiers"""
         return KeyModifier.combine(self.modifiers)
 
-
 class TypeOptions(BaseInputOptions):
     """Options for typing operations"""
 
@@ -111,14 +113,12 @@ class TypeOptions(BaseInputOptions):
     delay: Optional[int] = None
     clear: bool = False
 
-
 class SelectOptions(BaseInputOptions):
     """Options for select operations"""
 
     index: Optional[int] = None
     text: Optional[str] = None
     value: Optional[str] = None
-
 
 class DragOptions(MouseOptions):
     """Options for drag operations"""
@@ -129,20 +129,17 @@ class DragOptions(MouseOptions):
     smooth: bool = True
     total_time: float = 0.5
 
-
 class NavigationOptions(BaseInputOptions):
     """Options for navigation operations"""
 
     wait_until: NavigationWaitLiteral = "load"
     referer: Optional[str] = None
 
-
 class WaitOptions(BaseInputOptions):
     """Options for wait operations"""
 
     state: WaitStateLiteral = "visible"
     poll_interval: int = 100
-
 
 class BrowserOptions(BaseModel):
     """Configuration options for browser instances"""
@@ -164,7 +161,7 @@ class BrowserOptions(BaseModel):
     extra_args: Dict[str, Any] = Field(default_factory=dict)
     locale: Optional[str] = None
     timezone: Optional[str] = None
-    remote_url: Optional[str] = None  # URL for connecting to a remote CDP browser
+    remote_url: Optional[str] = None
 
     @model_validator(mode="after")
     def set_default_timeouts(self) -> "BrowserOptions":
@@ -175,9 +172,7 @@ class BrowserOptions(BaseModel):
             self.wait_timeout = self.timeout
         return self
 
-
 ElementRef = TypeVar("ElementRef")
-
 
 @runtime_checkable
 class ElementHandle(Protocol):
@@ -191,7 +186,6 @@ class ElementHandle(Protocol):
         page_id: ID of the page containing this element for tracking purposes
         selector: The selector used to find this element (optional)
         element_ref: Reference to the element in the underlying automation library
-
 
     """
     driver: Driver
@@ -337,9 +331,7 @@ class ElementHandle(Protocol):
         """Get the native element reference."""
         ...
 
-
 PageRef = TypeVar("PageRef")
-
 
 @runtime_checkable
 class Page(Protocol):
@@ -491,14 +483,6 @@ class Page(Protocol):
         """Release a mouse button."""
         ...
 
-    async def mouse_click(
-        self,
-        button: MouseButtonLiteral = "left",
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Click at the current mouse position."""
-        ...
-
     async def mouse_drag(
         self,
         source: CoordinateType,
@@ -539,9 +523,7 @@ class Page(Protocol):
         """Scroll the page or an element into view."""
         ...
 
-
 ContextRef = TypeVar("ContextRef")
-
 
 @runtime_checkable
 class BrowserContext(Protocol):
@@ -601,6 +583,10 @@ class BrowserContext(Protocol):
 
     async def add_init_script(self, script: str) -> Result[None, Exception]:
         """Add a script to be run in all pages."""
+        ...
+
+    async def set_content(self, content: str) -> Result[None, Exception]:
+        """Set the content of the page."""
         ...
 
     async def mouse_move(
@@ -670,9 +656,7 @@ class BrowserContext(Protocol):
         """Close the context and all its pages."""
         ...
 
-
 DriverRef = TypeVar("DriverRef")
-
 
 @runtime_checkable
 class Driver(Protocol):
@@ -971,7 +955,6 @@ class Driver(Protocol):
         """Close the browser and all its contexts."""
         ...
 
-
 class RetryOptions(BaseModel):
     """Options for action retry behavior"""
 
@@ -981,15 +964,13 @@ class RetryOptions(BaseModel):
     exponential_backoff: bool = False
     jitter: bool = True
 
-
 class WaitUntilOptions(BaseModel):
     """Options for conditional waiting"""
 
-    condition: str = ""  # JavaScript condition or special condition name
+    condition: str = ""
     timeout_ms: int = 30000
     poll_interval_ms: int = 100
     ignore_errors: bool = False
-
 
 class ActionOptions(BaseModel):
     """Options for browser actions"""
@@ -1003,7 +984,6 @@ class ActionOptions(BaseModel):
     validate_result: bool = False
     cleanup_after: bool = True
 
-
 class ActionContext(BaseModel):
     """
     Context for browser automation actions.
@@ -1013,20 +993,16 @@ class ActionContext(BaseModel):
     with the browser in a uniform way.
     """
 
-    # Driver references using uniform interfaces
     driver: Optional[Driver] = Field(default=None, exclude=True)
     context: Optional[BrowserContext] = Field(default=None, exclude=True)
     page: Optional[Page] = Field(default=None, exclude=True)
 
-    # Identification
     driver_type: str = "playwright"
     context_id: Optional[str] = None
     page_id: Optional[str] = None
 
-    # Tracking
     page_ids: Set[str] = Field(default_factory=set)
 
-    # Action execution state
     retry_count: int = 0
 
     options: ActionOptions = Field(default_factory=ActionOptions)
@@ -1037,19 +1013,15 @@ class ActionContext(BaseModel):
 
     def derive(self, **kwargs) -> "ActionContext":
         """Create a new context with updated values."""
-        # Special handling for metadata merging
         new_metadata = None
         if "metadata" in kwargs:
-            # Create a deep copy of current metadata and update it
             new_metadata = self.metadata.copy()
             metadata_updates = kwargs.pop("metadata")
             for key, value in metadata_updates.items():
                 new_metadata[key] = value
 
-        # Handle normal fields
         new_context = self.model_copy(update=kwargs)
 
-        # Apply merged metadata if needed
         if new_metadata:
             new_context.metadata = new_metadata
 
@@ -1079,4 +1051,3 @@ class ActionContext(BaseModel):
     def increment_retry_count(self) -> "ActionContext":
         """Increment retry count and return new context."""
         return self.derive(retry_count=self.retry_count + 1)
-

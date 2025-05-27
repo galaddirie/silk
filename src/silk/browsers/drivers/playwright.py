@@ -10,18 +10,18 @@ from typing import Any, Dict, List, Optional, Union, cast
 from contextlib import asynccontextmanager
 from weakref import WeakValueDictionary
 
-try:
-    from patchright.async_api import (
-        async_playwright,
-        Browser,
-        BrowserContext as PWBrowserContext,
-        Page as PWPage,
-        ElementHandle as PWElementHandle,
-        Playwright as PlaywrightAPIType,
-        Error as PlaywrightError,
-    )
-except ImportError:
-    from playwright.async_api import (
+# try:
+#     from patchright.async_api import (
+#         async_playwright,
+#         Browser,
+#         BrowserContext as PWBrowserContext,
+#         Page as PWPage,
+#         ElementHandle as PWElementHandle,
+#         Playwright as PlaywrightAPIType,
+#         Error as PlaywrightError,
+#     )
+# except ImportError:
+from playwright.async_api import (
         async_playwright,
         Browser,
         BrowserContext as PWBrowserContext,
@@ -221,6 +221,9 @@ class PlaywrightPage(Page):
 
     async def get_page_source(self) -> Result[str, Exception]:
         return await self.get_content()
+    
+    async def set_content(self, content: str) -> Result[None, Exception]:
+        return await self.driver.set_page_content(self.page_id, content)
 
     async def reload(
         self, options: Optional[NavigationOptions] = None
@@ -395,7 +398,6 @@ class PlaywrightBrowserContext(BrowserContext):
         if page_id:
             return await self.driver.get_page(page_id)
         else:
-            # Return first page
             pages_result = await self.pages()
             if pages_result.is_error():
                 return pages_result
@@ -410,7 +412,6 @@ class PlaywrightBrowserContext(BrowserContext):
         if page_id:
             return await self.driver.close_page(page_id)
         else:
-            # Close all pages in this context
             pages_result = await self.pages()
             if pages_result.is_ok():
                 for page in pages_result.default_value([]):
@@ -434,7 +435,6 @@ class PlaywrightBrowserContext(BrowserContext):
     async def mouse_move(
         self, x: int, y: int, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
-        # Get the first page to perform mouse operations
         page_result = await self.get_page()
         if page_result.is_error():
             return page_result
@@ -556,12 +556,10 @@ class PlaywrightDriver(Driver):
         self.driver_ref: Optional[PlaywrightAPIType] = None
         self.browser: Optional[Browser] = None
         
-        # Store actual Playwright objects by ID
         self._contexts: Dict[str, PWBrowserContext] = {}
         self._pages: Dict[str, PWPage] = {}
         self._elements: WeakValueDictionary[str, PWElementHandle] = WeakValueDictionary()
         
-        # Track relationships
         self._page_to_context: Dict[str, str] = {}
         self._element_to_page: Dict[str, str] = {}
         
@@ -570,7 +568,6 @@ class PlaywrightDriver(Driver):
     def get_driver_ref(self) -> Optional[PlaywrightAPIType]:
         return self.driver_ref
 
-    # Internal reference management methods
     def _get_context(self, context_id: str) -> PWBrowserContext:
         """Get the actual Playwright context by ID."""
         context = self._contexts.get(context_id)
@@ -605,11 +602,9 @@ class PlaywrightDriver(Driver):
         try:
             opts = options or BrowserOptions()
             
-            # Start playwright
             self._playwright_manager = async_playwright()
             self.driver_ref = await self._playwright_manager.start()
 
-            # Choose browser
             browser_launcher = {
                 "chrome": self.driver_ref.chromium,
                 "chromium": self.driver_ref.chromium,
@@ -617,7 +612,6 @@ class PlaywrightDriver(Driver):
                 "edge": self.driver_ref.chromium,
             }.get(opts.browser_type, self.driver_ref.chromium)
 
-            # Launch browser
             launch_args = {
                 "headless": opts.headless,
                 "args": opts.browser_args,
@@ -647,7 +641,6 @@ class PlaywrightDriver(Driver):
             
             context_options = options or {}
             
-            # Create browser context
             pw_context = await self.browser.new_context(**context_options)
             
             context_id = str(uuid.uuid4())
@@ -682,7 +675,6 @@ class PlaywrightDriver(Driver):
         try:
             context = self._get_context(context_id)
             
-            # Close all pages in this context first
             pages_to_close = [
                 page_id for page_id, ctx_id in self._page_to_context.items()
                 if ctx_id == context_id
@@ -690,7 +682,6 @@ class PlaywrightDriver(Driver):
             for page_id in pages_to_close:
                 await self.close_page(page_id)
             
-            # Close context
             await context.close()
             del self._contexts[context_id]
             
@@ -738,7 +729,6 @@ class PlaywrightDriver(Driver):
         try:
             page = self._get_page(page_id)
             
-            # Remove any elements associated with this page
             elements_to_remove = [
                 elem_id for elem_id, pg_id in self._element_to_page.items()
                 if pg_id == page_id
@@ -793,7 +783,14 @@ class PlaywrightDriver(Driver):
             return Ok(content)
         except Exception as e:
             return Error(e)
-
+    async def set_page_content(self, page_id: str, content: str) -> Result[None, Exception]:
+        try:
+            page = self._get_page(page_id)
+            await page.set_content(content)
+            return Ok(None)
+        except Exception as e:
+            return Error(e)
+            
     async def screenshot(
         self, page_id: str, path: Optional[Path] = None
     ) -> Result[Union[Path, bytes], Exception]:
@@ -877,7 +874,7 @@ class PlaywrightDriver(Driver):
             context_id = self._page_to_context[page_id]
             return Ok([
                 PlaywrightElementHandle(
-                    self, page_id, context_id, 
+                    self, page_id, context_id,
                     self._register_element(el, page_id), selector
                 )
                 for el in elements
@@ -922,7 +919,6 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
-    # Element operations using element IDs
     async def click_element(
         self, page_id: str, element_id: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
@@ -1123,7 +1119,7 @@ class PlaywrightDriver(Driver):
     ) -> Result[List[ElementHandle], Exception]:
         try:
             element = self._get_element(element_id)
-            children = await element.query_selector_all("*")
+            children = await element.query_selector_all(":scope > *")
             context_id = self._page_to_context[page_id]
             return Ok([
                 PlaywrightElementHandle(
@@ -1180,7 +1176,6 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
-    # Page-level operations by selector
     async def click(
         self, page_id: str, selector: str, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
@@ -1284,7 +1279,6 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
-    # Mouse operations
     async def mouse_move(
         self,
         page_id: str,
@@ -1329,17 +1323,16 @@ class PlaywrightDriver(Driver):
     async def mouse_click(
         self,
         page_id: str,
+        target: CoordinateType,
         button: MouseButtonLiteral = "left",
         options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         try:
             page = self._get_page(page_id)
             opts = options or MouseOptions()
-            # Get current position
-            pos = await page.evaluate("() => ({ x: window.mouseX || 0, y: window.mouseY || 0 })")
             await page.mouse.click(
-                pos["x"], 
-                pos["y"], 
+                target[0], 
+                target[1], 
                 button=button,
                 click_count=opts.click_count,
                 delay=opts.delay_between_ms,
@@ -1389,7 +1382,6 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
-    # Keyboard operations
     async def key_press(
         self, page_id: str, key: str, options: Optional[TypeOptions] = None
     ) -> Result[None, Exception]:
@@ -1420,7 +1412,6 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
-    # Context operations
     async def get_context_cookies(
         self, context_id: str
     ) -> Result[List[Dict[str, Any]], Exception]:
@@ -1459,7 +1450,6 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
-    # Scrolling
     async def scroll(
         self,
         page_id: str,
@@ -1482,51 +1472,82 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
-    # Table extraction (keeping as is since it uses element handle)
     async def extract_table(
         self,
         page_id: str,
         table_element: ElementHandle,
         include_headers: bool = True,
         header_selector: str = "th",
-        row_selector: str = "tr",
+        body_row_selector: str = "tr",
         cell_selector: str = "td",
     ) -> Result[List[Dict[str, str]], Exception]:
         try:
-            # Get native element
-            table = table_element.as_native()
+            # get the raw Playwright table handle
+            table = table_element
             
-            # Extract headers if needed
-            headers = []
+            print(f"DEBUG: Table element type: {type(table)}")
+            print(f"DEBUG: Table element: {table}")
+
+            # 1) Pull headers from the THEAD row only
+            headers: List[str] = []
             if include_headers:
-                header_elements = await table.query_selector_all(header_selector)
-                for header in header_elements:
-                    text = await header.text_content()
-                    headers.append(text.strip() if text else "")
+                thead_row_result = await table.query_selector("thead tr")
+                thead_row = thead_row_result.default_value(None)
+                print(f"DEBUG: Found thead row: {thead_row is not None}")
+                
+                if thead_row:
+                    header_cells_result = await thead_row.query_selector_all(header_selector)
+                    header_cells = header_cells_result.default_value([])
+                    print(f"DEBUG: Found {len(header_cells)} header cells in thead")
+                else:
+                    header_cells_result = await table.query_selector_all(header_selector)
+                    header_cells = header_cells_result.default_value([])
+                    print(f"DEBUG: Using fallback - found {len(header_cells)} header cells")
+                    
+                for i, th in enumerate(header_cells):
+                    text_result = await th.get_text()
+                    text = text_result.default_value("")
+                    cleaned_text = text.strip() if text else ""
+                    headers.append(cleaned_text)
+                    print(f"DEBUG: Header {i}: '{cleaned_text}'")
+
+            print(f"DEBUG: Final headers: {headers}")
+
+            # 2) Pull only the <tbody> rows
+            data_rows_result = await table.query_selector_all(body_row_selector)
+            data_rows = data_rows_result.default_value([])
+            print(f"DEBUG: Found {len(data_rows)} data rows")
             
-            # Extract rows
-            rows = await table.query_selector_all(row_selector)
-            data = []
-            
-            for row in rows:
-                cells = await row.query_selector_all(cell_selector)
+            data: List[Dict[str, str]] = []
+
+            # 3) For each body row, map each <td> to the corresponding header
+            for row_idx, row in enumerate(data_rows):
+                cells_result = await row.query_selector_all(cell_selector)
+                cells = cells_result.default_value([])
+                print(f"DEBUG: Row {row_idx} has {len(cells)} cells")
+                
                 if not cells:
                     continue
-                
-                row_data = {}
-                for i, cell in enumerate(cells):
-                    text = await cell.text_content()
-                    key = headers[i] if i < len(headers) else f"column_{i}"
-                    row_data[key] = text.strip() if text else ""
-                
-                if row_data:
-                    data.append(row_data)
-            
+                    
+                row_dict: Dict[str, str] = {}
+                for idx, cell in enumerate(cells):
+                    text_result = await cell.get_text()
+                    text = text_result.default_value("")
+                    cleaned_text = text.strip() if text else ""
+                    key = headers[idx] if idx < len(headers) else f"column_{idx}"
+                    row_dict[key] = cleaned_text
+                    print(f"DEBUG: Row {row_idx}, Cell {idx}: {key} = '{cleaned_text}'")
+                    
+                data.append(row_dict)
+
+            print(f"DEBUG: Final data: {data}")
             return Ok(data)
         except Exception as e:
+            print(f"DEBUG: Exception in extract_table: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return Error(e)
 
-    # CDP commands
     async def execute_cdp_cmd(
         self, page_id: str, cmd: str, *args: Any
     ) -> Result[Any, Exception]:
@@ -1541,19 +1562,15 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
-    # Cleanup
     async def close(self) -> Result[None, Exception]:
         try:
-            # Close all contexts
             for context_id in list(self._contexts.keys()):
                 await self.close_context(context_id)
             
-            # Close browser
             if self.browser:
                 await self.browser.close()
                 self.browser = None
             
-            # Stop playwright
             if self._playwright_manager:
                 await self._playwright_manager.__aexit__(None, None, None)
                 self._playwright_manager = None
@@ -1576,5 +1593,4 @@ class PlaywrightDriver(Driver):
             elif mod.name == "SHIFT":
                 modifiers.append("Shift")
         return modifiers
-
 

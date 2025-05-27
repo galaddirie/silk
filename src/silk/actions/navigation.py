@@ -324,7 +324,6 @@ async def WaitForSelector(
         if isinstance(selector, Selector):
             selector_value = selector.value
         elif isinstance(selector, SelectorGroup):
-            # Use the first selector in the group
             if not selector.selectors:
                 return Error(Exception("Empty selector group"))
             first_selector = selector.selectors[0]

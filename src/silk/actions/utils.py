@@ -1,14 +1,15 @@
 from typing import Any, Callable, Optional, Tuple, Union, TypeVar
 
 from expression import Error, Result, Ok
-from silk.browsers.models import ActionContext, ElementHandle, Driver, Page
+from silk.browsers.models import ActionContext, ElementHandle, Driver, Page, CoordinateType, CoordinateOptions
 from silk.selectors import Selector, SelectorGroup
 
 T = TypeVar('T')
 
+
 async def resolve_target(
     context: ActionContext, 
-    target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]]
+    target: Union[str, Selector, SelectorGroup, ElementHandle, CoordinateType]
 ) -> Result[ElementHandle, Exception]:
     page: Page = context.page
     
@@ -62,15 +63,14 @@ async def validate_driver(context: ActionContext) -> Result[Driver, Exception]:
 
 
 async def get_element_coordinates(
-    target: Union[ElementHandle, Tuple[int, int]], 
-    options: Optional[Any] = None
+    target: Union[ElementHandle, CoordinateType], 
+    options: Optional[CoordinateOptions] = None
 ) -> Result[Tuple[float, float], Exception]:
     """Helper function to get coordinates from an element or coordinate tuple"""
     # Handle tuple directly without using isinstance with a generic type
     if isinstance(target, tuple) and len(target) == 2:  # Coordinate type
         return Ok((float(target[0]), float(target[1])))
     
-    # Element handle
     result = await target.get_bounding_box()
     if result.is_error():
         return Error(result.error)
@@ -81,7 +81,7 @@ async def get_element_coordinates(
     
     x, y = bounding_box["x"], bounding_box["y"]
     
-    if options and getattr(options, "move_to_center", False):
+    if options and options.move_to_center:
         x += bounding_box["width"] / 2
         y += bounding_box["height"] / 2
     
