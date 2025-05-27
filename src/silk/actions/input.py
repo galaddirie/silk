@@ -105,7 +105,8 @@ async def Click(
         if isinstance(target, tuple) and len(target) == 2:
             x_int, y_int = int(target[0]), int(target[1])
             if context.page_id is not None:
-                await driver.mouse_click(context.page_id, (x_int, y_int), "left", options)
+                await driver.mouse_move(context.page_id, x_int, y_int)
+                await driver.mouse_click(context.page_id, "left", options)
                 return Ok(None)
             else:
                 return Error(Exception("No page ID found"))

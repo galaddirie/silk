@@ -210,7 +210,7 @@ class TestPlaywrightDriverIntegration:
         )
 
         # Test mouse click
-        click_result = await playwright_driver.mouse_click(page_id)
+        click_result = await playwright_driver.mouse_click(page_id, "left")
         assert click_result.is_ok()
 
         # Verify click was registered

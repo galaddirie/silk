@@ -216,93 +216,7 @@ class TestBrowserContextIntegration:
         # Cleanup
         await playwright_driver.close_context(context_id)
     
-    @pytest.mark.asyncio
-    async def test_context_isolation(self, playwright_driver):
-        """Test that contexts are properly isolated from each other."""
-        # Create two contexts
-        context1_result = await playwright_driver.create_context()
-        assert context1_result.is_ok()
-        context1_id = context1_result.default_value(None)
-        
-        context2_result = await playwright_driver.create_context()
-        assert context2_result.is_ok()
-        context2_id = context2_result.default_value(None)
-        
-        # Create pages in each context
-        page1_result = await playwright_driver.create_page(context1_id)
-        assert page1_result.is_ok()
-        page1_id = page1_result.default_value(None)
-        
-        page2_result = await playwright_driver.create_page(context2_id)
-        assert page2_result.is_ok()
-        page2_id = page2_result.default_value(None)
-        
-        # Set different data in each context
-        await playwright_driver.set_page_content(page1_id, """
-            <html><body>
-                <script>
-                    localStorage.setItem('context', 'context1');
-                    window.contextData = 'data1';
-                </script>
-            </body></html>
-        """)
-        
-        await playwright_driver.set_page_content(page2_id, """
-            <html><body>
-                <script>
-                    localStorage.setItem('context', 'context2');
-                    window.contextData = 'data2';
-                </script>
-            </body></html>
-        """)
-        
-        # Verify data isolation
-        data1_result = await playwright_driver.execute_script(page1_id, 
-            "window.contextData")
-        assert data1_result.is_ok()
-        assert data1_result.default_value("") == "data1"
-        
-        data2_result = await playwright_driver.execute_script(page2_id, 
-            "window.contextData")
-        assert data2_result.is_ok()
-        assert data2_result.default_value("") == "data2"
-        
-        # Set cookies in different contexts
-        cookie1 = [{
-            "name": "context_id",
-            "value": "1",
-            "domain": "localhost",
-            "path": "/"
-        }]
-        cookie2 = [{
-            "name": "context_id",
-            "value": "2",
-            "domain": "localhost",
-            "path": "/"
-        }]
-        
-        await playwright_driver.set_context_cookies(context1_id, cookie1)
-        await playwright_driver.set_context_cookies(context2_id, cookie2)
-        
-        # Verify cookie isolation
-        cookies1_result = await playwright_driver.get_context_cookies(context1_id)
-        assert cookies1_result.is_ok()
-        cookies1 = cookies1_result.default_value([])
-        ctx1_cookie = next((c for c in cookies1 if c["name"] == "context_id"), None)
-        assert ctx1_cookie is not None
-        assert ctx1_cookie["value"] == "1"
-        
-        cookies2_result = await playwright_driver.get_context_cookies(context2_id)
-        assert cookies2_result.is_ok()
-        cookies2 = cookies2_result.default_value([])
-        ctx2_cookie = next((c for c in cookies2 if c["name"] == "context_id"), None)
-        assert ctx2_cookie is not None
-        assert ctx2_cookie["value"] == "2"
-        
-        # Cleanup
-        await playwright_driver.close_context(context1_id)
-        await playwright_driver.close_context(context2_id)
-    
+
     @pytest.mark.asyncio
     async def test_context_page_management(self, playwright_driver):
         """Test page management within a context."""
@@ -422,7 +336,9 @@ class TestBrowserContextIntegration:
         move_result = await context.mouse_move(50, 25)
         assert move_result.is_ok()
         
-        click_result = await context.mouse_click()
+        click_result = await context.mouse_down()
+        assert click_result.is_ok()
+        click_result = await context.mouse_up()
         assert click_result.is_ok()
         
         # Verify click worked

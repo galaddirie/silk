@@ -1323,20 +1323,16 @@ class PlaywrightDriver(Driver):
     async def mouse_click(
         self,
         page_id: str,
-        target: CoordinateType,
         button: MouseButtonLiteral = "left",
         options: Optional[MouseOptions] = None,
     ) -> Result[None, Exception]:
         try:
             page = self._get_page(page_id)
             opts = options or MouseOptions()
-            await page.mouse.click(
-                target[0], 
-                target[1], 
-                button=button,
-                click_count=opts.click_count,
-                delay=opts.delay_between_ms,
-            )
+            delay_ms = opts.delay_between_ms if opts.delay_between_ms is not None else 50
+            await page.mouse.down(button=button, click_count=opts.click_count)
+            await asyncio.sleep(delay_ms / 1000)
+            await page.mouse.up(button=button, click_count=opts.click_count)
             return Ok(None)
         except Exception as e:
             return Error(e)

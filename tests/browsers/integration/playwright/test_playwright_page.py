@@ -306,8 +306,9 @@ class TestPageIntegration:
         """
         await driver.set_page_content(page_id, html)
         
-        
-        click_result = await driver.mouse_click(page_id, (100, 100))
+        move_result = await driver.mouse_move(page_id, 100, 100)
+        assert move_result.is_ok()
+        click_result = await driver.mouse_click(page_id, "left")
         assert click_result.is_ok()
         
         # Verify click was registered
