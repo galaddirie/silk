@@ -18,7 +18,7 @@ from silk.selectors.selector import Selector, SelectorGroup
 logger = logging.getLogger(__name__)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Navigate(
     url: str, options: Optional[NavigationOptions] = None, **kwargs: Any
 ) -> Result[None, Exception]:
@@ -49,7 +49,7 @@ async def Navigate(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GoBack(
     options: Optional[NavigationOptions] = None, **kwargs: Any
 ) -> Result[None, Exception]:
@@ -78,7 +78,7 @@ async def GoBack(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GoForward(
     options: Optional[NavigationOptions] = None, **kwargs: Any
 ) -> Result[None, Exception]:
@@ -107,7 +107,7 @@ async def GoForward(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Reload(
     options: Optional[NavigationOptions] = None, **kwargs: Any
 ) -> Result[None, Exception]:
@@ -136,7 +136,7 @@ async def Reload(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def WaitForNavigation(
     options: Optional[NavigationOptions] = None, **kwargs: Any
 ) -> Result[None, Exception]:
@@ -165,7 +165,7 @@ async def WaitForNavigation(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Screenshot(path: Path, **kwargs: Any) -> Result[Path, Exception]:
     """
     Action to take a screenshot
@@ -195,7 +195,7 @@ async def Screenshot(path: Path, **kwargs: Any) -> Result[Path, Exception]:
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GetCurrentUrl(**kwargs: Any) -> Result[str, Exception]:
     """
     Action to get the current URL
@@ -227,7 +227,7 @@ async def GetCurrentUrl(**kwargs: Any) -> Result[str, Exception]:
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GetPageSource(**kwargs: Any) -> Result[str, Exception]:
     """
     Action to get the page source
@@ -259,7 +259,7 @@ async def GetPageSource(**kwargs: Any) -> Result[str, Exception]:
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def ExecuteScript(
     script: str, *args: Any, **kwargs: Any
 ) -> Result[Any, Exception]:
@@ -297,7 +297,7 @@ async def ExecuteScript(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def WaitForSelector(
     selector: Union[str, Selector, SelectorGroup],
     options: Optional[WaitOptions] = None,

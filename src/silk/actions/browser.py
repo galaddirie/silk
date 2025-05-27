@@ -18,7 +18,7 @@ from silk.browsers.models import ActionContext,  BrowserOptions, NavigationOptio
 logger = logging.getLogger(__name__)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def CreateContext(
     context_options: Optional[BrowserContextOptions] = None,
     create_page: bool = True,
@@ -86,7 +86,7 @@ async def CreateContext(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def CreatePage(
     page_nickname: Optional[str] = None,
     switch_to: bool = True,
@@ -143,7 +143,7 @@ async def CreatePage(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def SwitchToPage(
     page_id: str,
     **kwargs: Any,
@@ -209,7 +209,7 @@ async def SwitchToPage(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def CloseCurrentPage(
     switch_to_last: bool = True,
     **kwargs: Any,
@@ -265,7 +265,7 @@ async def CloseCurrentPage(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def CloseContext(
     **kwargs: Any,
 ) -> Result[ActionContext, Exception]:
@@ -304,7 +304,7 @@ async def CloseContext(
         logger.error(f"Error closing context: {e}")
         return Error(e)
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def WithNewTab(
     url: Optional[str] = None,
     **kwargs: Any,
@@ -321,8 +321,7 @@ async def WithNewTab(
         Updated ActionContext with the new page
     """
     context: ActionContext = kwargs["context"]
-    
-    create_result: Result[ActionContext, Exception] = await CreatePage(switch_to=True, context=context).execute()
+    create_result: Result[ActionContext, Exception] = await CreatePage(switch_to=True).execute(**kwargs) # type: ignore[arg-type]
     if create_result.is_error():
         return Error(create_result.error)
     
@@ -346,7 +345,7 @@ async def WithNewTab(
     return Ok(new_context)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GetAllPages(
     **kwargs: Any,
 ) -> Result[List[str], Exception]:
@@ -380,7 +379,7 @@ async def GetAllPages(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def FocusPage(
     **kwargs: Any,
 ) -> Result[ActionContext, Exception]:
@@ -411,7 +410,7 @@ async def FocusPage(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def ReloadPage(
     wait_until: NavigationWaitLiteral = "load",
     **kwargs: Any,
@@ -444,7 +443,7 @@ async def ReloadPage(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GetCurrentUrl(
     **kwargs: Any,
 ) -> Result[str, Exception]:
@@ -473,7 +472,7 @@ async def GetCurrentUrl(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GetPageTitle(
     **kwargs: Any,
 ) -> Result[str, Exception]:
@@ -502,7 +501,7 @@ async def GetPageTitle(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def WithMetadata(
     metadata: Dict[str, Any],
     merge: bool = True,

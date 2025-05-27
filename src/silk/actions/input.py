@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def MouseMove(
     target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
     offset_x: int = 0,
@@ -79,7 +79,7 @@ async def MouseMove(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Click(
     target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
     options: Optional[MouseOptions] = None,
@@ -132,7 +132,7 @@ async def Click(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def DoubleClick(
     target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
     options: Optional[MouseOptions] = None,
@@ -185,7 +185,7 @@ async def DoubleClick(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def MouseDown(
     button: MouseButtonLiteral = "left",
     options: Optional[MouseOptions] = None,
@@ -218,7 +218,7 @@ async def MouseDown(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def MouseUp(
     button: MouseButtonLiteral = "left",
     options: Optional[MouseOptions] = None,
@@ -251,7 +251,7 @@ async def MouseUp(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Drag(
     source: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
     target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
@@ -323,7 +323,7 @@ async def Drag(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Fill(
     target: Union[str, Selector, SelectorGroup, ElementHandle],
     text: str,
@@ -369,7 +369,7 @@ async def Fill(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Type(
     target: Union[str, Selector, SelectorGroup, ElementHandle],
     text: str,
@@ -415,7 +415,7 @@ async def Type(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def KeyPress(
     key: str,
     modifiers: Optional[List[KeyModifier]] = None,
@@ -457,7 +457,7 @@ async def KeyPress(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Select(
     target: Union[str, Selector, SelectorGroup, ElementHandle],
     value: Optional[str] = None,
@@ -505,7 +505,7 @@ async def Select(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Scroll(
     target: Optional[Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]]] = None,
     x: Optional[int] = None,

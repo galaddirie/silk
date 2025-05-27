@@ -16,7 +16,7 @@ T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def Query(
     selector: Union[str, Selector, SelectorGroup],
     **kwargs: Any,
@@ -73,7 +73,7 @@ async def Query(
     except Exception as e:
         return Error(e)
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def QueryAll(
     selector: Union[str, Selector, SelectorGroup],
     **kwargs: Any,
@@ -133,7 +133,7 @@ async def QueryAll(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GetText(
     selector: Union[str, Selector, SelectorGroup, ElementHandle],
     **kwargs: Any,
@@ -179,7 +179,7 @@ async def GetText(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GetAttribute(
     selector: Union[str, Selector, SelectorGroup, ElementHandle],
     attribute: str,
@@ -220,7 +220,7 @@ async def GetAttribute(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GetHtml(
     selector: Union[str, Selector, SelectorGroup, ElementHandle],
     outer: bool = True,
@@ -262,7 +262,7 @@ async def GetHtml(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def GetInnerText(
     selector: Union[str, Selector, SelectorGroup, ElementHandle],
     **kwargs: Any,
@@ -315,7 +315,7 @@ async def GetInnerText(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def ExtractTable(
     table_selector: Union[str, Selector, SelectorGroup],
     include_headers: bool = True,
@@ -436,7 +436,7 @@ async def ExtractTable(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def WaitForSelector(
     selector: Union[str, Selector, SelectorGroup],
     options: Optional[WaitOptions] = None,
@@ -528,7 +528,7 @@ async def WaitForSelector(
         return Error(e)
 
 
-@operation(context=True, context_type=ActionContext)
+@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
 async def ElementExists(
     selector: Union[str, Selector, SelectorGroup],
     **kwargs: Any,
@@ -544,7 +544,7 @@ async def ElementExists(
     """
 
     try:
-        query_result = await Query(selector=selector, **kwargs)
+        query_result: Result[Optional[ElementHandle], Exception] = await Query(selector=selector).execute(**kwargs) # type: ignore[arg-type]
         if query_result.is_error():
             return Ok(False)
 
