@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast, Sequence, Literal, overload, TypedDict
 from contextlib import asynccontextmanager
 from weakref import WeakValueDictionary
 
@@ -29,11 +29,14 @@ from playwright.async_api import (
         ElementHandle as PWElementHandle,
         Playwright as PlaywrightAPIType,
         Error as PlaywrightError,
+        FloatRect,
+        Cookie,
     )
 from expression import Error, Ok, Result
 
 from silk.browsers.models import (
     BrowserContext,
+    BrowserContextOptions,
     BrowserOptions,
     CoordinateType,
     DragOptions,
@@ -41,6 +44,8 @@ from silk.browsers.models import (
     ElementHandle,
     MouseButton,
     MouseButtonLiteral,
+    KeyModifier,
+    KeyModifierLiteral,
     MouseOptions,
     NavigationOptions,
     Page,
@@ -48,9 +53,19 @@ from silk.browsers.models import (
     TypeOptions,
     WaitOptions,
 )
+SetCookieParam = TypedDict("SetCookieParam", {
+    "name": str,
+    "value": str,
+    "url": Optional[str],
+    "domain": Optional[str],
+    "path": Optional[str],
+    "expires": Optional[float],
+    "httpOnly": Optional[bool],
+    "secure": Optional[bool],
+    "sameSite": Optional[Literal["Lax", "None", "Strict"]],
+})
 
-
-class PlaywrightElementHandle(ElementHandle):
+class PlaywrightElementHandle(ElementHandle[PWElementHandle]):
     """Lightweight element handle that delegates to driver."""
 
     def __init__(
@@ -66,6 +81,9 @@ class PlaywrightElementHandle(ElementHandle):
         self.context_id = context_id
         self.element_id = element_id
         self.selector = selector
+        self.element_ref = self.driver._get_element(self.element_id)
+
+
 
     def get_page_id(self) -> str:
         return self.page_id
@@ -121,15 +139,15 @@ class PlaywrightElementHandle(ElementHandle):
     async def get_attribute(self, name: str) -> Result[Optional[str], Exception]:
         return await self.driver.get_element_attribute(self.page_id, self.element_id, name)
 
-    async def attribute(self, name: str, default: str = "") -> Optional[str]:
+    async def attribute(self, name: str, default: str = "") -> str:
         result = await self.get_attribute(name)
-        res: Optional[str] = result.default_value(default)
-        return res
+        attr_value: Optional[str] = result.default_value(cast(str, ""))
+        return attr_value if attr_value is not None else default
 
     async def has_attribute(self, name: str) -> bool:
         result = await self.get_attribute(name)
-        res: bool = result.default_value(False)
-        return res
+        attr_value: Optional[str] = result.default_value(cast(str, ""))
+        return attr_value is not None
 
     async def get_property(self, name: str) -> Result[Any, Exception]:
         return await self.driver.get_element_property(self.page_id, self.element_id, name)
@@ -143,22 +161,22 @@ class PlaywrightElementHandle(ElementHandle):
     async def is_enabled(self) -> Result[bool, Exception]:
         return await self.driver.is_element_enabled(self.page_id, self.element_id)
 
-    async def get_parent(self) -> Result[Optional[ElementHandle], Exception]:
+    async def get_parent(self) -> Result[Optional["ElementHandle"], Exception]:
         return await self.driver.get_element_parent(self.page_id, self.element_id)
 
-    async def get_children(self) -> Result[List[ElementHandle], Exception]:
+    async def get_children(self) -> Result[List["ElementHandle"], Exception]:
         return await self.driver.get_element_children(self.page_id, self.element_id)
 
     async def query_selector(
         self, selector: str
-    ) -> Result[Optional[ElementHandle], Exception]:
+    ) -> Result[Optional["ElementHandle"], Exception]:
         return await self.driver.query_selector_from_element(
             self.page_id, self.element_id, selector
         )
 
     async def query_selector_all(
         self, selector: str
-    ) -> Result[List[ElementHandle], Exception]:
+    ) -> Result[List["ElementHandle"], Exception]:
         return await self.driver.query_selector_all_from_element(
             self.page_id, self.element_id, selector
         )
@@ -182,7 +200,7 @@ class PlaywrightElementHandle(ElementHandle):
         return self.get_element_ref()
 
 
-class PlaywrightPage(Page):
+class PlaywrightPage(Page[PWPage]):
     """Lightweight page that delegates to driver."""
     
 
@@ -195,6 +213,9 @@ class PlaywrightPage(Page):
         self.driver = driver
         self.page_id = page_id
         self.context_id = context_id
+        self.page_ref = self.driver._get_page(self.page_id)
+
+
 
     def get_page_id(self) -> str:
         return self.page_id
@@ -285,6 +306,18 @@ class PlaywrightPage(Page):
     async def execute_script(self, script: str, *args: Any) -> Result[Any, Exception]:
         return await self.driver.execute_script(self.page_id, script, *args)
 
+    @overload
+    async def screenshot(
+        self, path: Path
+    ) -> Result[Path, Exception]:
+        """Take a screenshot of the page and save it to a file."""
+        ...
+
+    @overload
+    async def screenshot(self) -> Result[bytes, Exception]:
+        """Take a screenshot of the page."""
+        ...
+
     async def screenshot(
         self, path: Optional[Path] = None
     ) -> Result[Union[Path, bytes], Exception]:
@@ -350,13 +383,8 @@ class PlaywrightPage(Page):
     ) -> Result[None, Exception]:
         return await self.driver.scroll(self.page_id, x, y, selector)
 
-    @property
-    def page_ref(self) -> PWPage:
-        """Get the actual page reference when needed for compatibility."""
-        return self.driver._get_page(self.page_id)
 
-
-class PlaywrightBrowserContext(BrowserContext):
+class PlaywrightBrowserContext(BrowserContext[PWBrowserContext]):
     """Lightweight browser context that delegates to driver."""
 
     def __init__(
@@ -367,6 +395,9 @@ class PlaywrightBrowserContext(BrowserContext):
         self.driver = driver
         self.context_id = context_id
         self.page_id = ""
+        self.context_ref = self.driver._get_context(self.context_id)
+
+
 
     def get_page_id(self) -> str:
         return self.page_id
@@ -400,7 +431,7 @@ class PlaywrightBrowserContext(BrowserContext):
         else:
             pages_result = await self.pages()
             if pages_result.is_error():
-                return pages_result
+                return Error(pages_result.error)
             pages = pages_result.default_value([])
             if pages:
                 return Ok(pages[0])
@@ -432,12 +463,22 @@ class PlaywrightBrowserContext(BrowserContext):
     async def add_init_script(self, script: str) -> Result[None, Exception]:
         return await self.driver.add_context_init_script(self.context_id, script)
 
+    # Added missing set_content method
+    async def set_content(self, content: str) -> Result[None, Exception]:
+        page_result = await self.get_page()
+        if page_result.is_error():
+            return Error(page_result.error)
+        page = page_result.default_value(None)
+        if page is None:
+            return Error(ValueError("Failed to get page"))
+        return await self.driver.set_page_content(page.page_id, content)
+
     async def mouse_move(
         self, x: int, y: int, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
         page_result = await self.get_page()
         if page_result.is_error():
-            return page_result
+            return Error(page_result.error)
         page = page_result.default_value(None)
         if page is None:
             return Error(ValueError("Failed to get page"))
@@ -450,7 +491,7 @@ class PlaywrightBrowserContext(BrowserContext):
     ) -> Result[None, Exception]:
         page_result = await self.get_page()
         if page_result.is_error():
-            return page_result
+            return Error(page_result.error)
         page = page_result.default_value(None)
         if page is None:
             return Error(ValueError("Failed to get page"))
@@ -463,7 +504,7 @@ class PlaywrightBrowserContext(BrowserContext):
     ) -> Result[None, Exception]:
         page_result = await self.get_page()
         if page_result.is_error():
-            return page_result
+            return Error(page_result.error)
         page = page_result.default_value(None)
         if page is None:
             return Error(ValueError("Failed to get page"))
@@ -476,7 +517,7 @@ class PlaywrightBrowserContext(BrowserContext):
     ) -> Result[None, Exception]:
         page_result = await self.get_page()
         if page_result.is_error():
-            return page_result
+            return Error(page_result.error)
         page = page_result.default_value(None)
         if page is None:
             return Error(ValueError("Failed to get page"))
@@ -487,7 +528,7 @@ class PlaywrightBrowserContext(BrowserContext):
     ) -> Result[None, Exception]:
         page_result = await self.get_page()
         if page_result.is_error():
-            return page_result
+            return Error(page_result.error)
         page = page_result.default_value(None)
         if page is None:
             return Error(ValueError("Failed to get page"))
@@ -501,7 +542,7 @@ class PlaywrightBrowserContext(BrowserContext):
     ) -> Result[None, Exception]:
         page_result = await self.get_page()
         if page_result.is_error():
-            return page_result
+            return Error(page_result.error)
         page = page_result.default_value(None)
         if page is None:
             return Error(ValueError("Failed to get page"))
@@ -512,7 +553,7 @@ class PlaywrightBrowserContext(BrowserContext):
     ) -> Result[None, Exception]:
         page_result = await self.get_page()
         if page_result.is_error():
-            return page_result
+            return Error(page_result.error)
         page = page_result.default_value(None)
         if page is None:
             return Error(ValueError("Failed to get page"))
@@ -523,7 +564,7 @@ class PlaywrightBrowserContext(BrowserContext):
     ) -> Result[None, Exception]:
         page_result = await self.get_page()
         if page_result.is_error():
-            return page_result
+            return Error(page_result.error)
         page = page_result.default_value(None)
         if page is None:
             return Error(ValueError("Failed to get page"))
@@ -534,7 +575,7 @@ class PlaywrightBrowserContext(BrowserContext):
     ) -> Result[None, Exception]:
         page_result = await self.get_page()
         if page_result.is_error():
-            return page_result
+            return Error(page_result.error)
         page = page_result.default_value(None)
         if page is None:
             return Error(ValueError("Failed to get page"))
@@ -543,16 +584,11 @@ class PlaywrightBrowserContext(BrowserContext):
     async def close(self) -> Result[None, Exception]:
         return await self.driver.close_context(self.context_id)
 
-    @property
-    def context_ref(self) -> PWBrowserContext:
-        """Get the actual context reference when needed for compatibility."""
-        return self.driver._get_context(self.context_id)
 
-
-class PlaywrightDriver(Driver):
+class PlaywrightDriver(Driver[PlaywrightAPIType]):
     """Playwright driver with centralized reference management."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.driver_ref: Optional[PlaywrightAPIType] = None
         self.browser: Optional[Browser] = None
         
@@ -563,7 +599,7 @@ class PlaywrightDriver(Driver):
         self._page_to_context: Dict[str, str] = {}
         self._element_to_page: Dict[str, str] = {}
         
-        self._playwright_manager = None
+        self._playwright_manager:Any = None
 
     def get_driver_ref(self) -> Optional[PlaywrightAPIType]:
         return self.driver_ref
@@ -612,34 +648,71 @@ class PlaywrightDriver(Driver):
                 "edge": self.driver_ref.chromium,
             }.get(opts.browser_type, self.driver_ref.chromium)
 
-            launch_args = {
+            # Fixed launch args handling
+            launch_kwargs: Dict[str, Any] = {
                 "headless": opts.headless,
-                "args": opts.browser_args,
             }
             
+            if opts.browser_args:
+                launch_kwargs["args"] = opts.browser_args
+            
             if opts.proxy:
-                launch_args["proxy"] = {"server": opts.proxy}
+                launch_kwargs["proxy"] = {"server": opts.proxy}
+            
+            # Add other browser options as needed
+            if opts.user_agent:
+                launch_kwargs["user_agent"] = opts.user_agent
+            
+            if opts.ignore_https_errors:
+                launch_kwargs["ignore_https_errors"] = opts.ignore_https_errors
             
             if opts.remote_url:
+                # Fixed connect args handling
+                connect_kwargs: Dict[str, Any] = {}
+                if opts.timeout:
+                    connect_kwargs["timeout"] = float(opts.timeout)
+                if opts.extra_http_headers:
+                    connect_kwargs["headers"] = opts.extra_http_headers
+                
                 self.browser = await browser_launcher.connect(
                     opts.remote_url,
-                    **launch_args
+                    **connect_kwargs
                 )
             else:
-                self.browser = await browser_launcher.launch(**launch_args)
+                self.browser = await browser_launcher.launch(**launch_kwargs)
             
             return Ok(None)
         except Exception as e:
             return Error(e)
 
     async def new_context(
-        self, options: Optional[Dict[str, Any]] = None
+        self, options: Optional[BrowserContextOptions] = None
     ) -> Result[BrowserContext, Exception]:
         try:
             if not self.browser:
                 return Error(ValueError("Browser not launched"))
             
-            context_options = options or {}
+            context_options: Dict[str, Any] = {}
+            if options:
+                if options.viewport:
+                    context_options["viewport"] = options.viewport
+                if options.user_agent:
+                    context_options["user_agent"] = options.user_agent
+                if options.extra_http_headers:
+                    context_options["extra_http_headers"] = options.extra_http_headers
+                if options.proxy:
+                    context_options["proxy"] = options.proxy
+                if options.permissions:
+                    context_options["permissions"] = options.permissions
+                if options.user_data_dir:
+                    context_options["user_data_dir"] = options.user_data_dir
+                if options.args:
+                    context_options["args"] = options.args
+                # Note: headless is not a context option, it's a browser launch option
+                if options.slow_mo:
+                    context_options["slow_mo"] = options.slow_mo
+                if options.timeout:
+                    context_options["default_timeout"] = options.timeout
             
             pw_context = await self.browser.new_context(**context_options)
             
@@ -652,7 +725,7 @@ class PlaywrightDriver(Driver):
             return Error(e)
 
     async def create_context(
-        self, options: Optional[Dict[str, Any]] = None
+        self, options: Optional[BrowserContextOptions] = None
     ) -> Result[str, Exception]:
         result = await self.new_context(options)
         if result.is_error():
@@ -664,10 +737,11 @@ class PlaywrightDriver(Driver):
 
     async def contexts(self) -> Result[List[BrowserContext], Exception]:
         try:
-            return Ok([
+            context_list: List[BrowserContext] = [
                 PlaywrightBrowserContext(self, context_id)
                 for context_id in self._contexts
-            ])
+            ]
+            return Ok(context_list)
         except Exception as e:
             return Error(e)
 
@@ -711,13 +785,14 @@ class PlaywrightDriver(Driver):
             if not context_id:
                 return Error(ValueError(f"Context for page {page_id} not found"))
             
-            return Ok(PlaywrightPage(self, page_id, context_id))
+            page: Page = PlaywrightPage(self, page_id, context_id)
+            return Ok(page)
         except Exception as e:
             return Error(e)
 
     async def get_context_pages(self, context_id: str) -> Result[List[Page], Exception]:
         try:
-            pages = []
+            pages: List[Page] = []
             for page_id, ctx_id in self._page_to_context.items():
                 if ctx_id == context_id:
                     pages.append(PlaywrightPage(self, page_id, context_id))
@@ -783,6 +858,7 @@ class PlaywrightDriver(Driver):
             return Ok(content)
         except Exception as e:
             return Error(e)
+    
     async def set_page_content(self, page_id: str, content: str) -> Result[None, Exception]:
         try:
             page = self._get_page(page_id)
@@ -856,11 +932,10 @@ class PlaywrightDriver(Driver):
             if element:
                 context_id = self._page_to_context[page_id]
                 element_id = self._register_element(element, page_id)
-                return Ok(
-                    PlaywrightElementHandle(
-                        self, page_id, context_id, element_id, selector
-                    )
+                handle: ElementHandle = PlaywrightElementHandle(
+                    self, page_id, context_id, element_id, selector
                 )
+                return Ok(handle)
             return Ok(None)
         except Exception as e:
             return Error(e)
@@ -872,13 +947,14 @@ class PlaywrightDriver(Driver):
             page = self._get_page(page_id)
             elements = await page.query_selector_all(selector)
             context_id = self._page_to_context[page_id]
-            return Ok([
+            handles: List[ElementHandle] = [
                 PlaywrightElementHandle(
                     self, page_id, context_id,
                     self._register_element(el, page_id), selector
                 )
                 for el in elements
-            ])
+            ]
+            return Ok(handles)
         except Exception as e:
             return Error(e)
 
@@ -896,11 +972,10 @@ class PlaywrightDriver(Driver):
             if element:
                 context_id = self._page_to_context[page_id]
                 element_id = self._register_element(element, page_id)
-                return Ok(
-                    PlaywrightElementHandle(
-                        self, page_id, context_id, element_id, selector
-                    )
+                handle: ElementHandle = PlaywrightElementHandle(
+                    self, page_id, context_id, element_id, selector
                 )
+                return Ok(handle)
             return Ok(None)
         except Exception as e:
             return Error(e)
@@ -919,13 +994,23 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
+    # Fixed click_element method signature to match Driver protocol
     async def click_element(
-        self, page_id: str, element_id: str, options: Optional[MouseOptions] = None
+        self, page_id: str, element: Union[ElementHandle, str], options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
         try:
-            element = self._get_element(element_id)
+            if isinstance(element, str):
+                element_id = element
+            else:
+                # Extract element_id from ElementHandle
+                if hasattr(element, 'element_id'):
+                    element_id = element.element_id  # type: ignore
+                else:
+                    return Error(ValueError("Invalid element handle"))
+            
+            pw_element = self._get_element(element_id)
             opts = options or MouseOptions()
-            await element.click(
+            await pw_element.click(
                 button=opts.button,
                 click_count=opts.click_count,
                 delay=opts.delay_between_ms,
@@ -1009,45 +1094,85 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
+    # Fixed get_element_text method signature to match Driver protocol
     async def get_element_text(
-        self, page_id: str, element_id: str
+        self, page_id: str, element: Union[ElementHandle, str]
     ) -> Result[str, Exception]:
         try:
-            element = self._get_element(element_id)
-            text = await element.text_content()
+            if isinstance(element, str):
+                element_id = element
+            else:
+                # Extract element_id from ElementHandle
+                if hasattr(element, 'element_id'):
+                    element_id = element.element_id  # type: ignore
+                else:
+                    return Error(ValueError("Invalid element handle"))
+            
+            pw_element = self._get_element(element_id)
+            text = await pw_element.text_content()
             return Ok(text or "")
         except Exception as e:
             return Error(e)
 
+    # Fixed get_element_inner_text method signature to match Driver protocol
     async def get_element_inner_text(
-        self, page_id: str, element_id: str
+        self, page_id: str, element: Union[ElementHandle, str]
     ) -> Result[str, Exception]:
         try:
-            element = self._get_element(element_id)
-            text = await element.inner_text()
+            if isinstance(element, str):
+                element_id = element
+            else:
+                # Extract element_id from ElementHandle
+                if hasattr(element, 'element_id'):
+                    element_id = element.element_id  # type: ignore
+                else:
+                    return Error(ValueError("Invalid element handle"))
+            
+            pw_element = self._get_element(element_id)
+            text = await pw_element.inner_text()
             return Ok(text)
         except Exception as e:
             return Error(e)
 
+    # Fixed get_element_html method signature to match Driver protocol
     async def get_element_html(
-        self, page_id: str, element_id: str, outer: bool = True
+        self, page_id: str, element: Union[ElementHandle, str], outer: bool = True
     ) -> Result[str, Exception]:
         try:
-            element = self._get_element(element_id)
-            if outer:
-                html = await element.evaluate("el => el.outerHTML")
+            if isinstance(element, str):
+                element_id = element
             else:
-                html = await element.inner_html()
+                # Extract element_id from ElementHandle
+                if hasattr(element, 'element_id'):
+                    element_id = element.element_id  # type: ignore
+                else:
+                    return Error(ValueError("Invalid element handle"))
+            
+            pw_element = self._get_element(element_id)
+            if outer:
+                html = await pw_element.evaluate("el => el.outerHTML")
+            else:
+                html = await pw_element.inner_html()
             return Ok(html)
         except Exception as e:
             return Error(e)
 
+    # Fixed get_element_attribute method signature to match Driver protocol
     async def get_element_attribute(
-        self, page_id: str, element_id: str, name: str
+        self, page_id: str, element: Union[ElementHandle, str], name: str
     ) -> Result[Optional[str], Exception]:
         try:
-            element = self._get_element(element_id)
-            attr = await element.get_attribute(name)
+            if isinstance(element, str):
+                element_id = element
+            else:
+                # Extract element_id from ElementHandle
+                if hasattr(element, 'element_id'):
+                    element_id = element.element_id  # type: ignore
+                else:
+                    return Error(ValueError("Invalid element handle"))
+            
+            pw_element = self._get_element(element_id)
+            attr = await pw_element.get_attribute(name)
             return Ok(attr)
         except Exception as e:
             return Error(e)
@@ -1063,14 +1188,31 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
+    # Fixed get_element_bounding_box method signature to match Driver protocol
     async def get_element_bounding_box(
-        self, page_id: str, element_id: str
+        self, page_id: str, element: Union[ElementHandle, str]
     ) -> Result[Dict[str, float], Exception]:
         try:
-            element = self._get_element(element_id)
-            box = await element.bounding_box()
+            if isinstance(element, str):
+                element_id = element
+            else:
+                # Extract element_id from ElementHandle
+                if hasattr(element, 'element_id'):
+                    element_id = element.element_id  # type: ignore
+                else:
+                    return Error(ValueError("Invalid element handle"))
+            
+            pw_element = self._get_element(element_id)
+            box = await pw_element.bounding_box()
             if box:
-                return Ok(box)
+                # Convert FloatRect to Dict[str, float]
+                result: Dict[str, float] = {
+                    "x": box["x"],
+                    "y": box["y"],
+                    "width": box["width"],
+                    "height": box["height"]
+                }
+                return Ok(result)
             return Error(ValueError("Element has no bounding box"))
         except Exception as e:
             return Error(e)
@@ -1105,11 +1247,10 @@ class PlaywrightDriver(Driver):
                 parent_element = cast(PWElementHandle, parent)
                 context_id = self._page_to_context[page_id]
                 parent_id = self._register_element(parent_element, page_id)
-                return Ok(
-                    PlaywrightElementHandle(
-                        self, page_id, context_id, parent_id
-                    )
+                handle: ElementHandle = PlaywrightElementHandle(
+                    self, page_id, context_id, parent_id
                 )
+                return Ok(handle)
             return Ok(None)
         except Exception as e:
             return Error(e)
@@ -1121,13 +1262,14 @@ class PlaywrightDriver(Driver):
             element = self._get_element(element_id)
             children = await element.query_selector_all(":scope > *")
             context_id = self._page_to_context[page_id]
-            return Ok([
+            handles: List[ElementHandle] = [
                 PlaywrightElementHandle(
                     self, page_id, context_id,
                     self._register_element(child, page_id)
                 )
                 for child in children
-            ])
+            ]
+            return Ok(handles)
         except Exception as e:
             return Error(e)
 
@@ -1140,11 +1282,10 @@ class PlaywrightDriver(Driver):
             if child:
                 context_id = self._page_to_context[page_id]
                 child_id = self._register_element(child, page_id)
-                return Ok(
-                    PlaywrightElementHandle(
-                        self, page_id, context_id, child_id, selector
-                    )
+                handle: ElementHandle = PlaywrightElementHandle(
+                    self, page_id, context_id, child_id, selector
                 )
+                return Ok(handle)
             return Ok(None)
         except Exception as e:
             return Error(e)
@@ -1156,13 +1297,14 @@ class PlaywrightDriver(Driver):
             element = self._get_element(element_id)
             children = await element.query_selector_all(selector)
             context_id = self._page_to_context[page_id]
-            return Ok([
+            handles: List[ElementHandle] = [
                 PlaywrightElementHandle(
                     self, page_id, context_id,
                     self._register_element(child, page_id), selector
                 )
                 for child in children
-            ])
+            ]
+            return Ok(handles)
         except Exception as e:
             return Error(e)
 
@@ -1414,7 +1556,21 @@ class PlaywrightDriver(Driver):
         try:
             context = self._get_context(context_id)
             cookies = await context.cookies()
-            return Ok(cookies)
+            # Convert Cookie objects to Dict[str, Any]
+            cookie_dicts: List[Dict[str, Any]] = [
+                {
+                    "name": cookie["name"],
+                    "value": cookie["value"],
+                    "domain": cookie.get("domain", ""),
+                    "path": cookie.get("path", "/"),
+                    "expires": cookie.get("expires", -1),
+                    "httpOnly": cookie.get("httpOnly", False),
+                    "secure": cookie.get("secure", False),
+                    "sameSite": cookie.get("sameSite", "Lax"),
+                }
+                for cookie in cookies
+            ]
+            return Ok(cookie_dicts)
         except Exception as e:
             return Error(e)
 
@@ -1423,7 +1579,26 @@ class PlaywrightDriver(Driver):
     ) -> Result[None, Exception]:
         try:
             context = self._get_context(context_id)
-            await context.add_cookies(cookies)
+            # Convert Dict[str, Any] to SetCookieParam format
+            cookie_params: List[SetCookieParam] = []
+            for cookie_data in cookies:
+                param: SetCookieParam = {
+                    "name": cookie_data["name"],
+                    "value": cookie_data["value"],
+                    # Ensure all optional fields are correctly handled
+                    "url": cookie_data.get("url"),
+                    "domain": cookie_data.get("domain"),
+                    "path": cookie_data.get("path"),
+                    "expires": cookie_data.get("expires"),
+                    "httpOnly": cookie_data.get("httpOnly"),
+                    "secure": cookie_data.get("secure"),
+                    "sameSite": cookie_data.get("sameSite"),
+                }
+                # Remove None values as Playwright expects missing keys for defaults
+                param_cleaned = {k: v for k, v in param.items() if v is not None}
+                cookie_params.append(cast(SetCookieParam, param_cleaned))
+            
+            await context.add_cookies(cookie_params) # type: ignore
             return Ok(None)
         except Exception as e:
             return Error(e)
@@ -1474,12 +1649,18 @@ class PlaywrightDriver(Driver):
         table_element: ElementHandle,
         include_headers: bool = True,
         header_selector: str = "th",
-        body_row_selector: str = "tr",
+        row_selector: str = "tr",
         cell_selector: str = "td",
     ) -> Result[List[Dict[str, str]], Exception]:
         try:
+            # Extract element_id from ElementHandle
+            if hasattr(table_element, 'element_id'):
+                element_id = table_element.element_id  # type: ignore
+            else:
+                return Error(ValueError("Invalid table element handle"))
+            
             # get the raw Playwright table handle
-            table = table_element
+            table = self._get_element(element_id)
             
             print(f"DEBUG: Table element type: {type(table)}")
             print(f"DEBUG: Table element: {table}")
@@ -1487,22 +1668,18 @@ class PlaywrightDriver(Driver):
             # 1) Pull headers from the THEAD row only
             headers: List[str] = []
             if include_headers:
-                thead_row_result = await table.query_selector("thead tr")
-                thead_row = thead_row_result.default_value(None)
+                thead_row = await table.query_selector("thead tr")
                 print(f"DEBUG: Found thead row: {thead_row is not None}")
                 
                 if thead_row:
-                    header_cells_result = await thead_row.query_selector_all(header_selector)
-                    header_cells = header_cells_result.default_value([])
+                    header_cells = await thead_row.query_selector_all(header_selector)
                     print(f"DEBUG: Found {len(header_cells)} header cells in thead")
                 else:
-                    header_cells_result = await table.query_selector_all(header_selector)
-                    header_cells = header_cells_result.default_value([])
+                    header_cells = await table.query_selector_all(header_selector)
                     print(f"DEBUG: Using fallback - found {len(header_cells)} header cells")
                     
                 for i, th in enumerate(header_cells):
-                    text_result = await th.get_text()
-                    text = text_result.default_value("")
+                    text = await th.text_content()
                     cleaned_text = text.strip() if text else ""
                     headers.append(cleaned_text)
                     print(f"DEBUG: Header {i}: '{cleaned_text}'")
@@ -1510,16 +1687,14 @@ class PlaywrightDriver(Driver):
             print(f"DEBUG: Final headers: {headers}")
 
             # 2) Pull only the <tbody> rows
-            data_rows_result = await table.query_selector_all(body_row_selector)
-            data_rows = data_rows_result.default_value([])
+            data_rows = await table.query_selector_all(row_selector)
             print(f"DEBUG: Found {len(data_rows)} data rows")
             
             data: List[Dict[str, str]] = []
 
             # 3) For each body row, map each <td> to the corresponding header
             for row_idx, row in enumerate(data_rows):
-                cells_result = await row.query_selector_all(cell_selector)
-                cells = cells_result.default_value([])
+                cells = await row.query_selector_all(cell_selector)
                 print(f"DEBUG: Row {row_idx} has {len(cells)} cells")
                 
                 if not cells:
@@ -1527,8 +1702,7 @@ class PlaywrightDriver(Driver):
                     
                 row_dict: Dict[str, str] = {}
                 for idx, cell in enumerate(cells):
-                    text_result = await cell.get_text()
-                    text = text_result.default_value("")
+                    text = await cell.text_content()
                     cleaned_text = text.strip() if text else ""
                     key = headers[idx] if idx < len(headers) else f"column_{idx}"
                     row_dict[key] = cleaned_text
@@ -1576,17 +1750,38 @@ class PlaywrightDriver(Driver):
         except Exception as e:
             return Error(e)
 
-    def _get_modifiers(self, options: MouseOptions) -> List[str]:
+    def _get_modifiers(self, options: MouseOptions) -> List[Literal["Alt", "Control", "Meta", "Shift"]]:
         """Convert KeyModifier enums to Playwright modifier strings."""
-        modifiers = []
+        modifiers: List[Literal["Alt", "Control", "Meta", "Shift"]] = []
         for mod in options.modifiers:
             if mod.name == "ALT":
                 modifiers.append("Alt")
             elif mod.name == "CTRL":
-                modifiers.append("Control")
+                modifiers.append("Control")  
             elif mod.name == "COMMAND":
                 modifiers.append("Meta")
             elif mod.name == "SHIFT":
                 modifiers.append("Shift")
         return modifiers
 
+    # Add missing function to fix no-untyped-def error
+    def _setup_browser_options(self, options: BrowserOptions) -> Dict[str, Any]:
+        """Setup browser launch options."""
+        launch_options: Dict[str, Any] = {
+            "headless": options.headless,
+        }
+        
+        if options.browser_args:
+            launch_options["args"] = options.browser_args
+            
+        if options.proxy:
+            launch_options["proxy"] = {"server": options.proxy}
+            
+        if options.user_agent:
+            launch_options["user_agent"] = options.user_agent
+            
+        if options.ignore_https_errors:
+            launch_options["ignore_https_errors"] = options.ignore_https_errors
+            
+
+        return launch_options

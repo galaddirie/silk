@@ -52,6 +52,7 @@ class MouseButton(Enum):
     MIDDLE = "middle"
     RIGHT = "right"
 
+KeyModifierLiteral = Literal["alt", "control", "command", "shift"]
 class KeyModifier(Enum):
     """Enum representing keyboard modifiers"""
 
@@ -456,6 +457,10 @@ class Page(Protocol, Generic[PageRef]):
         """Take a screenshot of the page."""
         ...
 
+    async def screenshot(self, path: Optional[Path] = None) -> Result[Union[Path, bytes], Exception]:
+        """Take a screenshot of the page, optionally saving to a file."""
+        ...
+
     async def mouse_move(
         self, x: float, y: float, options: Optional[MouseOptions] = None
     ) -> Result[None, Exception]:
@@ -682,9 +687,9 @@ class Driver(Protocol, Generic[DriverRef]):
     implementations must fulfill, regardless of the underlying automation library.
     """
 
-    driver_ref: DriverRef
+    driver_ref: Optional[DriverRef] = None
 
-    def get_driver_ref(self) -> DriverRef:
+    def get_driver_ref(self) -> Optional[DriverRef]:
         """Get the reference to the driver in the underlying automation library"""
         return self.driver_ref
 

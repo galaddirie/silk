@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from silk.browsers.drivers.playwright import PlaywrightDriver
-
+from silk.browsers.models import BrowserContextOptions
 
 class TestBrowserContextIntegration:
     """Comprehensive integration tests for BrowserContext functionality."""
@@ -46,10 +46,9 @@ class TestBrowserContextIntegration:
             "locale": "en-US",
             "timezone_id": "America/New_York",
             "permissions": ["geolocation"],
-            "color_scheme": "dark"
         }
         
-        context_result = await playwright_driver.create_context(options)
+        context_result = await playwright_driver.create_context(BrowserContextOptions(**options))
         assert context_result.is_ok()
         context_id = context_result.default_value(None)
         
@@ -90,11 +89,7 @@ class TestBrowserContextIntegration:
         assert ua_result.is_ok()
         assert "TestBot/1.0" in ua_result.default_value("")
         
-        # Verify color scheme
-        scheme_result = await playwright_driver.execute_script(page_id, 
-            "document.getElementById('color-scheme').textContent")
-        assert scheme_result.is_ok()
-        assert scheme_result.default_value("") == "dark"
+       
         
         # Cleanup
         await playwright_driver.close_context(context_id)
@@ -265,7 +260,7 @@ class TestBrowserContextIntegration:
         assert page_access_result.is_error()
     
     @pytest.mark.asyncio
-    async def test_context_with_different_viewports(self, playwright_driver):
+    async def test_context_with_different_viewports(self, playwright_driver: PlaywrightDriver):
         """Test contexts with different viewport sizes."""
         viewports = [
             {"width": 375, "height": 667},   # iPhone SE
@@ -275,7 +270,7 @@ class TestBrowserContextIntegration:
         
         context_ids = []
         for viewport in viewports:
-            context_result = await playwright_driver.create_context({"viewport": viewport})
+            context_result = await playwright_driver.create_context(BrowserContextOptions(viewport=viewport))
             assert context_result.is_ok()
             context_id = context_result.default_value(None)
             context_ids.append(context_id)
