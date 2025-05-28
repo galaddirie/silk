@@ -760,11 +760,11 @@ silk/
 - [ ] Improve parallel execution
 - [ ] Support multiple actions in parallel in the same context/page eg. (GetText & GetAttribute & GetHtml) in an ergonomic way
 - [ ] Implement left shift (<<) operator for context modifiers and action decorators
-- [ ] improve manager ergonomics
+- [x] improve manager ergonomics
 - [ ] Selenium integration
 - [ ] Puppeteer integration
 - [ ] Add examples
-- [ ] Support Mapped tasks similar to airflow tasks eg. (QueryAll >> GetText[]) where get text is applied to each element in the collection
+- [x] Support Mapped tasks similar to airflow tasks eg. (QueryAll >> GetText[]) where get text is applied to each element in the collection
 - [ ] Add proxy options
 - [ ] Explore stealth options for browser automation ( implement patchwright, no-driver, driverless, etc.)
 - [ ] add dependency review
@@ -776,4 +776,5 @@ silk/
 - [ ] Distributed scraping support
 - [ ] Rate limiting and polite scraping utilities
 - [ ] Integration with popular data processing libraries (Pandas, etc.)
-- [ ] CLI tool for quick scraping tasks
+- [ ] Integration with popular scraping libraries (scrapy, etc.)
+
