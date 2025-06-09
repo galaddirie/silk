@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1] - 2025-06-08
+
+### Added
+- Add `parent` argument to `Query`, `QueryAll`, `GetText`, `GetInnerText`, and `GetHtml` actions.
+
+### Changed
+- bump fp-ops to 0.2.11
+
 ## [0.3.0] - 2025-05-26
 
 ### Added
