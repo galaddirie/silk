@@ -149,6 +149,7 @@ class BrowserOptions(BaseModel):
     browser_type: Literal["chrome", "firefox", "edge", "chromium"] = "chromium"
     headless: bool = True
     timeout: int = 30000
+    # todo add viewport as a dict
     viewport_width: int = 1366
     viewport_height: int = 768
     navigation_timeout: Optional[int] = None

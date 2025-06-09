@@ -1,66 +1,56 @@
 import asyncio
+from typing import List
+from pydantic import BaseModel
 
-from silk.actions.elements import GetText, QueryAll
 from silk.actions.navigation import Navigate
+from silk.actions.elements  import QueryAll, GetText
 from silk.browsers.drivers.playwright import PlaywrightDriver
-from silk.browsers.models import BrowserOptions
+from silk.browsers.models   import BrowserOptions, ElementHandle, ActionContext
 from silk.browsers.sessions import BrowserSession
-from silk.placeholder import _
-from silk.composition import map
+from silk.objects import build
+from silk.composition import Map
+from silk import Operation
 
-async def main():
-    """
-    Scrapes book titles and prices from books.toscrape.com.
-    """
-    options = BrowserOptions(
+
+class BookDetails(BaseModel):
+    title: str
+    price: str
+
+extract_book_details = build({
+    "title": GetText("h3 > a"),
+    "price": GetText("p.price_color"),
+}, BookDetails)
+
+pipeline: Operation[[ElementHandle], List[BookDetails]] = (
+    Navigate("https://books.toscrape.com/")  # load the page
+    >> QueryAll("article.product_pod")       # returns List[ElementHandle]
+    >> Map(extract_book_details)  # type: ignore  
+)
+
+async def main() -> None:
+    opts = BrowserOptions(
         headless=False,
         browser_type="chromium",
-        viewport={"width": 1280, "height": 800}
+        viewport_width=1280,
+        viewport_height=800,
     )
 
+    async with BrowserSession(options=opts, driver_class=PlaywrightDriver) as ctx:
+        print("Starting scraper for books.toscrape.com…")
+        result = await pipeline(context=ctx).execute()
 
-    extract_book_details = {
-        "title": GetText("h3 > a"),
-        "price": GetText("p.price_color")
-    }
+        books = result.default_value([])
+        if not books:
+            print("No books found.")
+            return
 
-    # extract_book_details = {
-    #     "title" << GetText("h3 > a"),
-    #     "price" << GetText("p.price_color")
-    }
+        print(f"Found {len(books)} books:")
 
-    pipeline = (
-        Navigate("https://books.toscrape.com/")
-        >> QueryAll("article.product_pod")
-        >> map(
-    )
-
-    async with BrowserSession(options=options, driver_class=PlaywrightDriver) as context:
-        print("Starting scraper for books.toscrape.com...")
-        result = await pipeline(context=context)
-
-        if result.is_ok():
-            books_data = result.default_value(None)
-            
-            if not books_data: # Check if the block is empty
-                print("No books found on the page.")
-                return
-
-            print(f"Found {len(books_data)} books:")
-            for i, book in enumerate(books_data):
-                if book: # book itself is a Result a dict, check if it's not an error if map can fail per item
-                    title = book.get("title", "N/A")
-                    price = book.get("price", "N/A")
-                    print(f"  {i+1}. Title: {title}, Price: {price}")
-                else:
-                    print(f"  {i+1}. Error extracting book details.")
-            
-            # If books_data can be None from result.ok_value in some scenarios
-            if books_data is None:
-                 print("No data returned from scraping pipeline.")
-
-        else:
-            print(f"An error occurred: {result.error}")
+        for idx, book in enumerate(books, 1):
+            if isinstance(book, BookDetails):
+                print(f"  {idx:2}. {book.title} — {book.price}")
+            else:
+                print(f"  {idx:2}. {book}")
 
 if __name__ == "__main__":
     asyncio.run(main())
