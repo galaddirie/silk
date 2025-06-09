@@ -571,6 +571,131 @@ title = await (
 )(context)
 ```
 
+## Object Manipulation
+
+
+### Object Construction with `build`
+
+The `build` operation creates objects from schemas, supporting static values, operations, and callables:
+
+```python
+from silk.objects import build
+from pydantic import BaseModel
+
+# Define a data model
+class Product(BaseModel):
+    title: str
+    price: float
+    in_stock: bool
+
+# Build a dictionary
+product_data = build({
+    "title": GetText(".product-title"),
+    "price": GetText(".price") >> lambda x: float(x.replace("$", "")),
+    "in_stock": ElementExists(".stock-status")
+})
+
+# Build a Pydantic model instance
+product = build({
+    "title": GetText(".product-title"),
+    "price": GetText(".price") >> lambda x: float(x.replace("$", "")),
+    "in_stock": ElementExists(".stock-status")
+}, Product)
+
+# Build a dataclass instance
+@dataclass
+class BookDetails:
+    title: str
+    price: str
+
+extract_book_details = build({
+    "title": GetText("h3 > a"),
+    "price": GetText("p.price_color"),
+}, BookDetails)
+```
+
+Silk provides powerful object manipulation utilities that enable declarative data extraction and transformation. These utilities are designed to work seamlessly with Silk's compositional approach.
+
+### Data Access with `get`
+
+The `get` operation provides ergonomic access to nested data structures using dot notation:
+
+```python
+from silk.objects import get
+
+# Access nested data with dot notation
+user_email = get("user.contact.email", "unknown@example.com")
+
+# Access array elements using numeric indices
+first_item_price = get("items.0.price", 0.0)
+
+# Use in pipelines
+pipeline = (
+    Navigate(url)
+    >> GetText(".user-data")
+    >> get("profile.email")  # Extract email from JSON response
+)
+```
+
+### Dictionary Merging with `merge`
+
+The `merge` operation combines multiple dictionaries, with later sources overriding earlier ones:
+
+```python
+from silk.objects import merge
+
+# Merge static dictionaries
+config = merge(
+    {"base_url": "https://api.example.com"},
+    {"timeout": 30},
+    {"retry_count": 3}
+)
+
+# Merge operations that return dictionaries
+user_data = merge(
+    get("user.profile"),      # Operation returning dict
+    get("user.settings"),     # Operation returning dict
+    {"timestamp": "2024-01-01"}  # Static dict
+)
+
+# Mix static values with operations
+contact_info = merge(
+    get("user.contact"),
+    {"name": get("user.name"), "active": True}  # Operation in dict
+)
+```
+
+### Dictionary Updates with `update`
+
+The `update` operation modifies dictionaries with new values:
+
+```python
+from silk.objects import update
+
+# Create an update operation
+add_timestamp = update({"timestamp": "2024-01-01"})
+
+# Use in pipelines
+pipeline = (
+    GetText(".user-data")
+    >> add_timestamp  # Add timestamp to the data
+)
+
+# Chain multiple updates
+pipeline = (
+    GetText(".user-data")
+    >> update({"source": "web"})
+    >> update({"timestamp": "2024-01-01"})
+)
+```
+
+These object manipulation utilities integrate seamlessly with Silk's compositional approach, enabling elegant data transformation pipelines. They are particularly useful when:
+
+- Extracting structured data from web pages
+- Transforming raw data into domain models
+- Combining data from multiple sources
+- Building complex data transformation pipelines
+
 ## Real-World Example
 
 ```python
@@ -777,4 +902,3 @@ silk/
 - [ ] Rate limiting and polite scraping utilities
 - [ ] Integration with popular data processing libraries (Pandas, etc.)
 - [ ] Integration with popular scraping libraries (scrapy, etc.)
-
