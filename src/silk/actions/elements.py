@@ -9,7 +9,7 @@ from expression import Error, Ok, Result
 from fp_ops import operation
 
 from silk.actions.utils import resolve_target, validate_driver
-from silk.browsers.models import ActionContext, ElementHandle, Page, WaitOptions
+from silk.browsers.models import ActionContext, ElementHandle, Page, WaitOptions, Driver
 from silk.selectors.selector import Selector, SelectorGroup
 
 T = TypeVar("T")
@@ -42,12 +42,9 @@ async def _query_single_element(
     page: Optional[Page] = None
 ) -> Result[Optional[ElementHandle], Exception]:
     """Helper to query a single element with various selector types."""
-    if parent_element:
-        target = parent_element
-    elif page:
-        target = page
-    else:
+    if not parent_element and not page:
         return Error(Exception("No target (parent or page) provided"))
+
     
     if isinstance(selector, str):
         result = await query_func(selector)
@@ -87,11 +84,7 @@ async def _query_all_elements(
     page: Optional[Page] = None
 ) -> Result[List[ElementHandle], Exception]:
     """Helper to query multiple elements with various selector types."""
-    if parent_element:
-        target = parent_element
-    elif page:
-        target = page
-    else:
+    if not parent_element and not page:
         return Error(Exception("No target (parent or page) provided"))
     
     if isinstance(selector, str):
@@ -314,7 +307,7 @@ async def GetAttribute(
         if attr_result.is_error():
             return Error(attr_result.error)
 
-        return Ok(attr_result.default_value(None))
+        return Ok(attr_result.default_value(""))
     except Exception as e:
         return Error(e)
 
@@ -666,7 +659,7 @@ def _build_full_selector(parent_selector: str, selector: Union[str, Selector, Se
 
 
 async def _wait_for_selector_group(
-    driver: Any,
+    driver: Driver,
     page_id: str,
     selector_group: SelectorGroup,
     parent_selector: Optional[str],
@@ -713,5 +706,8 @@ async def _wait_for_selector_group(
         }}, {options.timeout if options and options.timeout else 30000});
     }})
     """
+    result = await driver.execute_script(page_id, function_body)
+    if result.is_error():
+        return Error(result.error)
 
-    return await driver.execute_script(page_id, function_body)
+    return Ok(result.default_value(None))
