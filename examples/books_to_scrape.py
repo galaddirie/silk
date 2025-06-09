@@ -3,7 +3,7 @@ from typing import List
 from pydantic import BaseModel
 
 from silk.actions.navigation import Navigate
-from silk.actions.elements  import QueryAll, GetText
+from silk.actions.elements  import QueryAll, GetText, GetAttribute
 from silk.browsers.drivers.playwright import PlaywrightDriver
 from silk.browsers.models   import BrowserOptions, ElementHandle, ActionContext
 from silk.browsers.sessions import BrowserSession
@@ -17,14 +17,14 @@ class BookDetails(BaseModel):
     price: str
 
 extract_book_details = build({
-    "title": GetText("h3 > a"),
+    "title": GetAttribute("h3 > a", attribute="title"),
     "price": GetText("p.price_color"),
 }, BookDetails)
 
 pipeline: Operation[[ElementHandle], List[BookDetails]] = (
     Navigate("https://books.toscrape.com/")  # load the page
     >> QueryAll("article.product_pod")       # returns List[ElementHandle]
-    >> Map(extract_book_details)  # type: ignore  
+    >> Map(extract_book_details) 
 )
 
 async def main() -> None:
