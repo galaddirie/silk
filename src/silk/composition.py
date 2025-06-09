@@ -1,64 +1,52 @@
 from typing import Any
 from fp_ops.composition import (
-    compose,
-    fallback,
-    parallel,
-    pipe,
-    sequence,
-
-    transform,
-    map,
-    filter,
-    reduce,
-    zip,
-    flat_map,
-    group_by,
-    partition,
-    first,
-    last,
-    gather_operations,
+    compose as Compose,
+    fallback as Fallback,
+    parallel as Parallel,
+    pipe as Pipe,
 )
-from fp_ops.operator import constant, identity
-
-Compose = compose
-Fallback = fallback
-Parallel = parallel
-Pipe = pipe
-Sequence = sequence
-Identity = identity
-Constant = constant
-
-Transform = transform
-Map = map
-Filter = filter
-Reduce = reduce
-Zip = zip
-FlatMap = flat_map
-GroupBy = group_by
-Partition = partition
-First = first
-Last = last
-Gather = gather_operations
-
-
-
+from fp_ops.operator import (
+    constant as Constant,
+    identity as Identity,
+)
+from fp_ops.sequences import (
+    map as Map,
+    filter as Filter,
+    reduce as Reduce,
+    zip as Zip,
+    contains as Contains,
+    not_contains as NotContains,
+    flatten as Flatten,
+    flatten_deep as FlattenDeep,
+    unique as Unique,
+    reverse as Reverse,
+    length as Length,
+    keys as Keys,
+    values as Values,
+    items as Items,
+)
 
 __all__ = [
+    # Composition operations
     "Compose",
     "Fallback",
     "Parallel",
     "Pipe",
-    "Sequence",
     "Identity",
     "Constant",
+    # Sequence operations
     "Map",
     "Filter",
     "Reduce",
     "Zip",
-    "FlatMap",
-    "GroupBy",
-    "Partition",
-    "First",
-    "Last",
-    "Gather",
+    "Contains",
+    "NotContains",
+    "Flatten",
+    "FlattenDeep",
+    "Unique",
+    "Reverse",
+    "Length",
+    "Keys",
+    "Values",
+    "Items",
 ]

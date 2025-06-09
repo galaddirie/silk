@@ -122,14 +122,14 @@ pydantic = ["pydantic (>=2.6.2,<3.0.0)"]
 
 [[package]]
 name = "fp-ops"
-version = "0.2.5"
+version = "0.2.11"
 description = "an ergonomic wrapper around the expression library"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "fp_ops-0.2.5-py3-none-any.whl", hash = "sha256:9b9e0ef5bf1276ded445f93f8bed66b374df629bc8f104c9990ad26fc175cfde"},
-    {file = "fp_ops-0.2.5.tar.gz", hash = "sha256:212435ded25b4d176f27c55a760b902b7afb450db065422d96f48e6b9e44e043"},
+    {file = "fp_ops-0.2.11-py3-none-any.whl", hash = "sha256:cb5202778716ff1c6c6dc36cace6c9d76c58d77a31336d6d3c92d7fab3bb1717"},
+    {file = "fp_ops-0.2.11.tar.gz", hash = "sha256:38642448d5b0d8b854877290ed0978cf2f713f59fd646fd4c61eed0ac45d143b"},
 ]
 
 [package.dependencies]
