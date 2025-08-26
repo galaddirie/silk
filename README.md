@@ -60,6 +60,54 @@ purchase_flow = get_product >> purchase_product
 purchase_flow(context=context)
 ```
 
+### Developer Experience
+ Actions are type safe operations (Operation[In, Out]), all you need to do is describe the shape, Silk does the work. Actions are values, fields resolve in parallel, and models build themselves
+```python
+class BookDetails(BaseModel):
+    title: str
+    price: str
+
+extract_book_details = build({ # Build pydantic classes, dataclasses, or plain dict objects
+    "title": GetAttribute("h3 > a", attribute="title"),
+    "price": GetText("p.price_color"),
+}, BookDetails)
+
+pipeline: Operation[[ElementHandle], List[BookDetails]] = (
+    Navigate("https://books.toscrape.com/")  # load the page
+    >> QueryAll("article.product_pod")       # returns List[ElementHandle]
+    >> Map(extract_book_details) 
+)
+```
+Why it feels great
+
+- Actions as values: Drop actions directly into an object; no glue code or lambdas.
+- Parallel fields: Independent fields resolve concurrently, so pages feel snappy.
+- Schema-first: Target Pydantic/dataclasses for instant validation and IDE hints.
+
+Silk also provide easy to utlities, for example Selector groups for handling selector fallbacks:
+```python
+from silk.selectors.selector import SelectorGroup, css, xpath
+
+title_sel = SelectorGroup(
+    "book_title",
+    css("h3 > a[title]"),
+    css(".product_pod h3 a"),
+    xpath("//article[contains(@class,'product_pod')]//h3/a")
+)
+
+price_sel = SelectorGroup(
+    "book_price",
+    css("p.price_color"),
+    css(".price_color"),
+    xpath("//p[contains(@class,'price')]")
+)
+
+extract_book_details = build({
+    # Try attribute first; fall back to text if missing
+    "title": GetAttribute(title_sel, "title"),
+    "price": GetText(price_sel),
+}, BookDetails)
+```
 ### Declarative API
 
 Silk embraces **declarative programming** that focuses on **what** to accomplish, not **how**:
