@@ -20,7 +20,7 @@ Silk enables you to craft elegant, resilient scrapers with true functional progr
 ## Key Features
 
 - **Railway-Oriented Programming**: Honest error handling with errors as values.
-- **Immutable Data Flow**: Thread-safe operations with predictable behavior
+- **Immutable Data Flow**: Thread-safe operations with predictable behavior.
 - **Resilient by Design**: Built-in retry mechanisms and fallback selectors
 - **Browser Agnostic**: Unified API across Playwright, Selenium, and other automation tools
 - **Parallelization**: Run operations concurrently with simple `&` composition
