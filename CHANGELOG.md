@@ -1,5 +1,60 @@
 # Changelog
 
+## [0.4.0] - 2026-08-09
+
+This is a breaking pre-1.0 release. Version 0.3.1 on PyPI and the `v0.3.1`
+tag remain the immutable legacy ActionContext/callable/binary-`&` release;
+the redesigned package begins at 0.4.0.
+
+### Added
+- Add typed unary browser-action templates built on the exact `fp-ops==0.3.1`
+  contract: every action has one explicit input selected by `fp_ops._`, and
+  pipelines compose with `.then(...)` before running one focus value.
+- Add explicit typed environment capabilities for the browser driver, session
+  identity, and browser options, separate from changing page, context, and
+  element focus values.
+- Add frozen, action-specific options and deeply immutable browser-context
+  configuration values whose caller-owned inputs are snapshotted at operation
+  construction.
+- Add explicit missing-element and missing-attribute errors while preserving
+  original browser exceptions through traversal and object-construction error
+  wrappers.
+- Add truthfully named fail-fast, all-settled, lossy, retry, bounded-parallel,
+  and browser-cleanup policies with inspectable failure causes.
+
+### Changed
+- Replace hidden mutable browser focus with ordinary typed pipeline inputs and
+  outputs; stable capabilities flow through a read-only FP-Ops environment.
+- Define shared-driver concurrency explicitly: parallel branches reuse the
+  same driver capability, preserve declaration-order results, and use joined
+  best-effort cancellation on fail-fast paths.
+- Harden browser lifecycle and registry cleanup across ordinary exceptions and
+  cancellation, including partial startup and close failures.
+- Gate the supported interface with strict mypy and Pyright checks, local and
+  live Playwright coverage, the real Books to Scrape pipeline, package-content
+  inspection, and an isolated installed-wheel browser smoke.
+- Publish as `silk-scraper==0.4.0` so installers cannot be silently left on the
+  immutable legacy 0.3.1 distribution.
+- Make Playwright the ordinary runtime adapter dependency, retain the exact
+  `fp-ops==0.3.1` contract, and declare the bounded `typing-extensions`
+  dependency used by Silk's public type surface.
+- Make `BrowserSession` the sole browser-lifecycle owner; it selects its
+  private Playwright implementation and exposes only focus and capabilities.
+
+### Removed
+- Remove the legacy `ActionContext` execution model, callable action objects,
+  binary `&` composition, hidden-focus helpers, and the compatibility modules
+  `silk.composition`, `silk.flow`, `silk.objects`, `silk.operation`,
+  `silk.placeholder`, `silk.text`, `silk.utils`, and `silk.actions.utils`.
+- Remove compatibility call forms that appended configuration at runtime or
+  accepted ambiguous/multiple placeholders.
+- Remove the public `Driver`/`PlaywrightDriver` lifecycle types and the
+  caller-injectable `BrowserSession(driver_class=...)` ownership escape.
+- Remove the unsupported Patchright and redundant Playwright/`all` extras, the
+  unused Pydantic dependencies, and Silk's redundant direct dependency on
+  `expression`; FP-Ops remains the public source of `Result`, `Ok`, and
+  `Error`.
+
 ## [0.3.1] - 2025-06-08
 
 ### Added
@@ -79,7 +134,7 @@
 - Module restructuring:
   - Moved extraction actions from `silk.actions.extraction` to `silk.actions.elements`
   - Moved flow control functions from `silk.actions.flow` to `silk.flow`
-  - Moved composition functions from `silk.actions.composition` to `silk.composition` 
+  - Moved composition functions from `silk.actions.composition` to `silk.composition`
   - Moved browser options from `silk.models.browser` to `silk.browsers.types`
 - Changed execution model to explicitly use contexts: `action(context)` instead of `action(manager)`
 - Improved error handling with more detailed error types

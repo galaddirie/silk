@@ -1,56 +1,68 @@
+"""Scrape the public Books to Scrape catalogue through Silk's public API."""
+
+from __future__ import annotations
+
 import asyncio
-from typing import List
-from pydantic import BaseModel
+from dataclasses import dataclass
 
+from fp_ops import Operation, _, build, traverse
+
+from silk.actions.elements import (
+    ElementScope,
+    GetText,
+    QueryAll,
+    RequireAttribute,
+)
 from silk.actions.navigation import Navigate
-from silk.actions.elements  import QueryAll, GetText, GetAttribute
-from silk.browsers.drivers.playwright import PlaywrightDriver
-from silk.browsers.models   import BrowserOptions, ElementHandle, ActionContext
+from silk.browsers.models import BrowserOptions, Page
 from silk.browsers.sessions import BrowserSession
-from silk.objects import build
-from silk.composition import Map
-from silk import Operation
+
+BOOKS_URL = "https://books.toscrape.com/"
 
 
-class BookDetails(BaseModel):
+@dataclass(frozen=True, slots=True)
+class Book:
+    """One immutable catalogue record."""
+
     title: str
     price: str
 
-extract_book_details = build({
-    "title": GetAttribute("h3 > a", attribute="title"),
-    "price": GetText("p.price_color"),
-}, BookDetails)
 
-pipeline: Operation[[ElementHandle], List[BookDetails]] = (
-    Navigate("https://books.toscrape.com/")  # load the page
-    >> QueryAll("article.product_pod")       # returns List[ElementHandle]
-    >> Map(extract_book_details) 
+extract_book = build(
+    {
+        "title": RequireAttribute("h3 > a", _, attribute="title"),
+        "price": GetText("p.price_color", _),
+    },
+    Book,
 )
 
+books_pipeline = (
+    Navigate(_, BOOKS_URL)
+    .then(QueryAll("article.product_pod", _))
+    .then(traverse(extract_book))
+)
+
+
+async def scrape_books() -> list[Book]:
+    """Run the pipeline with explicit page focus and session capabilities."""
+
+    options = BrowserOptions(headless=True)
+    async with BrowserSession(options=options) as session:
+        result = await books_pipeline.run(
+            session.page,
+            environment=session.environment,
+        )
+        if result.is_error():
+            raise result.error
+        return result.ok
+
+
 async def main() -> None:
-    opts = BrowserOptions(
-        headless=False,
-        browser_type="chromium",
-        viewport_width=1280,
-        viewport_height=800,
-    )
+    books = await scrape_books()
+    print(f"Found {len(books)} books")
+    for book in books:
+        print(f"{book.title} — {book.price}")
 
-    async with BrowserSession(options=opts, driver_class=PlaywrightDriver) as ctx:
-        print("Starting scraper for books.toscrape.com…")
-        result = await pipeline(context=ctx).execute()
-
-        books = result.default_value([])
-        if not books:
-            print("No books found.")
-            return
-
-        print(f"Found {len(books)} books:")
-
-        for idx, book in enumerate(books, 1):
-            if isinstance(book, BookDetails):
-                print(f"  {idx:2}. {book.title} — {book.price}")
-            else:
-                print(f"  {idx:2}. {book}")
 
 if __name__ == "__main__":
     asyncio.run(main())

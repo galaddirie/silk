@@ -1,60 +1,48 @@
-"""
-Browser automation module for silk.
+"""Nominal browser focus, session lifecycle, and immutable configuration."""
 
-This module provides a unified interface for browser automation
-using different browser drivers.
-"""
-
+from silk.browsers.capabilities import (
+    BROWSER_OPTIONS,
+    BROWSER_SESSION,
+    DRIVER,
+    BrowserDriverCapability,
+    BrowserOptionsCapability,
+    BrowserSessionInfo,
+    BrowserSessionNotStartedError,
+)
 from silk.browsers.models import (
-    ActionContext,
-    ActionOptions,
-    BaseInputOptions,
     BrowserContext,
+    BrowserContextOptions,
+    BrowserFocus,
+    BrowserHttpHeaders,
+    BrowserLaunchProxy,
     BrowserOptions,
-    CoordinateType,
-    DragOptions,
-    Driver,
+    BrowserProxy,
+    BrowserViewport,
     ElementHandle,
     KeyModifier,
-    MouseButton,
-    MouseButtonLiteral,
-    MouseOptions,
-    NavigationOptions,
-    NavigationWaitLiteral,
     Page,
-    PointerEventType,
-    RetryOptions,
-    SelectOptions,
-    TypeOptions,
-    WaitOptions,
-    WaitStateLiteral,
-    WaitUntilOptions,
 )
-from silk.browsers.sessions import BrowserSession
+from silk.browsers.sessions import BrowserSession, BrowserSessionCleanupError
 
 __all__ = [
-    "ActionContext",
-    "ActionOptions",
-    "BaseInputOptions",
+    "BROWSER_OPTIONS",
+    "BROWSER_SESSION",
+    "DRIVER",
     "BrowserContext",
+    "BrowserContextOptions",
+    "BrowserDriverCapability",
+    "BrowserFocus",
+    "BrowserHttpHeaders",
+    "BrowserLaunchProxy",
     "BrowserOptions",
+    "BrowserOptionsCapability",
+    "BrowserProxy",
     "BrowserSession",
-    "CoordinateType",
-    "DragOptions",
-    "Driver",
+    "BrowserSessionCleanupError",
+    "BrowserSessionInfo",
+    "BrowserSessionNotStartedError",
+    "BrowserViewport",
     "ElementHandle",
     "KeyModifier",
-    "MouseButton",
-    "MouseButtonLiteral",
-    "MouseOptions",
-    "NavigationOptions",
-    "NavigationWaitLiteral",
     "Page",
-    "PointerEventType",
-    "RetryOptions",
-    "SelectOptions",
-    "TypeOptions",
-    "WaitOptions",
-    "WaitStateLiteral",
-    "WaitUntilOptions",
 ]

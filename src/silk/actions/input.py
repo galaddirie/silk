@@ -1,563 +1,522 @@
+"""Typed input actions with explicit element and page focus.
+
+Every public symbol is a construction-time FP-Ops template.  A caller chooses
+one semantic positional operand as the unary pipeline input by placing ``_``
+there; all other operands are snapshotted when the operation is constructed.
+
+Coordinate clicks are intentionally not synthesized from move/down/up calls:
+that sequence cannot provide atomic browser click semantics or safely recover
+from a partial failure. Use :func:`Click` with an element target instead.
 """
-Input actions for interacting with elements via mouse or keyboard in the browser.
-"""
 
-import logging
-from typing import Any, List, Optional, Tuple, TypeVar, Union
+from __future__ import annotations
 
-from expression import Error, Ok, Result
-from fp_ops import operation
+from dataclasses import dataclass
+from typing import Self, final
 
-from silk.actions.utils import get_element_coordinates, resolve_target, validate_driver
+from fp_ops import Error, Ok, Result, result_operation_template
+from typing_extensions import TypeIs
+
+from silk.actions._scope import (
+    Element,
+    ElementScope,
+    ElementTarget,
+    require_target,
+)
 from silk.browsers.models import (
-    DragOptions,
+    CoordinateType,
     KeyModifier,
     MouseButtonLiteral,
-    MouseOptions,
-    SelectOptions,
-    TypeOptions,
-    ActionContext,
-    ElementHandle,
+    Page,
 )
-from silk.selectors.selector import Selector, SelectorGroup
 
-logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
+InputPage = Page
 
 
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
-async def MouseMove(
-    target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
-    offset_x: int = 0,
-    offset_y: int = 0,
-    options: Optional[MouseOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to move the mouse to an element or specific coordinates
+class _ImmutableInputConfiguration:
+    """Identity-preserving copy policy for frozen input configuration."""
 
-    Args:
-        target: Target selector, element, or coordinates
-        offset_x: X offset from target
-        offset_y: Y offset from target
-        options: Additional movement options
-    """
-    context: ActionContext = kwargs["context"]
+    __slots__ = ()
 
-    try:
-        driver_result = await validate_driver(context)
-        if driver_result.is_error():
-            return Error(driver_result.error)
-        driver = driver_result.default_value(None)
-        if driver is None:
-            return Error(Exception("No browser driver found"))
+    def __copy__(self) -> Self:
+        return self
 
-        if isinstance(target, tuple) and len(target) == 2:
-            x_float, y_float = float(target[0]), float(target[1])
-        else:
-            element_result = await resolve_target(context, target)
-            element = element_result.default_value(None)
-            if element is None:
-                return Error(Exception("Target not found"))
-
-            coords_result = await get_element_coordinates(element)
-            if coords_result.is_error():
-                return Error(coords_result.error)
-
-            x_float, y_float = coords_result.default_value((0.0, 0.0))
-
-            x_float += offset_x
-            y_float += offset_y
-
-        if context.page_id is not None:
-            await driver.mouse_move(context.page_id, x_float, y_float)
-            return Ok(None)
-        else:
-            return Error(Exception("No page ID found"))
-    except Exception as e:
-        return Error(e)
+    def __deepcopy__(self, memo: dict[int, object]) -> Self:
+        memo[id(self)] = self
+        return self
 
 
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
+def _validate_optional_non_negative_integer(
+    value: object,
+    name: str,
+) -> None:
+    if value is None:
+        return
+    if type(value) is not int:
+        raise TypeError(f"{name} must be an integer or None")
+    if value < 0:
+        raise ValueError(f"{name} must be non-negative")
+
+
+def _validate_button(button: object) -> None:
+    if type(button) is not str:
+        raise TypeError("button must be a string")
+    if button not in ("left", "middle", "right"):
+        raise ValueError("button must be left, middle, or right")
+
+
+def _validate_boolean(value: object, name: str) -> None:
+    if type(value) is not bool:
+        raise TypeError(f"{name} must be a boolean")
+
+
+def _is_exact_object_tuple(value: object) -> TypeIs[tuple[object, ...]]:
+    return type(value) is tuple
+
+
+def _validate_modifiers(modifiers: object) -> None:
+    if not _is_exact_object_tuple(modifiers):
+        raise TypeError("modifiers must be an immutable tuple")
+    for modifier in modifiers:
+        if type(modifier) is not KeyModifier:
+            raise TypeError("modifiers must contain KeyModifier values")
+    if KeyModifier.NONE in modifiers:
+        raise ValueError("KeyModifier.NONE is not an active modifier")
+    if len(set(modifiers)) != len(modifiers):
+        raise ValueError("modifiers must not contain duplicates")
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class ClickOptions(_ImmutableInputConfiguration):
+    """Immutable configuration implemented by a native element click."""
+
+    timeout_ms: int | None = None
+    button: MouseButtonLiteral = "left"
+    modifiers: tuple[KeyModifier, ...] = ()
+    delay_ms: int | None = None
+    click_count: int = 1
+    force: bool = False
+
+    def __post_init__(self) -> None:
+        _validate_optional_non_negative_integer(self.timeout_ms, "timeout_ms")
+        _validate_button(self.button)
+        _validate_modifiers(self.modifiers)
+        _validate_optional_non_negative_integer(self.delay_ms, "delay_ms")
+        if type(self.click_count) is not int:
+            raise TypeError("click_count must be an integer")
+        if self.click_count < 1:
+            raise ValueError("click_count must be positive")
+        _validate_boolean(self.force, "force")
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class DoubleClickOptions(_ImmutableInputConfiguration):
+    """Immutable configuration implemented by a native double click."""
+
+    timeout_ms: int | None = None
+    button: MouseButtonLiteral = "left"
+    modifiers: tuple[KeyModifier, ...] = ()
+    delay_ms: int | None = None
+    force: bool = False
+
+    def __post_init__(self) -> None:
+        _validate_optional_non_negative_integer(self.timeout_ms, "timeout_ms")
+        _validate_button(self.button)
+        _validate_modifiers(self.modifiers)
+        _validate_optional_non_negative_integer(self.delay_ms, "delay_ms")
+        _validate_boolean(self.force, "force")
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class FillOptions(_ImmutableInputConfiguration):
+    """Configuration for replacement input, including an optional clear event."""
+
+    timeout_ms: int | None = None
+    clear: bool = False
+
+    def __post_init__(self) -> None:
+        _validate_optional_non_negative_integer(self.timeout_ms, "timeout_ms")
+        _validate_boolean(self.clear, "clear")
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class TypeTextOptions(_ImmutableInputConfiguration):
+    """Configuration for incremental text input."""
+
+    timeout_ms: int | None = None
+    delay_ms: int | None = None
+
+    def __post_init__(self) -> None:
+        _validate_optional_non_negative_integer(self.timeout_ms, "timeout_ms")
+        _validate_optional_non_negative_integer(self.delay_ms, "delay_ms")
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class DragOptions(_ImmutableInputConfiguration):
+    """Immutable element-to-element drag configuration."""
+
+    steps: int = 1
+    move_to_center: bool = True
+    position_offset: CoordinateType | None = None
+    source_offset: CoordinateType | None = None
+    target_offset: CoordinateType | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.steps) is not int:
+            raise TypeError("drag steps must be an integer")
+        if self.steps < 1:
+            raise ValueError("drag steps must be positive")
+        _validate_boolean(self.move_to_center, "move_to_center")
+        _validate_optional_coordinate(self.position_offset, "position_offset")
+        _validate_optional_coordinate(self.source_offset, "source_offset")
+        _validate_optional_coordinate(self.target_offset, "target_offset")
+
+
+def _validate_optional_coordinate(value: object, name: str) -> None:
+    if value is None:
+        return
+    if not _is_exact_object_tuple(value):
+        raise TypeError(f"{name} must be a tuple of two integers or None")
+    if len(value) != 2:
+        raise ValueError(f"{name} must contain exactly two integers")
+    if type(value[0]) is not int or type(value[1]) is not int:
+        raise TypeError(f"{name} must contain exactly two integers")
+
+
+def _retain_element(
+    element: Element,
+    effect: Result[None, Exception],
+) -> Result[Element, Exception]:
+    if effect.is_error():
+        return Error(effect.error)
+    return Ok(element)
+
+
+def _retain_page(
+    page: InputPage,
+    effect: Result[None, Exception],
+) -> Result[InputPage, Exception]:
+    if effect.is_error():
+        return Error(effect.error)
+    return Ok(page)
+
+
+@result_operation_template
 async def Click(
-    target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
-    options: Optional[MouseOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to click an element
+    target: ElementTarget,
+    scope: ElementScope,
+    *,
+    options: ClickOptions | None = None,
+) -> Result[Element, Exception]:
+    """Click a target and make the acted-on element the next focus."""
 
-    Args:
-        target: Target selector, element, or coordinates
-        options: Additional click options
-    """
-    context: ActionContext = kwargs["context"]
-
-    driver_result = await validate_driver(context)
-    if driver_result.is_error():
-        return Error(driver_result.error)
-    driver = driver_result.default_value(None)
-    if driver is None:
-        return Error(Exception("No browser driver found"))
-
-    try:
-        if isinstance(target, tuple) and len(target) == 2:
-            x_int, y_int = int(target[0]), int(target[1])
-            if context.page_id is not None:
-                await driver.mouse_move(context.page_id, x_int, y_int)
-                await driver.mouse_click(context.page_id, "left", options)
-                return Ok(None)
-            else:
-                return Error(Exception("No page ID found"))
-
-        element_result = await resolve_target(context, target)
-        if element_result.is_error():
-            return Error(element_result.error)
-
-        element = element_result.default_value(None)
-        if element is None:
-            return Error(Exception("Target not found"))
-
-        selector = element.get_selector()
-        if not selector:
-            return Error(Exception("Target has no selector"))
-
-        if context.page_id is not None:
-            await driver.click(context.page_id, selector, options)
-            return Ok(None)
-        else:
-            return Error(Exception("No page ID found"))
-    except Exception as e:
-        return Error(e)
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    element = element_result.ok
+    configured = options if options is not None else ClickOptions()
+    return _retain_element(
+        element,
+        await element.click(
+            timeout_ms=configured.timeout_ms,
+            button=configured.button,
+            modifiers=configured.modifiers,
+            delay_ms=configured.delay_ms,
+            click_count=configured.click_count,
+            force=configured.force,
+        ),
+    )
 
 
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
+@result_operation_template
 async def DoubleClick(
-    target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
-    options: Optional[MouseOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to double-click an element
+    target: ElementTarget,
+    scope: ElementScope,
+    *,
+    options: DoubleClickOptions | None = None,
+) -> Result[Element, Exception]:
+    """Double-click a target and make the acted-on element the next focus."""
 
-    Args:
-        target: Target selector, element, or coordinates
-        options: Additional click options
-    """
-    context: ActionContext = kwargs["context"]
-
-    driver_result = await validate_driver(context)
-    if driver_result.is_error():
-        return Error(driver_result.error)
-    driver = driver_result.default_value(None)
-    if driver is None:
-        return Error(Exception("No browser driver found"))
-
-    try:
-        if isinstance(target, tuple) and len(target) == 2:
-            x_int, y_int = int(target[0]), int(target[1])
-            if context.page_id is not None:
-                await driver.mouse_move(context.page_id, x_int, y_int, options)
-                await driver.mouse_double_click(context.page_id, x_int, y_int, options)
-                return Ok(None)
-            else:
-                return Error(Exception("No page ID found"))
-
-        element_result = await resolve_target(context, target)
-        if element_result.is_error():
-            return Error(element_result.error)
-
-        element = element_result.default_value(None)
-        if element is None:
-            return Error(Exception("Target not found"))
-
-        selector = element.get_selector()
-        if not selector:
-            return Error(Exception("Target has no selector"))
-
-        if context.page_id is not None:
-            await driver.double_click(context.page_id, selector, options)
-            return Ok(None)
-        else:
-            return Error(Exception("No page ID found"))
-    except Exception as e:
-        return Error(e)
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    element = element_result.ok
+    configured = options if options is not None else DoubleClickOptions()
+    return _retain_element(
+        element,
+        await element.double_click(
+            timeout_ms=configured.timeout_ms,
+            button=configured.button,
+            modifiers=configured.modifiers,
+            delay_ms=configured.delay_ms,
+            force=configured.force,
+        ),
+    )
 
 
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
-async def MouseDown(
-    button: MouseButtonLiteral = "left",
-    options: Optional[MouseOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to press a mouse button
-
-    Args:
-        button: Mouse button to press
-        options: Additional mouse options
-    """
-    context: ActionContext = kwargs["context"]
-
-    try:
-        driver_result = await validate_driver(context)
-        if driver_result.is_error():
-            return Error(driver_result.error)
-        driver = driver_result.default_value(None)
-        if driver is None:
-            return Error(Exception("No browser driver found"))
-
-        if context.page_id is not None:
-            await driver.mouse_down(context.page_id, button, options)
-        else:
-            return Error(Exception("No page ID found"))
-
-        return Ok(None)
-    except Exception as e:
-        return Error(e)
-
-
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
-async def MouseUp(
-    button: MouseButtonLiteral = "left",
-    options: Optional[MouseOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to release a mouse button
-
-    Args:
-        button: Mouse button to release
-        options: Additional mouse options
-    """
-    context: ActionContext = kwargs["context"]
-
-    try:
-        driver_result = await validate_driver(context)
-        if driver_result.is_error():
-            return Error(driver_result.error)
-        driver = driver_result.default_value(None)
-        if driver is None:
-            return Error(Exception("No browser driver found"))
-
-        if context.page_id is not None:
-            await driver.mouse_up(context.page_id, button, options)
-        else:
-            return Error(Exception("No page ID found"))
-
-        return Ok(None)
-    except Exception as e:
-        return Error(e)
-
-
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
-async def Drag(
-    source: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
-    target: Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]],
-    options: Optional[DragOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to drag from one element/position to another
-
-    Args:
-        source: Source element or position
-        target: Target element or position
-        options: Additional drag options
-    """
-    context: ActionContext = kwargs["context"]
-
-    try:
-        driver_result = await validate_driver(context)
-        if driver_result.is_error():
-            return Error(driver_result.error)
-        driver = driver_result.default_value(None)
-        if driver is None:
-            return Error(Exception("No browser driver found"))
-
-        if isinstance(source, tuple) and len(source) == 2:
-            source_x, source_y = int(source[0]), int(source[1])
-        else:
-            source_element_result = await resolve_target(context, source)
-            if source_element_result.is_error():
-                return Error(source_element_result.error)
-
-            source_element = source_element_result.default_value(None)
-            if source_element is None:
-                return Error(Exception("Source not found"))
-
-            source_coords = await get_element_coordinates(source_element)
-            if source_coords.is_error():
-                return Error(source_coords.error)
-
-            source_x_float, source_y_float = source_coords.default_value((0.0, 0.0))
-            source_x, source_y = int(source_x_float), int(source_y_float)
-
-        if isinstance(target, tuple) and len(target) == 2:
-            target_x, target_y = int(target[0]), int(target[1])
-        else:
-            target_element_result = await resolve_target(context, target)
-            if target_element_result.is_error():
-                return Error(target_element_result.error)
-
-            target_element = target_element_result.default_value(None)
-            if target_element is None:
-                return Error(Exception("Target not found"))
-
-            target_coords = await get_element_coordinates(target_element)
-            if target_coords.is_error():
-                return Error(target_coords.error)
-
-            target_x_float, target_y_float = target_coords.default_value((0.0, 0.0))
-            target_x, target_y = int(target_x_float), int(target_y_float)
-
-        if context.page_id is not None:
-            await driver.mouse_drag(
-                context.page_id, (source_x, source_y), (target_x, target_y), options
-            )
-            return Ok(None)
-        else:
-            return Error(Exception("No page ID found"))
-    except Exception as e:
-        return Error(e)
-
-
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
+@result_operation_template
 async def Fill(
-    target: Union[str, Selector, SelectorGroup, ElementHandle],
+    target: ElementTarget,
     text: str,
-    options: Optional[TypeOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to fill an input field with text
+    scope: ElementScope,
+    *,
+    options: FillOptions | None = None,
+) -> Result[Element, Exception]:
+    """Replace a target's value and make the acted-on element the next focus."""
 
-    Args:
-        target: Target input element
-        text: Text to input
-        options: Additional typing options
-    """
-    context: ActionContext = kwargs["context"]
-
-    driver_result = await validate_driver(context)
-    if driver_result.is_error():
-        return Error(driver_result.error)
-    driver = driver_result.default_value(None)
-    if driver is None:
-        return Error(Exception("No browser driver found"))
-
-    if context.page_id is None:
-        return Error(Exception("No page ID found"))
-
-    try:
-        element_result = await resolve_target(context, target)
-        if element_result.is_error():
-            return Error(element_result.error)
-
-        element = element_result.default_value(None)
-        if element is None:
-            return Error(Exception("Target not found"))
-
-        selector = element.get_selector()
-        if not selector:
-            return Error(Exception("Target has no selector"))
-
-        await driver.fill(context.page_id, selector, text, options)
-        return Ok(None)
-    except Exception as e:
-        return Error(e)
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    element = element_result.ok
+    configured = options if options is not None else FillOptions()
+    return _retain_element(
+        element,
+        await element.fill(
+            text,
+            timeout_ms=configured.timeout_ms,
+            clear=configured.clear,
+        ),
+    )
 
 
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
-async def Type(
-    target: Union[str, Selector, SelectorGroup, ElementHandle],
+@result_operation_template
+async def TypeText(
+    target: ElementTarget,
     text: str,
-    options: Optional[TypeOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to type text (alias for Fill with more intuitive name)
+    scope: ElementScope,
+    *,
+    options: TypeTextOptions | None = None,
+) -> Result[Element, Exception]:
+    """Type into a target and make the acted-on element the next focus."""
 
-    Args:
-        target: Target input element
-        text: Text to type
-        options: Additional typing options
-    """
-    context: ActionContext = kwargs["context"]
-
-    driver_result = await validate_driver(context)
-    if driver_result.is_error():
-        return Error(driver_result.error)
-    driver = driver_result.default_value(None)
-    if driver is None:
-        return Error(Exception("No browser driver found"))
-
-    try:
-        element_result = await resolve_target(context, target)
-        if element_result.is_error():
-            return Error(element_result.error)
-
-        element = element_result.default_value(None)
-        if element is None:
-            return Error(Exception("Target not found"))
-
-        selector = element.get_selector()
-        if not selector:
-            return Error(Exception("Target has no selector"))
-
-        if context.page_id is not None:
-            await driver.type(context.page_id, selector, text, options)
-            return Ok(None)
-        else:
-            return Error(Exception("No page ID found"))
-    except Exception as e:
-        return Error(e)
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    element = element_result.ok
+    configured = options if options is not None else TypeTextOptions()
+    return _retain_element(
+        element,
+        await element.type(
+            text,
+            timeout_ms=configured.timeout_ms,
+            delay_ms=configured.delay_ms,
+        ),
+    )
 
 
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
+@result_operation_template
+async def SelectValue(
+    target: ElementTarget,
+    value: str,
+    scope: ElementScope,
+) -> Result[Element, Exception]:
+    """Select by option value and retain the acted-on element."""
+
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    element = element_result.ok
+    return _retain_element(element, await element.select(value=value))
+
+
+@result_operation_template
+async def SelectText(
+    target: ElementTarget,
+    text: str,
+    scope: ElementScope,
+) -> Result[Element, Exception]:
+    """Select by visible option text and retain the acted-on element."""
+
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    element = element_result.ok
+    return _retain_element(element, await element.select(text=text))
+
+
+@result_operation_template
+async def ScrollIntoView(
+    target: ElementTarget,
+    scope: ElementScope,
+) -> Result[Element, Exception]:
+    """Scroll a target into view and make that element the next focus."""
+
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    element = element_result.ok
+    return _retain_element(element, await element.scroll_into_view())
+
+
+@result_operation_template
+async def MouseMove(
+    position: CoordinateType,
+    page: InputPage,
+    *,
+    steps: int = 1,
+) -> Result[InputPage, Exception]:
+    """Move the pointer to page coordinates and retain page focus."""
+
+    if steps < 1:
+        return Error(ValueError("mouse_move steps must be positive"))
+    x, y = position
+    return _retain_page(
+        page,
+        await page.mouse_move(x, y, steps=steps),
+    )
+
+
+@result_operation_template
+async def MouseMoveTo(
+    target: ElementTarget,
+    scope: ElementScope,
+    *,
+    offset: CoordinateType = (0, 0),
+    center: bool = True,
+    steps: int = 1,
+) -> Result[Element, Exception]:
+    """Move to an element-relative point and retain that element as focus."""
+
+    if steps < 1:
+        return Error(ValueError("mouse_move_to steps must be positive"))
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    element = element_result.ok
+
+    moved = await element.move_pointer_to(
+        offset=offset,
+        center=center,
+        steps=steps,
+    )
+    return _retain_element(element, moved)
+
+
+@result_operation_template
+async def MouseDown(
+    page: InputPage,
+    *,
+    button: MouseButtonLiteral = "left",
+) -> Result[InputPage, Exception]:
+    """Press a configured mouse button and retain page focus."""
+
+    return _retain_page(page, await page.mouse_down(button=button))
+
+
+@result_operation_template
+async def MouseUp(
+    page: InputPage,
+    *,
+    button: MouseButtonLiteral = "left",
+) -> Result[InputPage, Exception]:
+    """Release a configured mouse button and retain page focus."""
+
+    return _retain_page(page, await page.mouse_up(button=button))
+
+
+@result_operation_template
 async def KeyPress(
     key: str,
-    modifiers: Optional[List[KeyModifier]] = None,
-    options: Optional[TypeOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
+    page: InputPage,
+    *,
+    delay_ms: int | None = None,
+) -> Result[InputPage, Exception]:
+    """Press a key and retain page focus."""
+
+    if delay_ms is not None and delay_ms < 0:
+        return Error(ValueError("key_press delay_ms must be non-negative"))
+    return _retain_page(
+        page,
+        await page.key_press(key, delay_ms=delay_ms),
+    )
+
+
+@result_operation_template
+async def KeyDown(
+    key: str,
+    page: InputPage,
+) -> Result[InputPage, Exception]:
+    """Hold a key down and retain page focus."""
+
+    return _retain_page(page, await page.key_down(key))
+
+
+@result_operation_template
+async def KeyUp(
+    key: str,
+    page: InputPage,
+) -> Result[InputPage, Exception]:
+    """Release a held key and retain page focus."""
+
+    return _retain_page(page, await page.key_up(key))
+
+
+@result_operation_template
+async def ScrollTo(
+    position: CoordinateType,
+    page: InputPage,
+) -> Result[InputPage, Exception]:
+    """Scroll to page coordinates and retain page focus."""
+
+    x, y = position
+    return _retain_page(page, await page.scroll(x=x, y=y))
+
+
+@result_operation_template
+async def Drag(
+    source: Element,
+    target: Element,
+    *,
+    options: DragOptions | None = None,
+) -> Result[Element, Exception]:
+    """Drag ``source`` to ``target`` and retain the source as focus.
+
+    Both endpoints must be live handles owned by the same driver and page.
+    Bounding-box and pointer errors are returned unchanged.  Coordinates use
+    each element's top-left corner unless ``move_to_center`` is enabled; the
+    common ``position_offset`` and endpoint-specific offsets are then applied.
     """
-    Action to press a key or key combination
 
-    Args:
-        key: Key or key combination to press
-        modifiers: List of keyboard modifiers to apply
-        options: Additional key press options
-    """
-    context: ActionContext = kwargs["context"]
-
-    try:
-        driver_result = await validate_driver(context)
-        if driver_result.is_error():
-            return Error(driver_result.error)
-        driver = driver_result.default_value(None)
-        if driver is None:
-            return Error(Exception("No browser driver found"))
-
-        actual_options: Optional[TypeOptions] = None
-
-        if modifiers is not None:
-            actual_options = TypeOptions(modifiers=modifiers)
-        else:
-            actual_options = options
-
-        if context.page_id is not None:
-            await driver.key_press(context.page_id, key, actual_options)
-        else:
-            return Error(Exception("No page ID found"))
-
-        return Ok(None)
-    except Exception as e:
-        return Error(e)
+    configured = options if options is not None else DragOptions()
+    dragged = await source.drag_to(
+        target,
+        steps=configured.steps,
+        move_to_center=configured.move_to_center,
+        position_offset=configured.position_offset,
+        source_offset=configured.source_offset,
+        target_offset=configured.target_offset,
+    )
+    if dragged.is_error():
+        return Error(dragged.error)
+    return Ok(source)
 
 
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
-async def Select(
-    target: Union[str, Selector, SelectorGroup, ElementHandle],
-    value: Optional[str] = None,
-    text: Optional[str] = None,
-    options: Optional[SelectOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to select an option from a dropdown
-
-    Args:
-        target: Target select element
-        value: Option value to select
-        text: Option text to select (alternative to value)
-        options: Additional select options
-    """
-    context: ActionContext = kwargs["context"]
-
-    driver_result = await validate_driver(context)
-    if driver_result.is_error():
-        return Error(driver_result.error)
-    driver = driver_result.default_value(None)
-    if driver is None:
-        return Error(Exception("No browser driver found"))
-
-    try:
-        element_result = await resolve_target(context, target)
-        if element_result.is_error():
-            return Error(element_result.error)
-
-        element = element_result.default_value(None)
-        if element is None:
-            return Error(Exception("Target not found"))
-
-        selector = element.get_selector()
-        if not selector:
-            return Error(Exception("Target has no selector"))
-
-        if context.page_id is not None:
-            await driver.select(context.page_id, selector, value, text)
-            return Ok(None)
-        else:
-            return Error(Exception("No page ID found"))
-    except Exception as e:
-        return Error(e)
-
-
-@operation(context=True, context_type=ActionContext) # type: ignore[arg-type]
-async def Scroll(
-    target: Optional[Union[str, Selector, SelectorGroup, ElementHandle, Tuple[int, int]]] = None,
-    x: Optional[int] = None,
-    y: Optional[int] = None,
-    options: Optional[MouseOptions] = None,
-    **kwargs: Any,
-) -> Result[None, Exception]:
-    """
-    Action to scroll the page to an element or specific coordinates
-
-    Args:
-        target: Target selector, element, or coordinates to scroll to
-        x: X coordinate to scroll to (alternative to target)
-        y: Y coordinate to scroll to (alternative to target)
-        options: Additional scrolling options
-    """
-    context: ActionContext = kwargs["context"]
-
-    try:
-        driver_result = await validate_driver(context)
-        if driver_result.is_error():
-            return Error(driver_result.error)
-        driver = driver_result.default_value(None)
-        if driver is None:
-            return Error(Exception("No browser driver found"))
-
-        if context.page_id is None:
-            return Error(Exception("No page ID found"))
-
-        if target is not None:
-            if isinstance(target, tuple) and len(target) == 2:
-                x_int, y_int = int(target[0]), int(target[1])
-                return await driver.scroll(context.page_id, x=x_int, y=y_int)
-            else:
-                element_result = await resolve_target(context, target)
-                if element_result.is_error():
-                    return Error(element_result.error)
-
-                element = element_result.default_value(None)
-                if element is None:
-                    return Error(Exception("Target not found"))
-
-                selector = element.get_selector()
-                if not selector:
-                    return Error(Exception("Target has no selector"))
-
-                return await driver.scroll(context.page_id, selector=selector)
-        # If coordinates are specified, scroll to the position
-        elif x is not None or y is not None:
-            return await driver.scroll(context.page_id, x=x, y=y)
-        else:
-            return Error(Exception("Either target or scroll coordinates (x, y) must be specified"))
-
-    except Exception as e:
-        return Error(e)
+__all__ = [
+    "ClickOptions",
+    "Click",
+    "DoubleClickOptions",
+    "DoubleClick",
+    "Drag",
+    "DragOptions",
+    "Fill",
+    "FillOptions",
+    "InputPage",
+    "KeyDown",
+    "KeyPress",
+    "KeyUp",
+    "MouseDown",
+    "MouseMove",
+    "MouseMoveTo",
+    "MouseUp",
+    "ScrollIntoView",
+    "ScrollTo",
+    "SelectText",
+    "SelectValue",
+    "TypeText",
+    "TypeTextOptions",
+]

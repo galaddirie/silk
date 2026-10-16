@@ -1,7 +1,3 @@
-"""
-This module contains the drivers for the browsers.
-"""
+"""Internal browser adapters owned by :class:`BrowserSession`."""
 
-from silk.browsers.drivers.playwright import PlaywrightDriver
-
-__all__ = ["PlaywrightDriver"]
+__all__: list[str] = []

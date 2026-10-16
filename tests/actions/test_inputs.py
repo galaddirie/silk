@@ -1,509 +1,535 @@
-"""
-Tests for Silk input actions module.
-"""
+"""Behavioral contracts for the public input-action seam."""
+
+from __future__ import annotations
+
+from copy import copy, deepcopy
+from dataclasses import FrozenInstanceError
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from fp_ops import Error, Ok, Result, _
 
-from expression import Error, Ok, Result
-
+import silk.actions.input as input_actions
 from silk.actions.input import (
-    Click, DoubleClick, Drag, Fill, KeyPress, MouseDown, 
-    MouseMove, MouseUp, Select, Type, Scroll
+    ClickOptions,
+    DoubleClickOptions,
+    DragOptions,
+    FillOptions,
+    TypeTextOptions,
+    Click as click,
+    DoubleClick as double_click,
+    Drag as drag,
+    Fill as fill,
+    KeyDown as key_down,
+    KeyPress as key_press,
+    KeyUp as key_up,
+    MouseDown as mouse_down,
+    MouseMove as mouse_move,
+    MouseMoveTo as mouse_move_to,
+    MouseUp as mouse_up,
+    ScrollIntoView as scroll_into_view,
+    ScrollTo as scroll_to,
+    SelectText as select_text,
+    SelectValue as select_value,
+    TypeText as type_text,
 )
-from silk.browsers.models import (
-    ActionContext, 
-    ElementHandle, 
-    MouseOptions, 
-    TypeOptions, 
-    KeyModifier
-)
+from silk.browsers.models import ElementHandle, KeyModifier, MouseButtonLiteral, Page
 
 
-def create_mock_element(selector="#test-selector"):
-    """Create a mock element that implements ElementHandle protocol"""
-    mock_element = MagicMock(spec=ElementHandle)
-    
-    mock_element.driver = MagicMock()
-    mock_element.page_id = "test-page-id"
-    mock_element.context_id = "test-context-id"
-    mock_element.selector = selector
-    mock_element.element_ref = "mock-element-ref"
-    
-    mock_element.get_selector = MagicMock(return_value=selector)
-    mock_element.get_page_id = MagicMock(return_value="test-page-id")
-    mock_element.get_context_id = MagicMock(return_value="test-context-id")
-    mock_element.get_element_ref = MagicMock(return_value="mock-element-ref")
-    
-    mock_element.get_bounding_box = AsyncMock(
-        return_value=Ok({"x": 10.0, "y": 20.0, "width": 100.0, "height": 50.0})
-    )
-    
-    return mock_element
+class ProbeElement(ElementHandle):
+    def __init__(
+        self,
+        *,
+        page_id: str = "page",
+        selector: str = "#element",
+    ) -> None:
+        self._page_id = page_id
+        self._context_id = "context"
+        self._selector: str | None = selector
+        self.effects: dict[str, Result[None, Exception]] = {}
+        self.calls: list[tuple[str, object]] = []
 
+    @property
+    def page_id(self) -> str:
+        return self._page_id
 
-@pytest.mark.asyncio
-async def test_mouse_move_with_selector(action_context, mock_driver, mock_page):
-    """Test MouseMove action with a selector"""
-    mock_element = create_mock_element()
-    
-    mock_driver.mouse_move = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    mouse_move = MouseMove(target="#test-selector")
-    result = await mouse_move(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.mouse_move.assert_called_once_with("mock-page-id", 10.0, 20.0)
+    @property
+    def context_id(self) -> str:
+        return self._context_id
 
+    @property
+    def selector(self) -> str | None:
+        return self._selector
 
-@pytest.mark.asyncio
-async def test_mouse_move_with_coordinates(action_context, mock_driver):
-    """Test MouseMove action with direct coordinates"""
-    mock_driver.mouse_move = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    
-    mouse_move = MouseMove(target=(150, 250))
-    result = await mouse_move(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.mouse_move.assert_called_once_with("mock-page-id", 150.0, 250.0)
-
-
-@pytest.mark.asyncio
-async def test_click_with_selector(action_context, mock_driver, mock_page):
-    """Test Click action with a selector"""
-    mock_element = create_mock_element("#test-selector")
-    
-    mock_driver.click = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    click = Click(target="#test-selector")
-    result = await click(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.click.assert_called_once_with("mock-page-id", "#test-selector", None)
-
-
-@pytest.mark.asyncio
-async def test_click_with_coordinates(action_context, mock_driver):
-    """Test Click action with direct coordinates"""
-    mock_driver.mouse_click = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    
-    click = Click(target=(150, 250))
-    result = await click(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.mouse_click.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_double_click(action_context, mock_driver, mock_page):
-    """Test DoubleClick action"""
-    mock_element = create_mock_element("#test-selector")
-    
-    mock_driver.double_click = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    double_click = DoubleClick(target="#test-selector")
-    result = await double_click(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.double_click.assert_called_once_with("mock-page-id", "#test-selector", None)
-
-
-@pytest.mark.asyncio
-async def test_mouse_down(action_context, mock_driver):
-    """Test MouseDown action"""
-    mock_driver.mouse_down = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    
-    mouse_down = MouseDown()
-    result = await mouse_down(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.mouse_down.assert_called_once_with("mock-page-id", "left", None)
-
-
-@pytest.mark.asyncio
-async def test_mouse_up(action_context, mock_driver):
-    """Test MouseUp action"""
-    mock_driver.mouse_up = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    
-    mouse_up = MouseUp()
-    result = await mouse_up(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.mouse_up.assert_called_once_with("mock-page-id", "left", None)
-
-
-@pytest.mark.asyncio
-async def test_drag(action_context, mock_driver, mock_page):
-    """Test Drag action between two elements"""
-    source_element = create_mock_element("#source")
-    target_element = create_mock_element("#target")
-    target_element.get_bounding_box = AsyncMock(
-        return_value=Ok({"x": 100.0, "y": 200.0, "width": 100.0, "height": 50.0})
-    )
-    
-    mock_driver.mouse_drag = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock()
-    mock_page.query_selector.side_effect = [
-        Ok(source_element),
-        Ok(target_element)
-    ]
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    drag = Drag(source="#source", target="#target")
-    result = await drag(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.mouse_drag.assert_called_once_with(
-        "mock-page-id", (10, 20), (100, 200), None
-    )
-
-
-@pytest.mark.asyncio
-async def test_fill(action_context, mock_driver, mock_page):
-    """Test Fill action"""
-    mock_element = create_mock_element("#input-field")
-    
-    mock_driver.fill = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    fill = Fill(target="#input-field", text="test text")
-    result = await fill(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.fill.assert_called_once_with(
-        "mock-page-id", "#input-field", "test text", None
-    )
-
-
-@pytest.mark.asyncio
-async def test_type(action_context, mock_driver, mock_page):
-    """Test Type action"""
-    mock_element = create_mock_element("#input-field")
-    
-    mock_driver.type = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    type_action = Type(target="#input-field", text="test text")
-    result = await type_action(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.type.assert_called_once_with(
-        "mock-page-id", "#input-field", "test text", None
-    )
-
-
-@pytest.mark.asyncio
-async def test_key_press(action_context, mock_driver):
-    """Test KeyPress action"""
-    mock_driver.key_press = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    
-    key_press = KeyPress(key="Enter")
-    result = await key_press(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.key_press.assert_called_once_with("mock-page-id", "Enter", None)
-
-
-@pytest.mark.asyncio
-async def test_key_press_with_modifiers(action_context, mock_driver):
-    """Test KeyPress action with modifiers"""
-    mock_driver.key_press = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    
-    key_press = KeyPress(key="a", modifiers=[KeyModifier.CTRL])
-    result = await key_press(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.key_press.assert_called_once()
-    args, kwargs = mock_driver.key_press.call_args
-    assert "mock-page-id" == args[0]
-    assert "a" == args[1]
-    assert hasattr(args[2], 'modifiers')
-    assert args[2].modifiers == [KeyModifier.CTRL]
-
-
-@pytest.mark.asyncio
-async def test_select(action_context, mock_driver, mock_page):
-    """Test Select action"""
-    mock_element = create_mock_element("#dropdown")
-    
-    mock_driver.select = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    select = Select(target="#dropdown", value="option1")
-    result = await select(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.select.assert_called_once_with(
-        "mock-page-id", "#dropdown", "option1", None
-    )
-
-
-@pytest.mark.asyncio
-async def test_select_by_text(action_context, mock_driver, mock_page):
-    """Test Select action using text instead of value"""
-    mock_element = create_mock_element("#dropdown")
-    
-    mock_driver.select = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    select = Select(target="#dropdown", text="Option 1")
-    result = await select(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.select.assert_called_once_with(
-        "mock-page-id", "#dropdown", None, "Option 1"
-    )
-
-
-@pytest.mark.asyncio
-async def test_scroll_to_coordinates(action_context, mock_driver):
-    """Test Scroll action with coordinates"""
-    mock_driver.scroll = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    
-    scroll = Scroll(x=100, y=200)
-    result = await scroll(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.scroll.assert_called_once_with("mock-page-id", x=100, y=200)
-
-
-@pytest.mark.asyncio
-async def test_scroll_to_element(action_context, mock_driver, mock_page):
-    """Test Scroll action with element selector"""
-    mock_element = create_mock_element("#test-element")
-    
-    mock_driver.scroll = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    scroll = Scroll(target="#test-element")
-    result = await scroll(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.scroll.assert_called_once_with("mock-page-id", selector="#test-element")
-
-
-@pytest.mark.asyncio
-async def test_scroll_with_tuple_coordinates(action_context, mock_driver):
-    """Test Scroll action with coordinate tuple"""
-    mock_driver.scroll = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    
-    scroll = Scroll(target=(150, 250))
-    result = await scroll(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.scroll.assert_called_once_with("mock-page-id", x=150, y=250)
-
-
-@pytest.mark.asyncio
-async def test_click_with_no_driver(action_context):
-    """Test Click action when no driver is available"""
-    action_context.driver = None
-    
-    click = Click(target="#test-selector")
-    result = await click(context=action_context)
-    
-    assert result.is_error()
-    assert "No driver found" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_click_with_no_element(action_context, mock_driver, mock_page):
-    """Test Click action when element is not found"""
-    mock_page.query_selector = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    click = Click(target="#non-existent")
-    result = await click(context=action_context)
-    
-    assert result.is_error()
-    assert "No element found" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_drag_with_source_not_found(action_context, mock_driver, mock_page):
-    """Test Drag action when source element is not found"""
-    mock_page.query_selector = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    drag = Drag(source="#source", target="#target")
-    result = await drag(context=action_context)
-    
-    assert result.is_error()
-    assert "No element found" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_scroll_error_no_target(action_context, mock_driver):
-    """Test Scroll action with no target or coordinates"""
-    action_context.driver = mock_driver
-    
-    scroll = Scroll()
-    result = await scroll(context=action_context)
-    
-    assert result.is_error()
-    assert "Either target or scroll coordinates" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_fill_then_click_sequential_composition(action_context, mock_driver, mock_page):
-    """Test sequential composition with fill followed by click"""
-    input_element = create_mock_element("#input-field")
-    button_element = create_mock_element("#submit-button")
-    
-    mock_driver.fill = AsyncMock(return_value=Ok(None))
-    mock_driver.click = AsyncMock(return_value=Ok(None))
-    
-    def mock_query_selector(selector):
-        if selector == "#input-field":
-            return Ok(input_element)
-        elif selector == "#submit-button":
-            return Ok(button_element)
+    async def query_selector(
+        self,
+        selector: str,
+    ) -> Result[ElementHandle | None, Exception]:
+        self.calls.append(("query_selector", selector))
         return Ok(None)
-    
-    mock_page.query_selector = AsyncMock(side_effect=mock_query_selector)
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    fill = Fill(target="#input-field", text="test text")
-    fill_result = await fill(context=action_context)
-    assert fill_result.is_ok()
-    
-    click = Click(target="#submit-button")
-    click_result = await click(context=action_context)
-    assert click_result.is_ok()
-    
-    mock_driver.fill.assert_called_once_with(
-        "mock-page-id", "#input-field", "test text", None
-    )
-    mock_driver.click.assert_called_once_with(
-        "mock-page-id", "#submit-button", None
-    )
+
+    async def query_selector_all(
+        self,
+        selector: str,
+    ) -> Result[list[ElementHandle], Exception]:
+        self.calls.append(("query_selector_all", selector))
+        return Ok([])
+
+    async def click(
+        self,
+        *,
+        timeout_ms: int | None = None,
+        button: MouseButtonLiteral = "left",
+        modifiers: tuple[KeyModifier, ...] = (),
+        delay_ms: int | None = None,
+        click_count: int = 1,
+        force: bool = False,
+    ) -> Result[None, Exception]:
+        self.calls.append(
+            (
+                "click",
+                (timeout_ms, button, modifiers, delay_ms, click_count, force),
+            )
+        )
+        return self.effects.get("click", Ok(None))
+
+    async def double_click(
+        self,
+        *,
+        timeout_ms: int | None = None,
+        button: MouseButtonLiteral = "left",
+        modifiers: tuple[KeyModifier, ...] = (),
+        delay_ms: int | None = None,
+        force: bool = False,
+    ) -> Result[None, Exception]:
+        self.calls.append(
+            (
+                "double_click",
+                (timeout_ms, button, modifiers, delay_ms, force),
+            )
+        )
+        return self.effects.get("double_click", Ok(None))
+
+    async def fill(
+        self,
+        text: str,
+        *,
+        timeout_ms: int | None = None,
+        clear: bool = False,
+    ) -> Result[None, Exception]:
+        self.calls.append(("fill", (text, timeout_ms, clear)))
+        return self.effects.get("fill", Ok(None))
+
+    async def type(
+        self,
+        text: str,
+        *,
+        timeout_ms: int | None = None,
+        delay_ms: int | None = None,
+    ) -> Result[None, Exception]:
+        self.calls.append(("type", (text, timeout_ms, delay_ms)))
+        return self.effects.get("type", Ok(None))
+
+    async def select(
+        self,
+        *,
+        value: str | None = None,
+        text: str | None = None,
+    ) -> Result[None, Exception]:
+        self.calls.append(("select", (value, text)))
+        return self.effects.get("select", Ok(None))
+
+    async def scroll_into_view(self) -> Result[None, Exception]:
+        self.calls.append(("scroll_into_view", None))
+        return self.effects.get("scroll_into_view", Ok(None))
+
+    async def text(self) -> Result[str, Exception]:
+        return Ok("text")
+
+    async def inner_text(self) -> Result[str, Exception]:
+        return Ok("inner")
+
+    async def html(self, *, outer: bool = True) -> Result[str, Exception]:
+        return Ok("<div></div>" if outer else "")
+
+    async def attribute(
+        self,
+        name: str,
+    ) -> Result[str | None, Exception]:
+        return Ok(None)
+
+    async def move_pointer_to(
+        self,
+        *,
+        offset: tuple[int, int] = (0, 0),
+        center: bool = True,
+        steps: int = 1,
+    ) -> Result[None, Exception]:
+        self.calls.append(("move_pointer_to", (offset, center, steps)))
+        return self.effects.get("move_pointer_to", Ok(None))
+
+    async def drag_to(
+        self,
+        target: ElementHandle,
+        *,
+        steps: int = 1,
+        move_to_center: bool = True,
+        position_offset: tuple[int, int] | None = None,
+        source_offset: tuple[int, int] | None = None,
+        target_offset: tuple[int, int] | None = None,
+    ) -> Result[None, Exception]:
+        self.calls.append(
+            (
+                "drag_to",
+                (
+                    target,
+                    steps,
+                    move_to_center,
+                    position_offset,
+                    source_offset,
+                    target_offset,
+                ),
+            )
+        )
+        return self.effects.get("drag_to", Ok(None))
+
+
+def page_double() -> MagicMock:
+    page = MagicMock(spec=Page)
+    page.page_id = "page"
+    page.context_id = "context"
+    page.mouse_move = AsyncMock(return_value=Ok(None))
+    page.mouse_down = AsyncMock(return_value=Ok(None))
+    page.mouse_up = AsyncMock(return_value=Ok(None))
+    page.key_press = AsyncMock(return_value=Ok(None))
+    page.key_down = AsyncMock(return_value=Ok(None))
+    page.key_up = AsyncMock(return_value=Ok(None))
+    page.scroll = AsyncMock(return_value=Ok(None))
+    page.__copy__.return_value = page
+    page.__deepcopy__.return_value = page
+    return page
+
+
+def test_public_input_surface_uses_pascal_case_action_names() -> None:
+    expected = {
+        "Click",
+        "ClickOptions",
+        "DoubleClick",
+        "DoubleClickOptions",
+        "Drag",
+        "DragOptions",
+        "Fill",
+        "FillOptions",
+        "InputPage",
+        "KeyDown",
+        "KeyPress",
+        "KeyUp",
+        "MouseDown",
+        "MouseMove",
+        "MouseMoveTo",
+        "MouseUp",
+        "ScrollIntoView",
+        "ScrollTo",
+        "SelectText",
+        "SelectValue",
+        "TypeText",
+        "TypeTextOptions",
+    }
+
+    assert set(input_actions.__all__) == expected
+    assert all(name[0].isupper() for name in input_actions.__all__)
+    assert not hasattr(input_actions, "type_text")
+    assert input_actions.Click is click
+    assert input_actions.TypeText is type_text
+    assert type_text("#field", "value", _).name == "TypeText"
 
 
 @pytest.mark.asyncio
-async def test_mouse_move_with_element_handle(action_context, mock_driver, mock_page):
-    """Test MouseMove with ElementHandle passed directly"""
-    mock_element = create_mock_element()
-    
-    mock_driver.mouse_move = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    mouse_move = MouseMove(target=mock_element)
-    result = await mouse_move(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.mouse_move.assert_called_once_with("mock-page-id", 10.0, 20.0)
+async def test_element_input_actions_translate_configuration_and_retain_focus() -> None:
+    element = ProbeElement()
+
+    clicked = await click(
+        _,
+        element,
+        options=ClickOptions(
+            timeout_ms=500,
+            button="right",
+            modifiers=(KeyModifier.ALT,),
+            delay_ms=7,
+            click_count=3,
+            force=True,
+        ),
+    ).run(element)
+    doubled = await double_click(
+        element,
+        _,
+        options=DoubleClickOptions(timeout_ms=600, button="middle"),
+    ).run(element)
+    filled = await fill(
+        element,
+        _,
+        element,
+        options=FillOptions(timeout_ms=700, clear=True),
+    ).run("replacement")
+    typed = await type_text(
+        element,
+        "more",
+        _,
+        options=TypeTextOptions(timeout_ms=800, delay_ms=9),
+    ).run(element)
+
+    assert clicked.ok is element
+    assert doubled.ok is element
+    assert filled.ok is element
+    assert typed.ok is element
+    assert ("click", (500, "right", (KeyModifier.ALT,), 7, 3, True)) in element.calls
+    assert ("double_click", (600, "middle", (), None, False)) in element.calls
+    assert ("fill", ("replacement", 700, True)) in element.calls
+    assert ("type", ("more", 800, 9)) in element.calls
 
 
 @pytest.mark.asyncio
-async def test_drag_with_element_handles(action_context, mock_driver, mock_page):
-    """Test Drag with ElementHandle objects"""
-    source_element = create_mock_element("#source")
-    target_element = create_mock_element("#target")
-    target_element.get_bounding_box = AsyncMock(
-        return_value=Ok({"x": 100.0, "y": 200.0, "width": 100.0, "height": 50.0})
-    )
-    
-    mock_driver.mouse_drag = AsyncMock(return_value=Ok(None))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    drag = Drag(source=source_element, target=target_element)
-    result = await drag(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.mouse_drag.assert_called_once_with(
-        "mock-page-id", (10, 20), (100, 200), None
-    )
+async def test_selection_empty_values_scroll_and_error_identity_are_truthful() -> None:
+    element = ProbeElement()
+
+    value = await select_value(_, "", element).run(element)
+    label = await select_text(element, _, element).run("")
+    scrolled = await scroll_into_view(_, element).run(element)
+
+    assert value.ok is element
+    assert label.ok is element
+    assert scrolled.ok is element
+    assert ("select", ("", None)) in element.calls
+    assert ("select", (None, "")) in element.calls
+
+    browser_error = RuntimeError("native click failed")
+    element.effects["click"] = Error(browser_error)
+    failed = await click(_, element).run(element)
+    assert failed.is_error()
+    assert failed.error is browser_error
 
 
 @pytest.mark.asyncio
-async def test_click_with_mouse_options(action_context, mock_driver, mock_page, mock_mouse_options):
-    """Test Click action with MouseOptions"""
-    mock_element = create_mock_element("#test-selector")
-    
-    mock_driver.click = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    click = Click(target="#test-selector", options=mock_mouse_options)
-    result = await click(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.click.assert_called_once_with("mock-page-id", "#test-selector", mock_mouse_options)
+async def test_mouse_move_to_is_semantic_and_never_needs_a_driver() -> None:
+    element = ProbeElement()
+
+    outcome = await mouse_move_to(
+        _,
+        element,
+        offset=(2, 3),
+        center=True,
+        steps=4,
+    ).run(element)
+
+    assert outcome.ok is element
+    assert ("move_pointer_to", ((2, 3), True, 4)) in element.calls
+    assert not hasattr(element, "driver")
+
+    browser_error = RuntimeError("pointer move failed")
+    element.effects["move_pointer_to"] = Error(browser_error)
+    failed = await mouse_move_to(element, _).run(element)
+    assert failed.error is browser_error
 
 
 @pytest.mark.asyncio
-async def test_fill_with_type_options(action_context, mock_driver, mock_page, mock_type_options):
-    """Test Fill action with TypeOptions"""
-    mock_element = create_mock_element("#input-field")
-    
-    mock_driver.fill = AsyncMock(return_value=Ok(None))
-    mock_page.query_selector = AsyncMock(return_value=Ok(mock_element))
-    
-    action_context.driver = mock_driver
-    action_context.page = mock_page
-    
-    fill = Fill(target="#input-field", text="test text", options=mock_type_options)
-    result = await fill(context=action_context)
-    
-    assert result.is_ok()
-    mock_driver.fill.assert_called_once_with(
-        "mock-page-id", "#input-field", "test text", mock_type_options
+async def test_drag_supports_both_holes_and_forwards_semantic_options() -> None:
+    source = ProbeElement(selector="#source")
+    target = ProbeElement(selector="#target")
+    options = DragOptions(
+        steps=6,
+        move_to_center=True,
+        position_offset=(1, 2),
+        source_offset=(3, 4),
+        target_offset=(5, 6),
     )
+
+    source_hole = await drag(_, target, options=options).run(source)
+    target_hole = await drag(source, _, options=options).run(target)
+
+    assert source_hole.ok is source
+    assert target_hole.ok is source
+    expected_call = (
+        "drag_to",
+        (target, 6, True, (1, 2), (3, 4), (5, 6)),
+    )
+    assert source.calls.count(expected_call) == 2
+
+
+@pytest.mark.asyncio
+async def test_drag_preserves_original_semantic_adapter_error() -> None:
+    source = ProbeElement()
+    target = ProbeElement()
+    adapter_error = RuntimeError("drag failed")
+    source.effects["drag_to"] = Error(adapter_error)
+
+    failed = await drag(_, target).run(source)
+
+    assert failed.error is adapter_error
+
+
+@pytest.mark.asyncio
+async def test_page_input_actions_translate_primitives_and_retain_exact_page() -> None:
+    page = page_double()
+
+    moved = await mouse_move(_, page, steps=3).run((12, 34))
+    down = await mouse_down(_, button="right").run(page)
+    up = await mouse_up(_, button="middle").run(page)
+    pressed = await key_press(_, page, delay_ms=5).run("Enter")
+    held = await key_down("Shift", _).run(page)
+    released = await key_up(_, page).run("Shift")
+    scrolled = await scroll_to(_, page).run((50, 60))
+
+    assert all(
+        result.ok is page
+        for result in (moved, down, up, pressed, held, released, scrolled)
+    )
+    page.mouse_move.assert_awaited_once_with(12, 34, steps=3)
+    page.mouse_down.assert_awaited_once_with(button="right")
+    page.mouse_up.assert_awaited_once_with(button="middle")
+    page.key_press.assert_awaited_once_with("Enter", delay_ms=5)
+    page.key_down.assert_awaited_once_with("Shift")
+    page.key_up.assert_awaited_once_with("Shift")
+    page.scroll.assert_awaited_once_with(x=50, y=60)
+
+
+@pytest.mark.asyncio
+async def test_every_supported_input_operand_position_executes() -> None:
+    element = ProbeElement()
+    page = page_double()
+
+    element_results = [
+        await click(_, element).run(element),
+        await click(element, _).run(element),
+        await double_click(_, element).run(element),
+        await double_click(element, _).run(element),
+        await fill(_, "value", element).run(element),
+        await fill(element, _, element).run("value"),
+        await fill(element, "value", _).run(element),
+        await type_text(_, "value", element).run(element),
+        await type_text(element, _, element).run("value"),
+        await type_text(element, "value", _).run(element),
+        await select_value(_, "one", element).run(element),
+        await select_value(element, _, element).run("one"),
+        await select_value(element, "one", _).run(element),
+        await select_text(_, "One", element).run(element),
+        await select_text(element, _, element).run("One"),
+        await select_text(element, "One", _).run(element),
+        await scroll_into_view(_, element).run(element),
+        await scroll_into_view(element, _).run(element),
+        await mouse_move_to(_, element).run(element),
+        await mouse_move_to(element, _).run(element),
+        await drag(_, element).run(element),
+        await drag(element, _).run(element),
+    ]
+    assert all(result.is_ok() for result in element_results)
+
+    page_results = [
+        await mouse_move(_, page).run((1, 2)),
+        await mouse_move((1, 2), _).run(page),
+        await mouse_down(_).run(page),
+        await mouse_up(_).run(page),
+        await key_press(_, page).run("Enter"),
+        await key_press("Enter", _).run(page),
+        await key_down(_, page).run("Shift"),
+        await key_down("Shift", _).run(page),
+        await key_up(_, page).run("Shift"),
+        await key_up("Shift", _).run(page),
+        await scroll_to(_, page).run((3, 4)),
+        await scroll_to((3, 4), _).run(page),
+    ]
+    assert all(result.is_ok() for result in page_results)
+
+
+def test_every_input_template_requires_exactly_one_direct_placeholder() -> None:
+    element = ProbeElement()
+    page = page_double()
+    zero_hole_calls = (
+        lambda: drag(element, element),
+        lambda: click(element, element),
+        lambda: double_click(element, element),
+        lambda: fill(element, "value", element),
+        lambda: type_text(element, "value", element),
+        lambda: select_value(element, "one", element),
+        lambda: select_text(element, "One", element),
+        lambda: scroll_into_view(element, element),
+        lambda: mouse_move((1, 2), page),
+        lambda: mouse_move_to(element, element),
+        lambda: mouse_down(page),
+        lambda: mouse_up(page),
+        lambda: key_press("Enter", page),
+        lambda: key_down("Shift", page),
+        lambda: key_up("Shift", page),
+        lambda: scroll_to((1, 2), page),
+    )
+    multiple_hole_calls = (
+        lambda: drag(_, _),
+        lambda: click(_, _),
+        lambda: double_click(_, _),
+        lambda: fill(_, _, element),
+        lambda: type_text(_, _, element),
+        lambda: select_value(_, _, element),
+        lambda: select_text(_, _, element),
+        lambda: scroll_into_view(_, _),
+        lambda: mouse_move(_, _),
+        lambda: mouse_move_to(_, _),
+        lambda: key_press(_, _),
+        lambda: key_down(_, _),
+        lambda: key_up(_, _),
+        lambda: scroll_to(_, _),
+    )
+
+    for construct in (*zero_hole_calls, *multiple_hole_calls):
+        with pytest.raises(TypeError, match="exactly one direct placeholder"):
+            construct()
+
+
+def test_input_configuration_is_strict_frozen_and_identity_preserving() -> None:
+    drag_options = DragOptions(
+        steps=2,
+        position_offset=(1, 2),
+        source_offset=(3, 4),
+        target_offset=(5, 6),
+    )
+    assert copy(drag_options) is drag_options
+    assert deepcopy(drag_options) is drag_options
+    with pytest.raises(FrozenInstanceError):
+        drag_options.steps = 3
+
+    invalid = (
+        lambda: DragOptions(steps=True),
+        lambda: DragOptions(steps=0),
+        lambda: DragOptions(move_to_center="yes"),
+        lambda: DragOptions(position_offset=[1, 2]),
+        lambda: DragOptions(position_offset=(1,)),
+        lambda: DragOptions(source_offset=(1.0, 2)),
+        lambda: ClickOptions(button="primary"),
+        lambda: ClickOptions(modifiers=(KeyModifier.NONE,)),
+        lambda: TypeTextOptions(delay_ms=-1),
+        lambda: FillOptions(clear=1),
+    )
+    for construct in invalid:
+        with pytest.raises((TypeError, ValueError)):
+            construct()
+
+
+def test_input_templates_do_not_grow_runtime_binding_shortcuts() -> None:
+    for template in (
+        click,
+        double_click,
+        drag,
+        fill,
+        key_down,
+        key_press,
+        key_up,
+        mouse_down,
+        mouse_move,
+        mouse_move_to,
+        mouse_up,
+        scroll_into_view,
+        scroll_to,
+        select_text,
+        select_value,
+        type_text,
+    ):
+        assert not hasattr(template, "execute")
+        assert not hasattr(template, "bind")
