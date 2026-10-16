@@ -1,10 +1,6 @@
-"""
-Silk - A flexible browser automation library
-"""
+# pyright: strict
+"""Silk browser automation."""
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
-from expression import Error, Nothing, Ok, Option, Result, Some  # noqa
-from fp_ops import operation, Operation  # noqa
-
-__all__ = ["operation", "Operation", "Error", "Nothing", "Ok", "Option", "Result", "Some"]
+__all__ = ["__version__"]

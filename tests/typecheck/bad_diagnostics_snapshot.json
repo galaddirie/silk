@@ -1,0 +1,3375 @@
+{
+  "schema_version": 2,
+  "checker_versions": {
+    "mypy": "1.15.0",
+    "pyright": "1.1.411"
+  },
+  "python_versions": [
+    "3.11",
+    "3.13"
+  ],
+  "message_normalization": "Trim and collapse every Unicode whitespace run to one ASCII space; the selected primary rule and full normalized message must match exactly.",
+  "case_count": 240,
+  "cases": [
+    {
+      "id": "browser_actions.001",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Cannot inherit from final class \"BrowserViewport\""
+        },
+        "pyright": {
+          "rule": "reportGeneralTypeIssues",
+          "message": "Base class \"BrowserViewport\" is marked final and cannot be subclassed"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.002",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Cannot inherit from final class \"BrowserProxy\""
+        },
+        "pyright": {
+          "rule": "reportGeneralTypeIssues",
+          "message": "Base class \"BrowserProxy\" is marked final and cannot be subclassed"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.003",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Cannot inherit from final class \"BrowserHttpHeaders\""
+        },
+        "pyright": {
+          "rule": "reportGeneralTypeIssues",
+          "message": "Base class \"BrowserHttpHeaders\" is marked final and cannot be subclassed"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.004",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"BrowserContextOptions\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"BrowserContextOptions\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"BrowserContextOptions\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.005",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"BrowserContext\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"BrowserContext\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"BrowserContext\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.006",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"BrowserContext\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"BrowserContext\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"BrowserContext\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.007",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"BrowserContext\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.008",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"Page\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"Page\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.009",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"BrowserContext\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"BrowserContext\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"BrowserContext\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.010",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Too many arguments for \"__call__\" of \"OperationTemplate1\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "Expected 1 positional argument"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.011",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.012",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"BrowserContextOptions\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['not options']\" cannot be assigned to parameter \"value\" of type \"BrowserContextOptions\" in function \"run\" \"Literal['not options']\" is not assignable to \"BrowserContextOptions\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.013",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"Page\"; expected \"BrowserContext\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"value\" of type \"BrowserContext\" in function \"run\" \"Page\" is not assignable to \"BrowserContext\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.014",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"Page\"; expected \"BrowserContext\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"value\" of type \"BrowserContext\" in function \"run\" \"Page\" is not assignable to \"BrowserContext\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.015",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"int\"; expected \"str\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[7]\" cannot be assigned to parameter \"value\" of type \"str\" in function \"run\" \"Literal[7]\" is not assignable to \"str\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.016",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"Page\"; expected \"BrowserContext\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"value\" of type \"BrowserContext\" in function \"run\" \"Page\" is not assignable to \"BrowserContext\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.017",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"BrowserContext\"; expected \"Page\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"BrowserContext\" cannot be assigned to parameter \"value\" of type \"Page\" in function \"run\" \"BrowserContext\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.018",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"Page\"; expected \"BrowserContext\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"value\" of type \"BrowserContext\" in function \"run\" \"Page\" is not assignable to \"BrowserContext\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.019",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Cannot infer type argument 1 of \"with_value\" of \"Environment\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"BrowserSessionInfo\" cannot be assigned to parameter \"value\" of type \"T@with_value\" in function \"with_value\" \"BrowserSessionInfo\" is not assignable to \"BrowserDriverCapability\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.020",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"then\" of \"Operation\" has incompatible type \"Operation[Page, None]\"; expected \"Operation[BrowserContext, None]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Operation[Page, None]\" cannot be assigned to parameter \"next\" of type \"Operation[BrowserContext, C@then]\" in function \"then\" \"Operation[Page, None]\" is not assignable to \"Operation[BrowserContext, None]\" Type parameter \"A_contra@Operation\" is contravariant, but \"Page\" is not a supertype of \"BrowserContext\" \"BrowserContext\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.021",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"then\" of \"Operation\" has incompatible type \"Operation[BrowserContext, None]\"; expected \"Operation[Page, None]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Operation[BrowserContext, None]\" cannot be assigned to parameter \"next\" of type \"Operation[Page, C@then]\" in function \"then\" \"Operation[BrowserContext, None]\" is not assignable to \"Operation[Page, None]\" Type parameter \"A_contra@Operation\" is contravariant, but \"BrowserContext\" is not a supertype of \"Page\" \"Page\" is not assignable to \"BrowserContext\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.022",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"headless\" for \"BrowserContextOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"headless\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.023",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"slow_mo\" for \"BrowserContextOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"slow_mo\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.024",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"user_data_dir\" for \"BrowserContextOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"user_data_dir\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.025",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"args\" for \"BrowserContextOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"args\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.026",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"ignore_default_args\" for \"BrowserContextOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"ignore_default_args\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.027",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"viewport\" to \"BrowserContextOptions\" has incompatible type \"dict[str, object]\"; expected \"BrowserViewport | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"dict[str, str | int]\" cannot be assigned to parameter \"viewport\" of type \"BrowserViewport | None\" in function \"__init__\" Type \"dict[str, str | int]\" is not assignable to type \"BrowserViewport | None\" \"dict[str, str | int]\" is not assignable to \"BrowserViewport\" \"dict[str, str | int]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.028",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"viewport\" to \"BrowserContextOptions\" has incompatible type \"dict[str, int]\"; expected \"BrowserViewport | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"dict[str, int]\" cannot be assigned to parameter \"viewport\" of type \"BrowserViewport | None\" in function \"__init__\" Type \"dict[str, int]\" is not assignable to type \"BrowserViewport | None\" \"dict[str, int]\" is not assignable to \"BrowserViewport\" \"dict[str, int]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.029",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"width\" to \"BrowserViewport\" has incompatible type \"str\"; expected \"int\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['wide']\" cannot be assigned to parameter \"width\" of type \"int\" in function \"__init__\" \"Literal['wide']\" is not assignable to \"int\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.030",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"permissions\" to \"BrowserContextOptions\" has incompatible type \"tuple[int]\"; expected \"tuple[str, ...] | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"tuple[Literal[1]]\" cannot be assigned to parameter \"permissions\" of type \"tuple[str, ...] | None\" in function \"__init__\" Type \"tuple[Literal[1]]\" is not assignable to type \"tuple[str, ...] | None\" \"tuple[Literal[1]]\" is not assignable to \"tuple[str, ...]\" Tuple entry 1 is incorrect type \"Literal[1]\" is not assignable to \"str\" \"tuple[Literal[1]]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.031",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"extra_http_headers\" to \"BrowserContextOptions\" has incompatible type \"dict[str, int]\"; expected \"BrowserHttpHeaders | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"dict[str, int]\" cannot be assigned to parameter \"extra_http_headers\" of type \"BrowserHttpHeaders | None\" in function \"__init__\" Type \"dict[str, int]\" is not assignable to type \"BrowserHttpHeaders | None\" \"dict[str, int]\" is not assignable to \"BrowserHttpHeaders\" \"dict[str, int]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.032",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"extra_http_headers\" to \"BrowserContextOptions\" has incompatible type \"dict[str, str]\"; expected \"BrowserHttpHeaders | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"dict[str, str]\" cannot be assigned to parameter \"extra_http_headers\" of type \"BrowserHttpHeaders | None\" in function \"__init__\" Type \"dict[str, str]\" is not assignable to type \"BrowserHttpHeaders | None\" \"dict[str, str]\" is not assignable to \"BrowserHttpHeaders\" \"dict[str, str]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.033",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "dict-item",
+          "message": "Dict entry 0 has incompatible type \"str\": \"int\"; expected \"str\": \"str\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"dict[str, int]\" cannot be assigned to parameter \"values\" of type \"Mapping[str, str] | None\" in function \"__init__\" Type \"dict[str, int]\" is not assignable to type \"Mapping[str, str] | None\" \"dict[str, int]\" is not assignable to \"Mapping[str, str]\" Type parameter \"_VT_co@Mapping\" is covariant, but \"int\" is not a subtype of \"str\" \"int\" is not assignable to \"str\" \"dict[str, int]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.034",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"proxy\" to \"BrowserContextOptions\" has incompatible type \"dict[str, str]\"; expected \"BrowserProxy | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"dict[str, str]\" cannot be assigned to parameter \"proxy\" of type \"BrowserProxy | None\" in function \"__init__\" Type \"dict[str, str]\" is not assignable to type \"BrowserProxy | None\" \"dict[str, str]\" is not assignable to \"BrowserProxy\" \"dict[str, str]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.035",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"server\" to \"BrowserProxy\" has incompatible type \"int\"; expected \"str\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[123]\" cannot be assigned to parameter \"server\" of type \"str\" in function \"__init__\" \"Literal[123]\" is not assignable to \"str\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.036",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"timeout\" to \"BrowserContextOptions\" has incompatible type \"str\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['fast']\" cannot be assigned to parameter \"timeout\" of type \"int | None\" in function \"__init__\" Type \"Literal['fast']\" is not assignable to type \"int | None\" \"Literal['fast']\" is not assignable to \"int\" \"Literal['fast']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.037",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"timeout\" defined in \"BrowserContextOptions\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"timeout\" for class \"BrowserContextOptions\" Attribute \"timeout\" is read-only Attribute \"timeout\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.038",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"width\" defined in \"BrowserViewport\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"width\" for class \"BrowserViewport\" Attribute \"width\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.039",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "index",
+          "message": "Unsupported target for indexed assignment (\"tuple[str, ...] | None\")"
+        },
+        "pyright": {
+          "rule": "reportOptionalSubscript",
+          "message": "Object of type \"None\" is not subscriptable"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.040",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "index",
+          "message": "Unsupported target for indexed assignment (\"BrowserHttpHeaders\")"
+        },
+        "pyright": {
+          "rule": "reportIndexIssue",
+          "message": "\"__setitem__\" method not defined on type \"BrowserHttpHeaders\""
+        }
+      }
+    },
+    {
+      "id": "browser_actions.041",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"server\" defined in \"BrowserProxy\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"server\" for class \"BrowserProxy\" Attribute \"server\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.042",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"BrowserDriverCapability\" has no attribute \"driver\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"driver\" for class \"BrowserDriverCapability\" Attribute \"driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_actions.043",
+      "fixture": "tests/typecheck/browser_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"BrowserDriverCapability\" has no attribute \"close\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"close\" for class \"BrowserDriverCapability\" Attribute \"close\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.001",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"BrowserContext\" has no attribute \"driver\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"driver\" for class \"BrowserContext\" Attribute \"driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.002",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"BrowserContext\" has no attribute \"context_ref\"; maybe \"context_id\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"context_ref\" for class \"BrowserContext\" Attribute \"context_ref\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.003",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"Page\" has no attribute \"driver\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"driver\" for class \"Page\" Attribute \"driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.004",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"Page\" has no attribute \"page_ref\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"page_ref\" for class \"Page\" Attribute \"page_ref\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.005",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"Page\" has no attribute \"as_native\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"as_native\" for class \"Page\" Attribute \"as_native\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.006",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"ElementHandle\" has no attribute \"driver\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"driver\" for class \"ElementHandle\" Attribute \"driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.007",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"ElementHandle\" has no attribute \"element_ref\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"element_ref\" for class \"ElementHandle\" Attribute \"element_ref\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.008",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"ElementHandle\" has no attribute \"as_native\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"as_native\" for class \"ElementHandle\" Attribute \"as_native\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.009",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"ElementHandle\" has no attribute \"element_id\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"element_id\" for class \"ElementHandle\" Attribute \"element_id\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.010",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"ElementHandle\" has no attribute \"_pointer_owner_identity\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_pointer_owner_identity\" for class \"ElementHandle\" Attribute \"_pointer_owner_identity\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.011",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"ElementHandle\" has no attribute \"_bounding_box\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_bounding_box\" for class \"ElementHandle\" Attribute \"_bounding_box\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.012",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"ElementHandle\" has no attribute \"_move_pointer\"; maybe \"move_pointer_to\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_move_pointer\" for class \"ElementHandle\" Attribute \"_move_pointer\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.013",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"ElementHandle\" has no attribute \"_drag_pointer\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_drag_pointer\" for class \"ElementHandle\" Attribute \"_drag_pointer\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.014",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightBrowserContext\" has no attribute \"driver\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"driver\" for class \"PlaywrightBrowserContext\" Attribute \"driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.015",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightBrowserContext\" has no attribute \"context_ref\"; maybe \"context_id\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"context_ref\" for class \"PlaywrightBrowserContext\" Attribute \"context_ref\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.016",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightPage\" has no attribute \"driver\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"driver\" for class \"PlaywrightPage\" Attribute \"driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.017",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightPage\" has no attribute \"page_ref\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"page_ref\" for class \"PlaywrightPage\" Attribute \"page_ref\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.018",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightElementHandle\" has no attribute \"driver\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"driver\" for class \"PlaywrightElementHandle\" Attribute \"driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.019",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightElementHandle\" has no attribute \"element_ref\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"element_ref\" for class \"PlaywrightElementHandle\" Attribute \"element_ref\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.020",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightElementHandle\" has no attribute \"element_id\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"element_id\" for class \"PlaywrightElementHandle\" Attribute \"element_id\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.021",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightElementHandle\" has no attribute \"_pointer_owner_identity\"; maybe \"__owner_identity\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_pointer_owner_identity\" for class \"PlaywrightElementHandle\" Attribute \"_pointer_owner_identity\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.022",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightElementHandle\" has no attribute \"_bounding_box\"; maybe \"__bounding_box\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_bounding_box\" for class \"PlaywrightElementHandle\" Attribute \"_bounding_box\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.023",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightElementHandle\" has no attribute \"_move_pointer\"; maybe \"move_pointer_to\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_move_pointer\" for class \"PlaywrightElementHandle\" Attribute \"_move_pointer\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.024",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"PlaywrightElementHandle\" has no attribute \"_drag_pointer\"; maybe \"__drag_pointer\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_drag_pointer\" for class \"PlaywrightElementHandle\" Attribute \"_drag_pointer\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.025",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"BrowserContext\" has no attribute \"driver\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"driver\" for class \"BrowserContext\" Attribute \"driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.026",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"BrowserContext\" has no attribute \"context_ref\"; maybe \"context_id\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"context_ref\" for class \"BrowserContext\" Attribute \"context_ref\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.027",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "Module \"silk.browsers.drivers\" has no attribute \"PlaywrightDriver\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "\"PlaywrightDriver\" is unknown import symbol"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.028",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"driver_class\" for \"BrowserSession\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"driver_class\""
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.029",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"BrowserSession\" has no attribute \"driver\"; maybe \"__driver\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"driver\" for class \"BrowserSession\" Attribute \"driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.030",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"BrowserSession\" has no attribute \"_driver\"; maybe \"__driver\"?"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_driver\" for class \"BrowserSession\" Attribute \"_driver\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.031",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"BrowserSession\" has no attribute \"_driver_factory\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_driver_factory\" for class \"BrowserSession\" Attribute \"_driver_factory\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.032",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"driver_factory\" for \"BrowserSession\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"driver_factory\""
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.033",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"type[BrowserSession]\" has no attribute \"_for_testing\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"_for_testing\" for class \"type[BrowserSession]\" Attribute \"_for_testing\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "configuration_options.001",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"browser_type\" for \"BrowserOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"browser_type\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.002",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"user_agent\" for \"BrowserOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"user_agent\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.003",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"ignore_https_errors\" for \"BrowserOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"ignore_https_errors\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.004",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"viewport_width\" for \"BrowserOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"viewport_width\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.005",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"headless\" to \"BrowserOptions\" has incompatible type \"int\"; expected \"bool\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[1]\" cannot be assigned to parameter \"headless\" of type \"bool\" in function \"__init__\" \"Literal[1]\" is not assignable to \"bool\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.006",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"timeout\" to \"BrowserOptions\" has incompatible type \"str\"; expected \"int\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['30000']\" cannot be assigned to parameter \"timeout\" of type \"int\" in function \"__init__\" \"Literal['30000']\" is not assignable to \"int\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.007",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"args\" to \"BrowserOptions\" has incompatible type \"list[str]\"; expected \"tuple[str, ...]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"list[str]\" cannot be assigned to parameter \"args\" of type \"tuple[str, ...]\" in function \"__init__\" \"list[str]\" is not assignable to \"tuple[str, ...]\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.008",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"proxy\" to \"BrowserOptions\" has incompatible type \"str\"; expected \"BrowserLaunchProxy | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['http://proxy.test']\" cannot be assigned to parameter \"proxy\" of type \"BrowserLaunchProxy | None\" in function \"__init__\" Type \"Literal['http://proxy.test']\" is not assignable to type \"BrowserLaunchProxy | None\" \"Literal['http://proxy.test']\" is not assignable to \"BrowserLaunchProxy\" \"Literal['http://proxy.test']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.009",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"viewport\" to \"BrowserContextOptions\" has incompatible type \"dict[str, int]\"; expected \"BrowserViewport | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"dict[str, int]\" cannot be assigned to parameter \"viewport\" of type \"BrowserViewport | None\" in function \"__init__\" Type \"dict[str, int]\" is not assignable to type \"BrowserViewport | None\" \"dict[str, int]\" is not assignable to \"BrowserViewport\" \"dict[str, int]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.010",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"extra_http_headers\" to \"BrowserContextOptions\" has incompatible type \"dict[str, str]\"; expected \"BrowserHttpHeaders | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"dict[str, str]\" cannot be assigned to parameter \"extra_http_headers\" of type \"BrowserHttpHeaders | None\" in function \"__init__\" Type \"dict[str, str]\" is not assignable to type \"BrowserHttpHeaders | None\" \"dict[str, str]\" is not assignable to \"BrowserHttpHeaders\" \"dict[str, str]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.011",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"proxy\" to \"BrowserContextOptions\" has incompatible type \"dict[str, str]\"; expected \"BrowserProxy | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"dict[str, str]\" cannot be assigned to parameter \"proxy\" of type \"BrowserProxy | None\" in function \"__init__\" Type \"dict[str, str]\" is not assignable to type \"BrowserProxy | None\" \"dict[str, str]\" is not assignable to \"BrowserProxy\" \"dict[str, str]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.012",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"timeout\" to \"BrowserContextOptions\" has incompatible type \"str\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['500']\" cannot be assigned to parameter \"timeout\" of type \"int | None\" in function \"__init__\" Type \"Literal['500']\" is not assignable to type \"int | None\" \"Literal['500']\" is not assignable to \"int\" \"Literal['500']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.013",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"navigation_timeout\" to \"BrowserContextOptions\" has incompatible type \"str\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['1000']\" cannot be assigned to parameter \"navigation_timeout\" of type \"int | None\" in function \"__init__\" Type \"Literal['1000']\" is not assignable to type \"int | None\" \"Literal['1000']\" is not assignable to \"int\" \"Literal['1000']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.014",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"ignore_https_errors\" to \"BrowserContextOptions\" has incompatible type \"int\"; expected \"bool\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[1]\" cannot be assigned to parameter \"ignore_https_errors\" of type \"bool\" in function \"__init__\" \"Literal[1]\" is not assignable to \"bool\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.015",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"java_script_enabled\" to \"BrowserContextOptions\" has incompatible type \"int\"; expected \"bool\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[0]\" cannot be assigned to parameter \"java_script_enabled\" of type \"bool\" in function \"__init__\" \"Literal[0]\" is not assignable to \"bool\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.016",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"disable_javascript\" for \"BrowserContextOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"disable_javascript\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.017",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"timeout\" to \"NavigationOptions\" has incompatible type \"str\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['2000']\" cannot be assigned to parameter \"timeout\" of type \"int | None\" in function \"__init__\" Type \"Literal['2000']\" is not assignable to type \"int | None\" \"Literal['2000']\" is not assignable to \"int\" \"Literal['2000']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.018",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"wait_until\" to \"NavigationOptions\" has incompatible type \"Literal['complete']\"; expected \"Literal['load', 'domcontentloaded', 'networkidle']\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['complete']\" cannot be assigned to parameter \"wait_until\" of type \"NavigationWaitLiteral\" in function \"__init__\" Type \"Literal['complete']\" is not assignable to type \"NavigationWaitLiteral\" \"Literal['complete']\" is not assignable to type \"Literal['load']\" \"Literal['complete']\" is not assignable to type \"Literal['domcontentloaded']\" \"Literal['complete']\" is not assignable to type \"Literal['networkidle']\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.019",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"extra\" for \"NavigationOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"extra\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.020",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"timeout\" to \"WaitOptions\" has incompatible type \"str\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['250']\" cannot be assigned to parameter \"timeout\" of type \"int | None\" in function \"__init__\" Type \"Literal['250']\" is not assignable to type \"int | None\" \"Literal['250']\" is not assignable to \"int\" \"Literal['250']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.021",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"state\" to \"WaitOptions\" has incompatible type \"Literal['ready']\"; expected \"Literal['visible', 'hidden', 'attached', 'detached']\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['ready']\" cannot be assigned to parameter \"state\" of type \"WaitStateLiteral\" in function \"__init__\" Type \"Literal['ready']\" is not assignable to type \"WaitStateLiteral\" \"Literal['ready']\" is not assignable to type \"Literal['visible']\" \"Literal['ready']\" is not assignable to type \"Literal['hidden']\" \"Literal['ready']\" is not assignable to type \"Literal['attached']\" \"Literal['ready']\" is not assignable to type \"Literal['detached']\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.022",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"poll_interval\" for \"WaitOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"poll_interval\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.023",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"timeout\" for \"Selector\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"timeout\""
+        }
+      }
+    },
+    {
+      "id": "configuration_options.024",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"timeout\" defined in \"BrowserOptions\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"timeout\" for class \"BrowserOptions\" Attribute \"timeout\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "configuration_options.025",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"timeout\" defined in \"BrowserContextOptions\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"timeout\" for class \"BrowserContextOptions\" Attribute \"timeout\" is read-only Attribute \"timeout\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "configuration_options.026",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"wait_until\" defined in \"NavigationOptions\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"wait_until\" for class \"NavigationOptions\" Attribute \"wait_until\" is read-only Attribute \"wait_until\" is read-only Attribute \"wait_until\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "configuration_options.027",
+      "fixture": "tests/typecheck/configuration_options_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"state\" defined in \"WaitOptions\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"state\" for class \"WaitOptions\" Attribute \"state\" is read-only Attribute \"state\" is read-only Attribute \"state\" is read-only Attribute \"state\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "element_actions.001",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Cannot override final attribute \"__copy__\" (previously declared in base class \"BrowserFocus\")"
+        },
+        "pyright": {
+          "rule": "reportIncompatibleMethodOverride",
+          "message": "Method \"__copy__\" cannot override final method defined in class \"BrowserFocus\""
+        }
+      }
+    },
+    {
+      "id": "element_actions.002",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Cannot override final attribute \"__deepcopy__\" (previously declared in base class \"BrowserFocus\")"
+        },
+        "pyright": {
+          "rule": "reportIncompatibleMethodOverride",
+          "message": "Method \"__deepcopy__\" cannot override final method defined in class \"BrowserFocus\""
+        }
+      }
+    },
+    {
+      "id": "element_actions.003",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.004",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.005",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"int\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.006",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"int\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.007",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"int\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.008",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Placeholder\", \"int\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.009",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.010",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.011",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"SelectorGroup\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.012",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"ScopeWithoutIdentityHooks\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.013",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"ScopeWithoutIdentityHooks\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.014",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"CloningScope\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "element_actions.015",
+      "fixture": "tests/typecheck/element_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"CloningScope\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.001",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"ElementHandle\", \"ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.002",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.003",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.004",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.005",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.006",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.007",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.008",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.009",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"tuple[int, int]\", \"Page\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.010",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.011",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"Page\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"Page\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.012",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"Page\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"Page\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.013",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Page\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.014",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Page\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.015",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Page\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.016",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"tuple[int, int]\", \"Page\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.017",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.018",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.019",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.020",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.021",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.022",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.023",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.024",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.025",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.026",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.027",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.028",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.029",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.030",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.031",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.032",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"ElementHandle\", \"Placeholder\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.033",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Placeholder\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.034",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Placeholder\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.035",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"int\", \"str\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.036",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"int\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.037",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Placeholder\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.038",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Placeholder\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.039",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.040",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"tuple[int, int]\", \"Placeholder\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.041",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Placeholder\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.042",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"button\" to \"__call__\" of \"OperationTemplate1\" has incompatible type \"Literal['invalid']\"; expected \"Literal['left', 'middle', 'right']\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['invalid']\" cannot be assigned to parameter \"button\" of type \"MouseButtonLiteral\" in function \"__call__\" Type \"Literal['invalid']\" is not assignable to type \"MouseButtonLiteral\" \"Literal['invalid']\" is not assignable to type \"Literal['left']\" \"Literal['invalid']\" is not assignable to type \"Literal['middle']\" \"Literal['invalid']\" is not assignable to type \"Literal['right']\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.043",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"options\" for \"__call__\" of \"OperationTemplate1\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"options\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.044",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"int\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.045",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Placeholder\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments Argument types: (Literal['Enter'], Placeholder, Literal['removed'])"
+        }
+      }
+    },
+    {
+      "id": "input_actions.046",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Placeholder\", \"int\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments Argument types: (Literal['Shift'], Placeholder, Literal[1])"
+        }
+      }
+    },
+    {
+      "id": "input_actions.047",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate2\" has incompatible type \"tuple[float, float]\"; expected \"tuple[int, int]\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "input_actions.048",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"button\" to \"ClickOptions\" has incompatible type \"Literal['invalid']\"; expected \"Literal['left', 'middle', 'right']\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['invalid']\" cannot be assigned to parameter \"button\" of type \"MouseButtonLiteral\" in function \"__init__\" Type \"Literal['invalid']\" is not assignable to type \"MouseButtonLiteral\" \"Literal['invalid']\" is not assignable to type \"Literal['left']\" \"Literal['invalid']\" is not assignable to type \"Literal['middle']\" \"Literal['invalid']\" is not assignable to type \"Literal['right']\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.049",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"modifiers\" to \"ClickOptions\" has incompatible type \"tuple[str]\"; expected \"tuple[KeyModifier, ...]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"tuple[Literal['shift']]\" cannot be assigned to parameter \"modifiers\" of type \"tuple[KeyModifier, ...]\" in function \"__init__\" \"Literal['shift']\" is not assignable to \"KeyModifier\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.050",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"modifiers\" to \"ClickOptions\" has incompatible type \"list[KeyModifier]\"; expected \"tuple[KeyModifier, ...]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"list[KeyModifier]\" cannot be assigned to parameter \"modifiers\" of type \"tuple[KeyModifier, ...]\" in function \"__init__\" \"list[KeyModifier]\" is not assignable to \"tuple[KeyModifier, ...]\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.051",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"force\" to \"DoubleClickOptions\" has incompatible type \"str\"; expected \"bool\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['yes']\" cannot be assigned to parameter \"force\" of type \"bool\" in function \"__init__\" \"Literal['yes']\" is not assignable to \"bool\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.052",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"clear\" to \"FillOptions\" has incompatible type \"str\"; expected \"bool\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['yes']\" cannot be assigned to parameter \"clear\" of type \"bool\" in function \"__init__\" \"Literal['yes']\" is not assignable to \"bool\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.053",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"delay_ms\" to \"TypeTextOptions\" has incompatible type \"str\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['slow']\" cannot be assigned to parameter \"delay_ms\" of type \"int | None\" in function \"__init__\" Type \"Literal['slow']\" is not assignable to type \"int | None\" \"Literal['slow']\" is not assignable to \"int\" \"Literal['slow']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.054",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['not an element']\" cannot be assigned to parameter \"value\" of type \"Element\" in function \"run\" \"Literal['not an element']\" is not assignable to \"ElementHandle\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.055",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"Page\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['not a page']\" cannot be assigned to parameter \"value\" of type \"InputPage\" in function \"run\" \"Literal['not a page']\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.056",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"int\"; expected \"str | Selector | SelectorGroup | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[42]\" cannot be assigned to parameter \"value\" of type \"ElementTarget\" in function \"run\" Type \"Literal[42]\" is not assignable to type \"ElementTarget\" \"Literal[42]\" is not assignable to \"str\" \"Literal[42]\" is not assignable to \"Selector\" \"Literal[42]\" is not assignable to \"SelectorGroup\" \"Literal[42]\" is not assignable to \"ElementHandle\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.057",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"int\"; expected \"str\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[42]\" cannot be assigned to parameter \"value\" of type \"str\" in function \"run\" \"Literal[42]\" is not assignable to \"str\""
+        }
+      }
+    },
+    {
+      "id": "input_actions.058",
+      "fixture": "tests/typecheck/input_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"int\"; expected \"str | Selector | SelectorGroup | ElementHandle\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[42]\" cannot be assigned to parameter \"value\" of type \"ElementTarget\" in function \"run\" Type \"Literal[42]\" is not assignable to type \"ElementTarget\" \"Literal[42]\" is not assignable to \"str\" \"Literal[42]\" is not assignable to \"Selector\" \"Literal[42]\" is not assignable to \"SelectorGroup\" \"Literal[42]\" is not assignable to \"ElementHandle\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.001",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"timeout_ms\" to \"ClickOptions\" has incompatible type \"str\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['100']\" cannot be assigned to parameter \"timeout_ms\" of type \"int | None\" in function \"__init__\" Type \"Literal['100']\" is not assignable to type \"int | None\" \"Literal['100']\" is not assignable to \"int\" \"Literal['100']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.002",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"delay_ms\" to \"ClickOptions\" has incompatible type \"float\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"float\" cannot be assigned to parameter \"delay_ms\" of type \"int | None\" in function \"__init__\" Type \"float\" is not assignable to type \"int | None\" \"float\" is not assignable to \"int\" \"float\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.003",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"button\" to \"ClickOptions\" has incompatible type \"Literal['bogus']\"; expected \"Literal['left', 'middle', 'right']\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['bogus']\" cannot be assigned to parameter \"button\" of type \"MouseButtonLiteral\" in function \"__init__\" Type \"Literal['bogus']\" is not assignable to type \"MouseButtonLiteral\" \"Literal['bogus']\" is not assignable to type \"Literal['left']\" \"Literal['bogus']\" is not assignable to type \"Literal['middle']\" \"Literal['bogus']\" is not assignable to type \"Literal['right']\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.004",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"modifiers\" to \"ClickOptions\" has incompatible type \"list[KeyModifier]\"; expected \"tuple[KeyModifier, ...]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"list[KeyModifier]\" cannot be assigned to parameter \"modifiers\" of type \"tuple[KeyModifier, ...]\" in function \"__init__\" \"list[KeyModifier]\" is not assignable to \"tuple[KeyModifier, ...]\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.005",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"click_count\" to \"ClickOptions\" has incompatible type \"str\"; expected \"int\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['two']\" cannot be assigned to parameter \"click_count\" of type \"int\" in function \"__init__\" \"Literal['two']\" is not assignable to \"int\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.006",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"force\" to \"ClickOptions\" has incompatible type \"str\"; expected \"bool\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['yes']\" cannot be assigned to parameter \"force\" of type \"bool\" in function \"__init__\" \"Literal['yes']\" is not assignable to \"bool\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.007",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"button\" to \"DoubleClickOptions\" has incompatible type \"Literal['bogus']\"; expected \"Literal['left', 'middle', 'right']\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['bogus']\" cannot be assigned to parameter \"button\" of type \"MouseButtonLiteral\" in function \"__init__\" Type \"Literal['bogus']\" is not assignable to type \"MouseButtonLiteral\" \"Literal['bogus']\" is not assignable to type \"Literal['left']\" \"Literal['bogus']\" is not assignable to type \"Literal['middle']\" \"Literal['bogus']\" is not assignable to type \"Literal['right']\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.008",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"modifiers\" to \"DoubleClickOptions\" has incompatible type \"tuple[str]\"; expected \"tuple[KeyModifier, ...]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"tuple[Literal['alt']]\" cannot be assigned to parameter \"modifiers\" of type \"tuple[KeyModifier, ...]\" in function \"__init__\" \"Literal['alt']\" is not assignable to \"KeyModifier\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.009",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"delay_ms\" to \"DoubleClickOptions\" has incompatible type \"float\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"float\" cannot be assigned to parameter \"delay_ms\" of type \"int | None\" in function \"__init__\" Type \"float\" is not assignable to type \"int | None\" \"float\" is not assignable to \"int\" \"float\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.010",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"force\" to \"DoubleClickOptions\" has incompatible type \"str\"; expected \"bool\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['yes']\" cannot be assigned to parameter \"force\" of type \"bool\" in function \"__init__\" \"Literal['yes']\" is not assignable to \"bool\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.011",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"timeout_ms\" to \"FillOptions\" has incompatible type \"str\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['100']\" cannot be assigned to parameter \"timeout_ms\" of type \"int | None\" in function \"__init__\" Type \"Literal['100']\" is not assignable to type \"int | None\" \"Literal['100']\" is not assignable to \"int\" \"Literal['100']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.012",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"clear\" to \"FillOptions\" has incompatible type \"str\"; expected \"bool\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['yes']\" cannot be assigned to parameter \"clear\" of type \"bool\" in function \"__init__\" \"Literal['yes']\" is not assignable to \"bool\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.013",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"timeout_ms\" to \"TypeTextOptions\" has incompatible type \"str\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['100']\" cannot be assigned to parameter \"timeout_ms\" of type \"int | None\" in function \"__init__\" Type \"Literal['100']\" is not assignable to type \"int | None\" \"Literal['100']\" is not assignable to \"int\" \"Literal['100']\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.014",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"delay_ms\" to \"TypeTextOptions\" has incompatible type \"float\"; expected \"int | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"float\" cannot be assigned to parameter \"delay_ms\" of type \"int | None\" in function \"__init__\" Type \"float\" is not assignable to type \"int | None\" \"float\" is not assignable to \"int\" \"float\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.015",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"steps\" to \"DragOptions\" has incompatible type \"str\"; expected \"int\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['many']\" cannot be assigned to parameter \"steps\" of type \"int\" in function \"__init__\" \"Literal['many']\" is not assignable to \"int\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.016",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"move_to_center\" to \"DragOptions\" has incompatible type \"str\"; expected \"bool\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['yes']\" cannot be assigned to parameter \"move_to_center\" of type \"bool\" in function \"__init__\" \"Literal['yes']\" is not assignable to \"bool\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.017",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"position_offset\" to \"DragOptions\" has incompatible type \"list[int]\"; expected \"tuple[int, int] | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"list[int]\" cannot be assigned to parameter \"position_offset\" of type \"CoordinateType | None\" in function \"__init__\" Type \"list[int]\" is not assignable to type \"CoordinateType | None\" \"list[int]\" is not assignable to \"tuple[int, int]\" \"list[int]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.018",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"position_offset\" to \"DragOptions\" has incompatible type \"tuple[int]\"; expected \"tuple[int, int] | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"tuple[Literal[1]]\" cannot be assigned to parameter \"position_offset\" of type \"CoordinateType | None\" in function \"__init__\" Type \"tuple[Literal[1]]\" is not assignable to type \"CoordinateType | None\" \"tuple[Literal[1]]\" is not assignable to \"tuple[int, int]\" Tuple size mismatch; expected 2 but received 1 \"tuple[Literal[1]]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.019",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"source_offset\" to \"DragOptions\" has incompatible type \"tuple[float, int]\"; expected \"tuple[int, int] | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"tuple[float, Literal[2]]\" cannot be assigned to parameter \"source_offset\" of type \"CoordinateType | None\" in function \"__init__\" Type \"tuple[float, Literal[2]]\" is not assignable to type \"CoordinateType | None\" \"tuple[float, Literal[2]]\" is not assignable to \"tuple[int, int]\" Tuple entry 1 is incorrect type \"float\" is not assignable to \"int\" \"tuple[float, Literal[2]]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.020",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"target_offset\" to \"DragOptions\" has incompatible type \"tuple[int, str]\"; expected \"tuple[int, int] | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"tuple[Literal[1], Literal['2']]\" cannot be assigned to parameter \"target_offset\" of type \"CoordinateType | None\" in function \"__init__\" Type \"tuple[Literal[1], Literal['2']]\" is not assignable to type \"CoordinateType | None\" \"tuple[Literal[1], Literal['2']]\" is not assignable to \"tuple[int, int]\" Tuple entry 2 is incorrect type \"Literal['2']\" is not assignable to \"int\" \"tuple[Literal[1], Literal['2']]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "input_option_values.021",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"force\" defined in \"ClickOptions\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"force\" for class \"ClickOptions\" Attribute \"force\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "input_option_values.022",
+      "fixture": "tests/typecheck/input_option_values_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"steps\" defined in \"DragOptions\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"steps\" for class \"DragOptions\" Attribute \"steps\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.001",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"Page\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"Page\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.002",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"Page\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"Page\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.003",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Page\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.004",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Page\", \"Path\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.005",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Page\", \"str\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.006",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Page\", \"str\", \"None\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.007",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Too many positional arguments for \"__call__\" of \"OperationTemplate1\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "Expected 1 positional argument"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.008",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Too many arguments for \"__call__\" of \"OperationTemplate1\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "Expected 1 positional argument"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.009",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.010",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.011",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.012",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"None\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.013",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"Page\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['not a page']\" cannot be assigned to parameter \"value\" of type \"Page\" in function \"run\" \"Literal['not a page']\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.014",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"Page\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['not a page']\" cannot be assigned to parameter \"value\" of type \"Page\" in function \"run\" \"Literal['not a page']\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.015",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"Page\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['not a page']\" cannot be assigned to parameter \"value\" of type \"Page\" in function \"run\" \"Literal['not a page']\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.016",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"int\"; expected \"str\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[42]\" cannot be assigned to parameter \"value\" of type \"str\" in function \"run\" \"Literal[42]\" is not assignable to \"str\""
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.017",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"Path\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['not a path']\" cannot be assigned to parameter \"value\" of type \"Path\" in function \"run\" \"Literal['not a path']\" is not assignable to \"Path\""
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.018",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"int\"; expected \"str\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[42]\" cannot be assigned to parameter \"value\" of type \"str\" in function \"run\" \"Literal[42]\" is not assignable to \"str\""
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.019",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"Page\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['not a page']\" cannot be assigned to parameter \"value\" of type \"Page\" in function \"run\" \"Literal['not a page']\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "navigation_actions.020",
+      "fixture": "tests/typecheck/navigation_actions_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"int\"; expected \"str\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[42]\" cannot be assigned to parameter \"value\" of type \"str\" in function \"run\" \"Literal[42]\" is not assignable to \"str\""
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.001",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"str\", \"NavigationOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.002",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Page\", \"Placeholder\", \"NavigationOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.003",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"options\" to \"__call__\" of \"OperationTemplate1\" has incompatible type \"NavigateOptions\"; expected \"NavigationOptions | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"NavigateOptions\" cannot be assigned to parameter \"options\" of type \"NavigationOptions | None\" in function \"__call__\" Type \"NavigateOptions\" is not assignable to type \"NavigationOptions | None\" \"NavigateOptions\" is not assignable to \"NavigationOptions\" \"NavigateOptions\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.004",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"options\" to \"__call__\" of \"OperationTemplate1\" has incompatible type \"NavigateOptions\"; expected \"NavigationOptions | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"NavigateOptions\" cannot be assigned to parameter \"options\" of type \"NavigationOptions | None\" in function \"__call__\" Type \"NavigateOptions\" is not assignable to type \"NavigationOptions | None\" \"NavigateOptions\" is not assignable to \"NavigationOptions\" \"NavigateOptions\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.005",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"options\" to \"__call__\" of \"OperationTemplate1\" has incompatible type \"NavigateOptions\"; expected \"NavigationOptions | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"NavigateOptions\" cannot be assigned to parameter \"options\" of type \"NavigationOptions | None\" in function \"__call__\" Type \"NavigateOptions\" is not assignable to type \"NavigationOptions | None\" \"NavigateOptions\" is not assignable to \"NavigationOptions\" \"NavigateOptions\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.006",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"options\" to \"__call__\" of \"OperationTemplate1\" has incompatible type \"NavigateOptions\"; expected \"NavigationOptions | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"NavigateOptions\" cannot be assigned to parameter \"options\" of type \"NavigationOptions | None\" in function \"__call__\" Type \"NavigateOptions\" is not assignable to type \"NavigationOptions | None\" \"NavigateOptions\" is not assignable to \"NavigationOptions\" \"NavigateOptions\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.007",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"Page\" has no attribute \"goto\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"goto\" for class \"Page\" Attribute \"goto\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.008",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-arg",
+          "message": "Unexpected keyword argument \"referer\" for \"NavigationOptions\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No parameter named \"referer\""
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.009",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"referer\" to \"NavigateOptions\" has incompatible type \"int\"; expected \"str | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal[123]\" cannot be assigned to parameter \"referer\" of type \"str | None\" in function \"__init__\" Type \"Literal[123]\" is not assignable to type \"str | None\" \"Literal[123]\" is not assignable to \"str\" \"Literal[123]\" is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.010",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"referer\" defined in \"NavigateOptions\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"referer\" for class \"NavigateOptions\" Attribute \"referer\" is read-only Attribute \"referer\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "navigation_option_separation.011",
+      "fixture": "tests/typecheck/navigation_option_separation_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "misc",
+          "message": "Property \"wait_until\" defined in \"NavigationOptions\" is read-only"
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot assign to attribute \"wait_until\" for class \"NavigationOptions\" Attribute \"wait_until\" is read-only Attribute \"wait_until\" is read-only Attribute \"wait_until\" is read-only"
+        }
+      }
+    },
+    {
+      "id": "policy_composition.001",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"then\" of \"Operation\" has incompatible type \"Operation[Page, None]\"; expected \"Operation[str, None]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Operation[Page, None]\" cannot be assigned to parameter \"next\" of type \"Operation[str, C@then]\" in function \"then\" \"Operation[Page, None]\" is not assignable to \"Operation[str, None]\" Type parameter \"A_contra@Operation\" is contravariant, but \"Page\" is not a supertype of \"str\" \"str\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "policy_composition.002",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"then\" of \"Operation\" has incompatible type \"Operation[Page, str]\"; expected \"Operation[tuple[str, str], str]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Operation[Page, str]\" cannot be assigned to parameter \"next\" of type \"Operation[tuple[str, str], C@then]\" in function \"then\" \"Operation[Page, str]\" is not assignable to \"Operation[tuple[str, str], str]\" Type parameter \"A_contra@Operation\" is contravariant, but \"Page\" is not a supertype of \"tuple[str, str]\" \"tuple[str, str]\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "policy_composition.003",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"then\" of \"CollectionOperation\" has incompatible type \"Operation[Page, str]\"; expected \"Operation[list[str], str]\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"then\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "policy_composition.004",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"then\" of \"CollectionOperation\" has incompatible type \"Operation[Page, Page]\"; expected \"Operation[list[Result[str, Exception]], Page]\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"then\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "policy_composition.005",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"BrowserContext\"; expected \"Page\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"BrowserContext\" cannot be assigned to parameter \"value\" of type \"Page\" in function \"run\" \"BrowserContext\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "policy_composition.006",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "list-item",
+          "message": "List item 0 has incompatible type \"Page\"; expected \"BrowserContext\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"run\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "policy_composition.007",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "assignment",
+          "message": "Incompatible types in assignment (expression has type \"Operation[Page, tuple[str, str]]\", variable has type \"Operation[Page, tuple[str]]\")"
+        },
+        "pyright": {
+          "rule": "reportAssignmentType",
+          "message": "Type \"Operation[Page, tuple[str, str]]\" is not assignable to declared type \"Operation[Page, tuple[str]]\" \"Operation[Page, tuple[str, str]]\" is not assignable to \"Operation[Page, tuple[str]]\" Type parameter \"B_co@Operation\" is covariant, but \"tuple[str, str]\" is not a subtype of \"tuple[str]\" \"tuple[str, str]\" is not assignable to \"tuple[str]\" Tuple size mismatch; expected 1 but received 2"
+        }
+      }
+    },
+    {
+      "id": "policy_composition.008",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "assignment",
+          "message": "Incompatible types in assignment (expression has type \"Operation[Page, tuple[Result[str, Exception], Result[str, Exception]]]\", variable has type \"Operation[Page, tuple[str, str]]\")"
+        },
+        "pyright": {
+          "rule": "reportAssignmentType",
+          "message": "Type \"Operation[Page, tuple[Result[str, Exception], Result[str, Exception]]]\" is not assignable to declared type \"Operation[Page, tuple[str, str]]\" \"Operation[Page, tuple[Result[str, Exception], Result[str, Exception]]]\" is not assignable to \"Operation[Page, tuple[str, str]]\" Type parameter \"B_co@Operation\" is covariant, but \"tuple[Result[str, Exception], Result[str, Exception]]\" is not a subtype of \"tuple[str, str]\" \"tuple[Result[str, Exception], Result[str, Exception]]\" is not assignable to \"tuple[str, str]\" Tuple entry 1 is incorrect type \"Result[str, Exception]\" is not assignable to \"str\""
+        }
+      }
+    },
+    {
+      "id": "policy_composition.009",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "assignment",
+          "message": "Incompatible types in assignment (expression has type \"Operation[Page, tuple[Result[str, Exception], ...]]\", variable has type \"Operation[Page, tuple[Result[int, Exception], Result[str, Exception]]]\")"
+        },
+        "pyright": {
+          "rule": "reportAssignmentType",
+          "message": "Type \"Operation[Page, tuple[Result[str, Exception], Result[str, Exception]]]\" is not assignable to declared type \"Operation[Page, tuple[Result[int, Exception], Result[str, Exception]]]\" \"Operation[Page, tuple[Result[str, Exception], Result[str, Exception]]]\" is not assignable to \"Operation[Page, tuple[Result[int, Exception], Result[str, Exception]]]\" Type parameter \"B_co@Operation\" is covariant, but \"tuple[Result[str, Exception], Result[str, Exception]]\" is not a subtype of \"tuple[Result[int, Exception], Result[str, Exception]]\" \"tuple[Result[str, Exception], Result[str, Exception]]\" is not assignable to \"tuple[Result[int, Exception], Result[str, Exception]]\" Tuple entry 1 is incorrect type \"Result[str, Exception]\" is not assignable to \"Result[int, Exception]\""
+        }
+      }
+    },
+    {
+      "id": "policy_composition.010",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"Never\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"fanout_parallel\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "policy_composition.011",
+      "fixture": "tests/typecheck/policy_composition_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"then\" of \"Operation\" has incompatible type \"Operation[Page, None]\"; expected \"Operation[None, None]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Operation[Page, None]\" cannot be assigned to parameter \"next\" of type \"Operation[None, C@then]\" in function \"then\" \"Operation[Page, None]\" is not assignable to \"Operation[None, None]\" Type parameter \"A_contra@Operation\" is contravariant, but \"Page\" is not a supertype of \"None\" \"None\" is not assignable to \"Page\""
+        }
+      }
+    }
+  ]
+}

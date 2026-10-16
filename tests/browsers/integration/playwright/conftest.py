@@ -1,27 +1,12 @@
 import pytest
-from silk.browsers.drivers.playwright import PlaywrightDriver
+
 from silk.browsers.models import BrowserOptions
+from silk.browsers.sessions import BrowserSession
 
 
 @pytest.fixture
-async def playwright_driver():
-    """Create a real PlaywrightDriver instance."""
-    options = BrowserOptions(
-        headless=True,
-        timeout=10000,
-        viewport_width=1280,
-        viewport_height=720,
-    )
-    driver = PlaywrightDriver()
-
-    # Launch the browser
-    result = await driver.launch(options)
-    if result.is_error():
-        pytest.fail(f"Failed to launch browser: {result.error}")
-
-    try:
-        yield driver
-    finally:
-        # Clean up
-        await driver.close()
-
+async def browser_session():
+    """Create a real browser through Silk's public ownership root."""
+    options = BrowserOptions(headless=True, timeout=10_000)
+    async with BrowserSession(options=options) as session:
+        yield session

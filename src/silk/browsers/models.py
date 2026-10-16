@@ -1,60 +1,26 @@
+# pyright: strict
+"""Small nominal browser seam and immutable session configuration."""
+
 from __future__ import annotations
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Set,
-    Literal,
-    Optional,
-    Union,
-    ParamSpec,
-    Tuple,
-    Generic,
-    TypeVar,
-    Protocol,
-    overload,
-    runtime_checkable,
-    AsyncGenerator,
-    Callable,
-    Awaitable,
-)
-from pathlib import Path
 
-import logging
+from abc import ABC, abstractmethod
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from enum import Enum
-from expression import Error, Ok, Result
-from pydantic import BaseModel, Field, model_validator
-from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Literal, Self, final, overload
 
-from fp_ops.context import BaseContext
+from fp_ops import Result
 
-logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
-S = TypeVar("S")
-R = TypeVar("R")
-P = ParamSpec("P")
-
-CoordinateType = Tuple[int, int]
+CoordinateType = tuple[int, int]
 MouseButtonLiteral = Literal["left", "middle", "right"]
 WaitStateLiteral = Literal["visible", "hidden", "attached", "detached"]
 NavigationWaitLiteral = Literal["load", "domcontentloaded", "networkidle"]
+_NO_EVALUATION_ARGUMENT = object()
 
 
-    
-
-
-class MouseButton(Enum):
-    """Enum representing mouse buttons for mouse actions"""
-
-    LEFT = "left"
-    MIDDLE = "middle"
-    RIGHT = "right"
-
-KeyModifierLiteral = Literal["alt", "control", "command", "shift"]
 class KeyModifier(Enum):
-    """Enum representing keyboard modifiers"""
+    """Keyboard modifiers accepted by element pointer actions."""
 
     NONE = 0
     ALT = 1
@@ -62,1013 +28,516 @@ class KeyModifier(Enum):
     COMMAND = 4
     SHIFT = 8
 
-    @classmethod
-    def combine(cls, modifiers: List["KeyModifier"]) -> int:
-        """Combine multiple modifiers into a single value"""
-        value = 0
-        for modifier in modifiers:
-            value |= modifier.value
-        return value
 
-class PointerEventType(Enum):
-    """Enum representing pointer event types"""
+class _ImmutableBrowserConfiguration:
+    """Identity-preserving copy policy for immutable configuration values."""
 
-    MOVE = "mouseMoved"
-    DOWN = "mousePressed"
-    UP = "mouseReleased"
-    WHEEL = "mouseWheel"
+    __slots__ = ()
 
-class BaseInputOptions(BaseModel):
-    """Base model for all operation options"""
-
-    timeout: Optional[int] = None
-
-    class Config:
-        arbitrary_types_allowed = True
-
-
-class MouseOptions(BaseInputOptions):
-    """Base options for mouse operations"""
-
-    button: MouseButtonLiteral = "left"
-    modifiers: List[KeyModifier] = Field(default_factory=list)
-    steps: int = 1
-    smooth: bool = True
-    total_time: float = 0.5
-    acceleration: float = 2.0
-    force: float = 0.5
-    move_to_center: bool = True
-    click_count: int = 1
-    delay_between_ms: Optional[int] = None
-    position_offset: Optional[CoordinateType] = None
-
-    @property
-    def modifiers_value(self) -> int:
-        """Get the combined value of all modifiers"""
-        return KeyModifier.combine(self.modifiers)
-
-class TypeOptions(BaseInputOptions):
-    """Options for typing operations"""
-
-    key: Optional[str] = None
-    modifiers: List[KeyModifier] = Field(default_factory=list)
-    delay: Optional[int] = None
-    clear: bool = False
-
-class SelectOptions(BaseInputOptions):
-    """Options for select operations"""
-
-    index: Optional[int] = None
-    text: Optional[str] = None
-    value: Optional[str] = None
-
-class DragOptions(MouseOptions):
-    """Options for drag operations"""
-
-    source_offset: Optional[CoordinateType] = None
-    target_offset: Optional[CoordinateType] = None
-    steps: int = 1
-    smooth: bool = True
-    total_time: float = 0.5
-
-class NavigationOptions(BaseInputOptions):
-    """Options for navigation operations"""
-
-    wait_until: NavigationWaitLiteral = "load"
-    referer: Optional[str] = None
-
-class WaitOptions(BaseInputOptions):
-    """Options for wait operations"""
-
-    state: WaitStateLiteral = "visible"
-    poll_interval: int = 100
-
-class BrowserOptions(BaseModel):
-    """Configuration options for browser instances"""
-
-    browser_type: Literal["chrome", "firefox", "edge", "chromium"] = "chromium"
-    headless: bool = True
-    timeout: int = 30000
-    # todo add viewport as a dict
-    viewport_width: int = 1366
-    viewport_height: int = 768
-    navigation_timeout: Optional[int] = None
-    wait_timeout: Optional[int] = None
-    stealth_mode: bool = False
-    proxy: Optional[str] = None
-    user_agent: Optional[str] = None
-    extra_http_headers: Dict[str, str] = Field(default_factory=dict)
-    ignore_https_errors: bool = False
-    disable_javascript: bool = False
-    browser_args: List[str] = Field(default_factory=list)
-    extra_args: Dict[str, Any] = Field(default_factory=dict)
-    locale: Optional[str] = None
-    timezone: Optional[str] = None
-    remote_url: Optional[str] = None
-
-    @model_validator(mode="after")
-    def set_default_timeouts(self) -> "BrowserOptions":
-        """Set default timeouts if not provided"""
-        if self.navigation_timeout is None:
-            self.navigation_timeout = self.timeout
-        if self.wait_timeout is None:
-            self.wait_timeout = self.timeout
+    def __copy__(self) -> Self:
         return self
 
-ElementRef = TypeVar("ElementRef")
+    def __deepcopy__(self, memo: dict[int, object]) -> Self:
+        memo[id(self)] = self
+        return self
 
-@runtime_checkable
-class ElementHandle(Protocol, Generic[ElementRef]):
-    """
-    Uniform interface for browser elements.
 
-    This protocol defines the contract that all browser element
-    implementations must fulfill, regardless of the underlying automation library.
+def _require_exact_string(value: object, name: str) -> None:
+    if type(value) is not str:
+        raise TypeError(f"{name} must be a string")
 
-    Args:
-        page_id: ID of the page containing this element for tracking purposes
-        selector: The selector used to find this element (optional)
-        element_ref: Reference to the element in the underlying automation library
 
-    """
-    driver: Driver
-    page_id: str
-    context_id: str
-    selector: Optional[str]
-    element_ref: ElementRef
+def _require_optional_string(value: object, name: str) -> None:
+    if value is not None:
+        _require_exact_string(value, name)
 
-    def get_page_id(self) -> str:
-        """Get the page ID associated with this element"""
-        return self.page_id
 
-    def get_context_id(self) -> str:
-        """Get the context ID associated with this element"""
-        return self.context_id
+def _require_optional_non_negative_integer(
+    value: object,
+    name: str,
+) -> None:
+    if value is None:
+        return
+    if type(value) is not int:
+        raise TypeError(f"{name} must be an integer or None")
+    if value < 0:
+        raise ValueError(f"{name} must be non-negative")
 
-    def get_selector(self) -> Optional[str]:
-        """Get the selector used to find this element"""
-        return self.selector
 
-    def get_element_ref(self) -> ElementRef:
-        """Get the reference to the element in the underlying automation library"""
-        return self.element_ref
+class BrowserFocus:
+    """Nominal base for live browser values snapshotted by operations."""
 
-    async def click(
-        self, options: Optional[MouseOptions] = None
-    ) -> Result[None, Exception]:
-        """Click the element."""
-        ...
+    @final
+    def __copy__(self) -> Self:
+        return self
 
-    async def double_click(
-        self, options: Optional[MouseOptions] = None
-    ) -> Result[None, Exception]:
-        """Double-click the element."""
-        ...
+    @final
+    def __deepcopy__(self, memo: dict[int, object]) -> Self:
+        memo[id(self)] = self
+        return self
 
-    async def type(
-        self, text: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Type text into the element."""
-        ...
 
-    async def fill(
-        self, text: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Fill the element with text (replacing existing content)."""
-        ...
+class ElementHandle(BrowserFocus, ABC):
+    """Action-facing element focus with semantic pointer behavior."""
 
-    async def select(
-        self, value: Optional[str] = None, text: Optional[str] = None
-    ) -> Result[None, Exception]:
-        """Select an option from a dropdown/select element."""
-        ...
+    @property
+    @abstractmethod
+    def page_id(self) -> str: ...
 
-    async def get_text(self) -> Result[str, Exception]:
-        """Get element's text content."""
-        ...
+    @property
+    @abstractmethod
+    def context_id(self) -> str: ...
 
-    async def text(self) -> str:
-        """Get element's text content (simplified version)."""
-        ...
+    @property
+    @abstractmethod
+    def selector(self) -> str | None: ...
 
-    async def get_inner_text(self) -> Result[str, Exception]:
-        """Get element's inner text (visible text only)."""
-        ...
-
-    async def get_html(self, outer: bool = True) -> Result[str, Exception]:
-        """Get element's HTML content."""
-        ...
-
-    async def get_attribute(self, name: str) -> Result[Optional[str], Exception]:
-        """Get element's attribute value."""
-        ...
-
-    async def attribute(self, name: str, default: str = "") -> str:
-        """Get element's attribute value (simplified version)."""
-        ...
-
-    async def has_attribute(self, name: str) -> bool:
-        """Check if element has the specified attribute."""
-        ...
-
-    async def get_property(self, name: str) -> Result[Any, Exception]:
-        """Get element's JavaScript property value."""
-        ...
-
-    async def get_bounding_box(self) -> Result[Dict[str, float], Exception]:
-        """Get element's bounding box (x, y, width, height)."""
-        ...
-
-    async def is_visible(self) -> Result[bool, Exception]:
-        """Check if element is visible."""
-        ...
-
-    async def is_enabled(self) -> Result[bool, Exception]:
-        """Check if element is enabled."""
-        ...
-
-    async def get_parent(self) -> Result[Optional["ElementHandle"], Exception]:
-        """Get the parent element."""
-        ...
-
-    async def get_children(self) -> Result[List["ElementHandle"], Exception]:
-        """Get all child elements."""
-        ...
-
+    @abstractmethod
     async def query_selector(
-        self, selector: str
-    ) -> Result[Optional["ElementHandle"], Exception]:
-        """Find a child element matching the selector."""
-        ...
+        self,
+        selector: str,
+    ) -> Result[ElementHandle | None, Exception]: ...
 
+    @abstractmethod
     async def query_selector_all(
-        self, selector: str
-    ) -> Result[List["ElementHandle"], Exception]:
-        """Find all child elements matching the selector."""
-        ...
+        self,
+        selector: str,
+    ) -> Result[list[ElementHandle], Exception]: ...
 
-    async def scroll_into_view(self) -> Result[None, Exception]:
-        """Scroll the element into view."""
-        ...
+    @abstractmethod
+    async def click(
+        self,
+        *,
+        timeout_ms: int | None = None,
+        button: MouseButtonLiteral = "left",
+        modifiers: tuple[KeyModifier, ...] = (),
+        delay_ms: int | None = None,
+        click_count: int = 1,
+        force: bool = False,
+    ) -> Result[None, Exception]: ...
 
-    async def input(
-        self, text: str, options: Optional[TypeOptions] = None
-    ) -> "ElementHandle":
-        """Fill element with text and return self for chaining."""
-        ...
+    @abstractmethod
+    async def double_click(
+        self,
+        *,
+        timeout_ms: int | None = None,
+        button: MouseButtonLiteral = "left",
+        modifiers: tuple[KeyModifier, ...] = (),
+        delay_ms: int | None = None,
+        force: bool = False,
+    ) -> Result[None, Exception]: ...
 
-    async def choose(
-        self, value: Optional[str] = None, text: Optional[str] = None
-    ) -> "ElementHandle":
-        """Select an option and return self for chaining."""
-        ...
+    @abstractmethod
+    async def fill(
+        self,
+        text: str,
+        *,
+        timeout_ms: int | None = None,
+        clear: bool = False,
+    ) -> Result[None, Exception]: ...
+
+    @abstractmethod
+    async def type(
+        self,
+        text: str,
+        *,
+        timeout_ms: int | None = None,
+        delay_ms: int | None = None,
+    ) -> Result[None, Exception]: ...
+
+    @abstractmethod
+    async def select(
+        self,
+        *,
+        value: str | None = None,
+        text: str | None = None,
+    ) -> Result[None, Exception]: ...
+
+    @abstractmethod
+    async def scroll_into_view(self) -> Result[None, Exception]: ...
+
+    @abstractmethod
+    async def text(self) -> Result[str, Exception]: ...
+
+    @abstractmethod
+    async def inner_text(self) -> Result[str, Exception]: ...
+
+    @abstractmethod
+    async def html(self, *, outer: bool = True) -> Result[str, Exception]: ...
+
+    @abstractmethod
+    async def attribute(
+        self,
+        name: str,
+    ) -> Result[str | None, Exception]: ...
+
+    @abstractmethod
+    async def move_pointer_to(
+        self,
+        *,
+        offset: CoordinateType = (0, 0),
+        center: bool = True,
+        steps: int = 1,
+    ) -> Result[None, Exception]: ...
+
+    @abstractmethod
+    async def drag_to(
+        self,
+        target: ElementHandle,
+        *,
+        steps: int = 1,
+        move_to_center: bool = True,
+        position_offset: CoordinateType | None = None,
+        source_offset: CoordinateType | None = None,
+        target_offset: CoordinateType | None = None,
+    ) -> Result[None, Exception]: ...
 
 
-    def as_native(self) -> ElementRef:
-        """Get the native element reference."""
-        ...
+class Page(BrowserFocus, ABC):
+    """Action-facing page focus."""
 
-PageRef = TypeVar("PageRef")
+    @property
+    @abstractmethod
+    def page_id(self) -> str: ...
 
-@runtime_checkable
-class Page(Protocol, Generic[PageRef]):
-    """
-    Uniform interface for browser pages/tabs.
+    @property
+    @abstractmethod
+    def context_id(self) -> str: ...
 
-    This protocol defines the contract that all browser page
-    implementations must fulfill, regardless of the underlying automation library.
-    """
+    @abstractmethod
+    async def navigate(
+        self,
+        url: str,
+        *,
+        timeout_ms: int | None = None,
+        wait_until: NavigationWaitLiteral = "load",
+        referer: str | None = None,
+    ) -> Result[None, Exception]: ...
 
-    page_id: str
-    page_ref: PageRef
+    @abstractmethod
+    async def url(self) -> Result[str, Exception]: ...
 
-    def get_page_id(self) -> str:
-        """Get the page ID associated with this page"""
-        return self.page_id
+    @abstractmethod
+    async def title(self) -> Result[str, Exception]: ...
 
-    async def goto(
-        self, url: str, options: Optional[NavigationOptions] = None
-    ) -> Result[None, Exception]:
-        """Navigate to a URL."""
-        ...
+    @abstractmethod
+    async def content(self) -> Result[str, Exception]: ...
 
-    async def get_url(self) -> Result[str, Exception]:
-        """Get the current URL."""
-        ...
-
-    async def current_url(self) -> Result[str, Exception]:
-        """Get the current URL."""
-        ...
-
-    async def get_title(self) -> Result[str, Exception]:
-        """Get the page title."""
-        ...
-
-    async def get_content(self) -> Result[str, Exception]:
-        """Get the page HTML content."""
-        ...
-
-    async def get_page_source(self) -> Result[str, Exception]:
-        """Get the HTML source of the page."""
-        ...
-
+    @abstractmethod
     async def reload(
-        self, options: Optional[NavigationOptions] = None
-    ) -> Result[None, Exception]:
-        """Reload the page."""
-        ...
+        self,
+        *,
+        timeout_ms: int | None = None,
+        wait_until: NavigationWaitLiteral = "load",
+    ) -> Result[None, Exception]: ...
 
+    @abstractmethod
     async def go_back(
-        self, options: Optional[NavigationOptions] = None
-    ) -> Result[None, Exception]:
-        """Navigate back in history."""
-        ...
+        self,
+        *,
+        timeout_ms: int | None = None,
+        wait_until: NavigationWaitLiteral = "load",
+    ) -> Result[None, Exception]: ...
 
+    @abstractmethod
     async def go_forward(
-        self, options: Optional[NavigationOptions] = None
-    ) -> Result[None, Exception]:
-        """Navigate forward in history."""
-        ...
+        self,
+        *,
+        timeout_ms: int | None = None,
+        wait_until: NavigationWaitLiteral = "load",
+    ) -> Result[None, Exception]: ...
 
-    async def query_selector(
-        self, selector: str
-    ) -> Result[Optional[ElementHandle], Exception]:
-        """Find an element by selector."""
-        ...
-
-    async def query_selector_all(
-        self, selector: str
-    ) -> Result[List[ElementHandle], Exception]:
-        """Find all elements matching selector."""
-        ...
-
-    async def wait_for_selector(
-        self, selector: str, options: Optional[WaitOptions] = None
-    ) -> Result[Optional[ElementHandle], Exception]:
-        """Wait for an element matching the selector to appear."""
-        ...
-
+    @abstractmethod
     async def wait_for_navigation(
-        self, options: Optional[NavigationOptions] = None
+        self,
+        *,
+        timeout_ms: int | None = None,
+        wait_until: NavigationWaitLiteral = "load",
     ) -> Result[None, Exception]:
-        """Wait for navigation to complete."""
+        """Wait for the next main-frame navigation and its load state."""
+
         ...
 
-    async def click(
-        self, selector: str, options: Optional[MouseOptions] = None
-    ) -> Result[None, Exception]:
-        """Click an element identified by selector."""
-        ...
+    @abstractmethod
+    async def query_selector(
+        self,
+        selector: str,
+    ) -> Result[ElementHandle | None, Exception]: ...
 
-    async def double_click(
-        self, selector: str, options: Optional[MouseOptions] = None
-    ) -> Result[None, Exception]:
-        """Double-click an element identified by selector."""
-        ...
+    @abstractmethod
+    async def query_selector_all(
+        self,
+        selector: str,
+    ) -> Result[list[ElementHandle], Exception]: ...
 
-    async def type(
-        self, selector: str, text: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Type text into an element identified by selector."""
-        ...
-
-    async def fill(
-        self, selector: str, text: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Fill an element identified by selector with text."""
-        ...
-
-    async def select(
-        self, selector: str, value: Optional[str] = None, text: Optional[str] = None
-    ) -> Result[None, Exception]:
-        """Select an option in a dropdown/select element."""
-        ...
-
-    async def execute_script(self, script: str, *args: Any) -> Result[Any, Exception]:
-        """Execute JavaScript in the page."""
-        ...
+    @abstractmethod
+    async def wait_for_selector(
+        self,
+        selector: str,
+        *,
+        timeout_ms: int | None = None,
+        state: WaitStateLiteral = "visible",
+    ) -> Result[ElementHandle | None, Exception]: ...
 
     @overload
-    async def screenshot(self, path: Path) -> Result[Path, Exception]:
-        """Take a screenshot of the page and save it to a file."""
-        ...
+    async def evaluate(self, script: str) -> Result[object, Exception]: ...
 
     @overload
-    async def screenshot(self) -> Result[bytes, Exception]:
-        """Take a screenshot of the page."""
-        ...
-
-    async def screenshot(self, path: Optional[Path] = None) -> Result[Union[Path, bytes], Exception]:
-        """Take a screenshot of the page, optionally saving to a file."""
-        ...
-
-    async def mouse_move(
-        self, x: float, y: float, options: Optional[MouseOptions] = None
-    ) -> Result[None, Exception]:
-        """Move the mouse to coordinates."""
-        ...
-
-    async def mouse_down(
+    async def evaluate(
         self,
-        button: MouseButtonLiteral = "left",
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Press a mouse button."""
-        ...
+        script: str,
+        argument: object,
+    ) -> Result[object, Exception]: ...
 
-    async def mouse_up(
+    @abstractmethod
+    async def evaluate(
         self,
-        button: MouseButtonLiteral = "left",
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Release a mouse button."""
-        ...
+        script: str,
+        argument: object = _NO_EVALUATION_ARGUMENT,
+    ) -> Result[object, Exception]: ...
 
-    async def mouse_drag(
-        self,
-        source: CoordinateType,
-        target: CoordinateType,
-        options: Optional[DragOptions] = None,
-    ) -> Result[None, Exception]:
-        """Drag from source to target coordinates."""
-        ...
+    @overload
+    async def screenshot(self, path: Path) -> Result[Path, Exception]: ...
 
-    async def key_press(
-        self, key: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Press a key."""
-        ...
+    @overload
+    async def screenshot(self) -> Result[bytes, Exception]: ...
 
-    async def key_down(
-        self, key: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Press and hold a key."""
-        ...
-
-    async def key_up(
-        self, key: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Release a key."""
-        ...
-
-    async def close(self) -> Result[None, Exception]:
-        """Close the page."""
-        ...
-
-    async def scroll(
-        self,
-        x: Optional[int] = None,
-        y: Optional[int] = None,
-        selector: Optional[str] = None,
-    ) -> Result[None, Exception]:
-        """Scroll the page or an element into view."""
-        ...
-
-ContextRef = TypeVar("ContextRef")
-
-class BrowserContextOptions(BaseModel):
-    """Options for creating a browser context"""
-    viewport: Optional[Dict[str, Any]] = None
-    permissions: Optional[List[str]] = None
-    user_agent: Optional[str] = None
-    extra_http_headers: Optional[Dict[str, str]] = None
-    proxy: Optional[Dict[str, Any]] = None
-    user_data_dir: Optional[str] = None
-    ignore_default_args: bool = False
-    args: Optional[List[str]] = None
-    headless: bool = True
-    slow_mo: Optional[int] = None
-    timeout: Optional[int] = None
-    
-
-@runtime_checkable
-class BrowserContext(Protocol, Generic[ContextRef]):
-    """
-    Uniform interface for browser contexts.
-
-    A browser context is an isolated browser session with its own cookies,
-    localStorage, and cache.
-    """
-
-    page_id: str
-    context_id: str
-    context_ref: ContextRef
-
-    def get_page_id(self) -> str:
-        """Get the page ID associated with this context"""
-        return self.page_id
-    
-    def get_context_id(self) -> str:
-        """Get the context ID associated with this context"""
-        return self.context_id
-
-    async def new_page(self) -> Result[Page, Exception]:
-        """Create a new page in this context."""
-        ...
-
-    async def create_page(
-        self, nickname: Optional[str] = None
-    ) -> Result[Page, Exception]:
-        """Create a new page in this context."""
-        ...
-
-    async def pages(self) -> Result[List[Page], Exception]:
-        """Get all pages in this context."""
-        ...
-
-    async def get_page(
-        self, page_id: Optional[str] = None
-    ) -> Result[Page, Exception]:
-        """Get a page by ID or the default page."""
-        ...
-
-    async def close_page(
-        self, page_id: Optional[str] = None
-    ) -> Result[None, Exception]:
-        """Close a page by ID or the default page."""
-        ...
-
-    async def get_cookies(self) -> Result[List[Dict[str, Any]], Exception]:
-        """Get all cookies."""
-        ...
-
-    async def set_cookies(
-        self, cookies: List[Dict[str, Any]]
-    ) -> Result[None, Exception]:
-        """Set cookies."""
-        ...
-
-    async def clear_cookies(self) -> Result[None, Exception]:
-        """Clear all cookies."""
-        ...
-
-    async def add_init_script(self, script: str) -> Result[None, Exception]:
-        """Add a script to be run in all pages."""
-        ...
-
-    async def set_content(self, content: str) -> Result[None, Exception]:
-        """Set the content of the page."""
-        ...
-
-    async def mouse_move(
-        self, x: int, y: int, options: Optional[MouseOptions] = None
-    ) -> Result[None, Exception]:
-        """Move the mouse to coordinates."""
-        ...
-
-    async def mouse_down(
-        self,
-        button: MouseButtonLiteral = "left",
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Press a mouse button."""
-        ...
-
-    async def mouse_up(
-        self,
-        button: MouseButtonLiteral = "left",
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Release a mouse button."""
-        ...
-
-    async def mouse_click(
-        self,
-        button: MouseButtonLiteral = "left",
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Click at the current mouse position."""
-        ...
-
-    async def mouse_double_click(
-        self, x: int, y: int, options: Optional[MouseOptions] = None
-    ) -> Result[None, Exception]:
-        """Double click at the specified coordinates."""
-        ...
-
-    async def mouse_drag(
-        self,
-        source: CoordinateType,
-        target: CoordinateType,
-        options: Optional[DragOptions] = None,
-    ) -> Result[None, Exception]:
-        """Drag from source to target coordinates."""
-        ...
-
-    async def key_press(
-        self, key: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Press a key."""
-        ...
-
-    async def key_down(
-        self, key: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Press and hold a key."""
-        ...
-
-    async def key_up(
-        self, key: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Release a key."""
-        ...
-
-    async def close(self) -> Result[None, Exception]:
-        """Close the context and all its pages."""
-        ...
-
-DriverRef = TypeVar("DriverRef")
-
-@runtime_checkable
-class Driver(Protocol, Generic[DriverRef]):
-    """
-    Uniform interface for browser automation drivers.
-
-    This protocol defines the contract that all browser driver
-    implementations must fulfill, regardless of the underlying automation library.
-    """
-
-    driver_ref: Optional[DriverRef] = None
-
-    def get_driver_ref(self) -> Optional[DriverRef]:
-        """Get the reference to the driver in the underlying automation library"""
-        return self.driver_ref
-
-    async def launch(
-        self, options: Optional[BrowserOptions] = None
-    ) -> Result[None, Exception]:
-        """Launch the browser."""
-        ...
-
-    async def new_context(
-        self, options: Optional[BrowserContextOptions] = None
-    ) -> Result[BrowserContext, Exception]:
-        """Create a new browser context."""
-        ...
-
-    async def create_context(
-        self, options: Optional[BrowserContextOptions] = None
-    ) -> Result[str, Exception]:
-        """Create a new browser context with isolated storage and return its ID."""
-        ...
-
-    async def contexts(self) -> Result[List[BrowserContext], Exception]:
-        """Get all browser contexts."""
-        ...
-
-    async def close_context(self, context_id: str) -> Result[None, Exception]:
-        """Close a browser context."""
-        ...
-
-    async def create_page(self, context_id: str) -> Result[str, Exception]:
-        """Create a new page in the specified context."""
-        ...
-
-    async def close_page(self, page_id: str) -> Result[None, Exception]:
-        """Close a page."""
-        ...
-
-    async def goto(
-        self, page_id: str, url: str, options: Optional[NavigationOptions] = None
-    ) -> Result[None, Exception]:
-        """Navigate a page to a URL."""
-        ...
-
-    async def current_url(self, page_id: str) -> Result[str, Exception]:
-        """Get the current URL of a page."""
-        ...
-
-    async def get_source(self, page_id: str) -> Result[str, Exception]:
-        """Get the current page HTML source."""
-        ...
-
+    @abstractmethod
     async def screenshot(
-        self, page_id: str, path: Optional[Path] = None
-    ) -> Result[Union[Path, bytes], Exception]:
-        """Take a screenshot of a page."""
-        ...
-
-    async def reload(self, page_id: str) -> Result[None, Exception]:
-        """Reload the current page."""
-        ...
-
-    async def go_back(self, page_id: str) -> Result[None, Exception]:
-        """Go back to the previous page."""
-        ...
-
-    async def go_forward(self, page_id: str) -> Result[None, Exception]:
-        """Go forward to the next page."""
-        ...
-
-    async def query_selector(
-        self, page_id: str, selector: str
-    ) -> Result[Optional[ElementHandle], Exception]:
-        """Query a single element with the provided selector in a page."""
-        ...
-
-    async def query_selector_all(
-        self, page_id: str, selector: str
-    ) -> Result[List[ElementHandle], Exception]:
-        """Query all elements that match the provided selector in a page."""
-        ...
-
-    async def wait_for_selector(
-        self, page_id: str, selector: str, options: Optional[WaitOptions] = None
-    ) -> Result[Optional[ElementHandle], Exception]:
-        """Wait for an element matching the selector to appear in a page."""
-        ...
-
-    async def wait_for_navigation(
-        self, page_id: str, options: Optional[NavigationOptions] = None
-    ) -> Result[None, Exception]:
-        """Wait for navigation to complete in a page."""
-        ...
-
-    async def click(
-        self, page_id: str, selector: str, options: Optional[MouseOptions] = None
-    ) -> Result[None, Exception]:
-        """Click an element in a page."""
-        ...
-
-    async def double_click(
-        self, page_id: str, selector: str, options: Optional[MouseOptions] = None
-    ) -> Result[None, Exception]:
-        """Double click an element in a page."""
-        ...
-
-    async def type(
         self,
-        page_id: str,
-        selector: str,
-        text: str,
-        options: Optional[TypeOptions] = None,
-    ) -> Result[None, Exception]:
-        """Type text into an element."""
-        ...
+        path: Path | None = None,
+    ) -> Result[Path | bytes, Exception]: ...
 
-    async def fill(
-        self,
-        page_id: str,
-        selector: str,
-        text: str,
-        options: Optional[TypeOptions] = None,
-    ) -> Result[None, Exception]:
-        """Fill an input element with text."""
-        ...
-
-    async def select(
-        self,
-        page_id: str,
-        selector: str,
-        value: Optional[str] = None,
-        text: Optional[str] = None,
-    ) -> Result[None, Exception]:
-        """Select an option in a <select> element."""
-        ...
-
-    async def execute_script(
-        self, page_id: str, script: str, *args: Any
-    ) -> Result[Any, Exception]:
-        """Execute JavaScript in the page context."""
-        ...
-
+    @abstractmethod
     async def mouse_move(
         self,
-        page_id: str,
         x: float,
         y: float,
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Move the mouse to the specified coordinates within a context."""
-        ...
+        *,
+        steps: int = 1,
+    ) -> Result[None, Exception]: ...
 
+    @abstractmethod
     async def mouse_down(
         self,
-        page_id: str,
+        *,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Press a mouse button within a context."""
-        ...
+    ) -> Result[None, Exception]: ...
 
+    @abstractmethod
     async def mouse_up(
         self,
-        page_id: str,
+        *,
         button: MouseButtonLiteral = "left",
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Release a mouse button within a context."""
-        ...
+    ) -> Result[None, Exception]: ...
 
-    async def mouse_click(
-        self,
-        page_id: str,
-        button: MouseButtonLiteral = "left",
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Click at the current mouse position within a context."""
-        ...
-
-    async def mouse_double_click(
-        self,
-        page_id: str,
-        x: int,
-        y: int,
-        options: Optional[MouseOptions] = None,
-    ) -> Result[None, Exception]:
-        """Double click at the specified coordinates within a context."""
-        ...
-
-    async def mouse_drag(
-        self,
-        page_id: str,
-        source: CoordinateType,
-        target: CoordinateType,
-        options: Optional[DragOptions] = None,
-    ) -> Result[None, Exception]:
-        """Drag from one element or position to another within a context."""
-        ...
-
+    @abstractmethod
     async def key_press(
-        self, page_id: str, key: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Press a key or key combination within a context."""
-        ...
-
-    async def key_down(
-        self, page_id: str, key: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Press and hold a key within a context."""
-        ...
-
-    async def key_up(
-        self, page_id: str, key: str, options: Optional[TypeOptions] = None
-    ) -> Result[None, Exception]:
-        """Release a key within a context."""
-        ...
-
-    async def get_element_text(
-        self, page_id: str, element: ElementHandle
-    ) -> Result[str, Exception]:
-        """Get the text content of an element."""
-        ...
-
-    async def get_element_attribute(
-        self, page_id: str, element: ElementHandle, name: str
-    ) -> Result[Optional[str], Exception]:
-        """Get an attribute value from an element."""
-        ...
-
-    async def get_element_bounding_box(
-        self, page_id: str, element: ElementHandle
-    ) -> Result[Dict[str, float], Exception]:
-        """Get the bounding box of an element."""
-        ...
-
-    async def click_element(
-        self, page_id: str, element: ElementHandle
-    ) -> Result[None, Exception]:
-        """Click an element."""
-        ...
-
-    async def get_element_html(
-        self, page_id: str, element: ElementHandle, outer: bool = True
-    ) -> Result[str, Exception]:
-        """Get the HTML content of an element."""
-        ...
-
-    async def get_element_inner_text(
-        self, page_id: str, element: ElementHandle
-    ) -> Result[str, Exception]:
-        """Get the innerText of an element (visible text only)."""
-        ...
-
-    async def extract_table(
         self,
-        page_id: str,
-        table_element: ElementHandle,
-        include_headers: bool = True,
-        header_selector: str = "th",
-        row_selector: str = "tr",
-        cell_selector: str = "td",
-    ) -> Result[List[Dict[str, str]], Exception]:
-        """Extract data from an HTML table element."""
-        ...
+        key: str,
+        *,
+        delay_ms: int | None = None,
+    ) -> Result[None, Exception]: ...
 
+    @abstractmethod
+    async def key_down(self, key: str) -> Result[None, Exception]: ...
+
+    @abstractmethod
+    async def key_up(self, key: str) -> Result[None, Exception]: ...
+
+    @abstractmethod
     async def scroll(
         self,
-        page_id: str,
-        x: Optional[int] = None,
-        y: Optional[int] = None,
-        selector: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None,
-    ) -> Result[None, Exception]:
-        """Scroll the page to specific coordinates or scroll an element into view."""
-        ...
+        *,
+        x: int = 0,
+        y: int = 0,
+    ) -> Result[None, Exception]: ...
 
-    async def execute_cdp_cmd(
-        self, page_id: str, cmd: str, *args: Any
-    ) -> Result[Any, Exception]:
-        """Execute a CDP command."""
-        ...
+    @abstractmethod
+    async def close(self) -> Result[None, Exception]: ...
 
-    async def close(self) -> Result[None, Exception]:
-        """Close the browser and all its contexts."""
-        ...
 
-class RetryOptions(BaseModel):
-    """Options for action retry behavior"""
-
-    max_retries: int = 0
-    retry_delay_ms: int = 500
-    retry_on_error_types: List[str] = Field(default_factory=list)
-    exponential_backoff: bool = False
-    jitter: bool = True
-
-class WaitUntilOptions(BaseModel):
-    """Options for conditional waiting"""
-
-    condition: str = ""
-    timeout_ms: int = 30000
-    poll_interval_ms: int = 100
-    ignore_errors: bool = False
-
-class ActionOptions(BaseModel):
-    """Options for browser actions"""
-
-    timeout_ms: int = 30000
-    retry: RetryOptions = Field(default_factory=RetryOptions)
-    wait: WaitUntilOptions = Field(default_factory=WaitUntilOptions)
-    continue_on_error: bool = False
-    record_performance: bool = False
-    take_screenshot_on_error: bool = False
-    validate_result: bool = False
-    cleanup_after: bool = True
-
-class ActionContext(BaseContext):
-    """
-    Context for browser automation actions.
-
-    This context maintains references to the current driver,
-    browser context, and page, allowing actions to interact
-    with the browser in a uniform way.
-    """
-
-    driver: Optional[Driver] = Field(default=None, exclude=True)
-    context: Optional[BrowserContext] = Field(default=None, exclude=True)
-    page: Optional[Page] = Field(default=None, exclude=True)
-
-    driver_type: str = "playwright"
-    context_id: Optional[str] = None
-    page_id: Optional[str] = None
-
-    page_ids: Set[str] = Field(default_factory=set)
-
-    retry_count: int = 0
-
-    options: ActionOptions = Field(default_factory=ActionOptions)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    def derive(self, **kwargs: Any) -> "ActionContext":
-        """Create a new context with updated values."""
-        new_metadata = None
-        if "metadata" in kwargs:
-            new_metadata = self.metadata.copy()
-            metadata_updates = kwargs.pop("metadata")
-            for key, value in metadata_updates.items():
-                new_metadata[key] = value
-
-        new_context = self.model_copy(update=kwargs)
-
-        if new_metadata:
-            new_context.metadata = new_metadata
-
-        return new_context
+class BrowserContext(BrowserFocus, ABC):
+    """Action-facing identity and lifecycle for one isolated context."""
 
     @property
-    def current_url(self) -> Optional[str]:
-        """Get the current URL from metadata."""
-        return self.metadata.get("current_url")
+    @abstractmethod
+    def context_id(self) -> str: ...
 
-    @property
-    def has_active_page(self) -> bool:
-        """Check if there's an active page."""
-        return self.page is not None
+    @abstractmethod
+    async def new_page(self) -> Result[Page, Exception]: ...
 
-    def with_retry_options(self, **retry_kwargs: Any) -> "ActionContext":
-        """Update retry options and return new context."""
-        new_retry = RetryOptions(**{**self.options.retry.model_dump(), **retry_kwargs})
-        new_action_options = self.options.model_copy(update={"retry": new_retry})
-        return self.derive(options=new_action_options)
+    @abstractmethod
+    async def pages(self) -> Result[list[Page], Exception]: ...
 
-    def with_timeout(self, timeout_ms: int) -> "ActionContext":
-        """Set action timeout and return new context."""
-        new_action_options = self.options.model_copy(update={"timeout_ms": timeout_ms})
-        return self.derive(options=new_action_options)
+    @abstractmethod
+    async def close(self) -> Result[None, Exception]: ...
 
-    def increment_retry_count(self) -> "ActionContext":
-        """Increment retry count and return new context."""
-        return self.derive(retry_count=self.retry_count + 1)
+
+@final
+@dataclass(frozen=True, slots=True)
+class BrowserViewport(_ImmutableBrowserConfiguration):
+    """Strict immutable viewport dimensions for one browser context."""
+
+    width: int
+    height: int
+
+    def __post_init__(self) -> None:
+        if type(self.width) is not int:
+            raise TypeError("viewport width must be an integer")
+        if type(self.height) is not int:
+            raise TypeError("viewport height must be an integer")
+        if self.width < 1:
+            raise ValueError("viewport width must be positive")
+        if self.height < 1:
+            raise ValueError("viewport height must be positive")
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class BrowserProxy(_ImmutableBrowserConfiguration):
+    """Strict immutable per-context proxy settings."""
+
+    server: str
+    bypass: str | None = None
+    username: str | None = None
+    password: str | None = None
+
+    def __post_init__(self) -> None:
+        _require_exact_string(self.server, "proxy server")
+        _require_optional_string(self.bypass, "proxy bypass")
+        _require_optional_string(self.username, "proxy username")
+        _require_optional_string(self.password, "proxy password")
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class BrowserLaunchProxy(_ImmutableBrowserConfiguration):
+    """Strict immutable proxy endpoint for the Chromium process."""
+
+    server: str
+
+    def __post_init__(self) -> None:
+        _require_exact_string(self.server, "launch proxy server")
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class BrowserOptions(_ImmutableBrowserConfiguration):
+    """Strict immutable Chromium process-launch configuration."""
+
+    headless: bool = True
+    timeout: int = 30_000
+    args: tuple[str, ...] = ()
+    proxy: BrowserLaunchProxy | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.headless) is not bool:
+            raise TypeError("headless must be a boolean")
+        if type(self.timeout) is not int:
+            raise TypeError("timeout must be an integer")
+        if self.timeout < 0:
+            raise ValueError("timeout must be non-negative")
+        if type(self.args) is not tuple:
+            raise TypeError("args must be a tuple of strings")
+        for argument in self.args:
+            _require_exact_string(argument, "browser argument")
+        if self.proxy is not None and type(self.proxy) is not BrowserLaunchProxy:
+            raise TypeError("proxy must be BrowserLaunchProxy or None")
+
+
+@final
+@dataclass(frozen=True, slots=True, init=False)
+class BrowserHttpHeaders(_ImmutableBrowserConfiguration, Mapping[str, str]):
+    """Immutable HTTP header mapping copied from construction data."""
+
+    _items: tuple[tuple[str, str], ...]
+
+    def __init__(self, values: Mapping[str, str] | None = None) -> None:
+        if values is None:
+            items: tuple[tuple[str, str], ...] = ()
+        else:
+            collected: list[tuple[str, str]] = []
+            for name, value in values.items():
+                _require_exact_string(name, "HTTP header name")
+                _require_exact_string(value, f"HTTP header {name!r} value")
+                collected.append((name, value))
+            items = tuple(collected)
+        object.__setattr__(self, "_items", items)
+
+    def __getitem__(self, name: str) -> str:
+        for item_name, value in self._items:
+            if item_name == name:
+                return value
+        raise KeyError(name)
+
+    def __iter__(self) -> Iterator[str]:
+        return (name for name, _value in self._items)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class BrowserContextOptions(_ImmutableBrowserConfiguration):
+    """Strict deeply immutable configuration for one browser context."""
+
+    viewport: BrowserViewport | None = None
+    permissions: tuple[str, ...] | None = None
+    user_agent: str | None = None
+    extra_http_headers: BrowserHttpHeaders | None = None
+    proxy: BrowserProxy | None = None
+    locale: str | None = None
+    timezone_id: str | None = None
+    timeout: int | None = None
+    navigation_timeout: int | None = None
+    ignore_https_errors: bool = False
+    java_script_enabled: bool = True
+
+    def __post_init__(self) -> None:
+        if self.viewport is not None and type(self.viewport) is not BrowserViewport:
+            raise TypeError("viewport must be BrowserViewport or None")
+        if self.permissions is not None:
+            if type(self.permissions) is not tuple:
+                raise TypeError("permissions must be a tuple of strings or None")
+            for permission in self.permissions:
+                _require_exact_string(permission, "permission")
+        _require_optional_string(self.user_agent, "user agent")
+        if (
+            self.extra_http_headers is not None
+            and type(self.extra_http_headers) is not BrowserHttpHeaders
+        ):
+            raise TypeError("extra_http_headers must be BrowserHttpHeaders or None")
+        if self.proxy is not None and type(self.proxy) is not BrowserProxy:
+            raise TypeError("proxy must be BrowserProxy or None")
+        _require_optional_string(self.locale, "locale")
+        _require_optional_string(self.timezone_id, "timezone_id")
+        _require_optional_non_negative_integer(self.timeout, "timeout")
+        _require_optional_non_negative_integer(
+            self.navigation_timeout,
+            "navigation_timeout",
+        )
+        if type(self.ignore_https_errors) is not bool:
+            raise TypeError("ignore_https_errors must be a boolean")
+        if type(self.java_script_enabled) is not bool:
+            raise TypeError("java_script_enabled must be a boolean")
+
+
+__all__ = [
+    "BrowserContext",
+    "BrowserContextOptions",
+    "BrowserFocus",
+    "BrowserHttpHeaders",
+    "BrowserLaunchProxy",
+    "BrowserOptions",
+    "BrowserProxy",
+    "BrowserViewport",
+    "CoordinateType",
+    "ElementHandle",
+    "KeyModifier",
+    "MouseButtonLiteral",
+    "NavigationWaitLiteral",
+    "Page",
+    "WaitStateLiteral",
+]
