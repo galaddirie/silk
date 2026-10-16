@@ -1,706 +1,381 @@
-"""
-Tests for Silk context management actions module.
-"""
+"""Public-interface contracts for browser lifecycle operation templates."""
+
+from __future__ import annotations
+
+import inspect
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from fp_ops import Environment, EnvironmentError, Error, Ok, Operation, _
 
-from expression import Error, Ok, Result
-
+import silk.actions.browser as browser_actions
 from silk.actions.browser import (
-    CreateContext, CreatePage, SwitchToPage, CloseCurrentPage,
-    CloseContext, WithNewTab, GetAllPages, FocusPage, ReloadPage,
-    GetCurrentUrl, GetPageTitle, WithMetadata
+    CloseContext as close_context,
+    ClosePage as close_page,
+    CreateContext as create_context,
+    NewPage as new_page,
+    PageById as page_by_id,
+    Pages as pages,
 )
-from silk.browsers.models import ActionContext, BrowserContext, Page, Driver, NavigationOptions
+from silk.browsers.capabilities import (
+    DRIVER,
+    BrowserDriverCapability,
+    BrowserSessionInfo,
+)
+from silk.browsers.models import (
+    BrowserContext,
+    BrowserContextOptions,
+    BrowserHttpHeaders,
+    BrowserOptions,
+    BrowserViewport,
+    Page,
+)
+from silk.browsers.sessions import BrowserSession
+from silk.errors import PageNotFoundError
 
 
-def create_mock_page(page_id="mock-page-id"):
-    """Create a mock page that implements the Page protocol."""
-    mock = MagicMock()
-    mock.page_id = page_id
-    mock.page_ref = f"{page_id}-ref"
-    mock.get_page_id = MagicMock(return_value=page_id)
-    mock.close = AsyncMock(return_value=Ok(None))
-    return mock
+def make_page(page_id: str) -> MagicMock:
+    """Return an identity-preserving page double at the public seam."""
+
+    page = MagicMock(spec=Page)
+    page.page_id = page_id
+    page.close = AsyncMock(return_value=Ok(None))
+    page.__copy__.return_value = page
+    page.__deepcopy__.return_value = page
+    return page
 
 
-def create_mock_context(context_id="mock-context-id", pages=None):
-    """Create a mock context that implements the BrowserContext protocol."""
-    mock = MagicMock()
-    mock.context_id = context_id
-    mock.page_id = "default-page-id"
-    mock.context_ref = f"{context_id}-ref"
-    mock.get_page_id = MagicMock(return_value="default-page-id")
-    
-    if pages is None:
-        pages = {"default-page-id": create_mock_page("default-page-id")}
-    mock._pages = pages
-    
-    async def mock_new_page():
-        page_id = f"page-{len(mock._pages) + 1}"
-        page = create_mock_page(page_id)
-        mock._pages[page_id] = page
-        return Ok(page)
-    
-    async def mock_create_page(nickname=None):
-        page_id = nickname or f"page-{len(mock._pages) + 1}"
-        if page_id in mock._pages:
-            return Error(Exception(f"Page '{page_id}' already exists"))
-        page = create_mock_page(page_id)
-        mock._pages[page_id] = page
-        return Ok(page)
-    
-    async def mock_get_page(page_id=None):
-        if page_id is None:
-            page_id = "default-page-id"
-        if page_id in mock._pages:
-            return Ok(mock._pages[page_id])
-        return Error(Exception(f"Page '{page_id}' not found"))
-    
-    async def mock_close_page(page_id=None):
-        if page_id is None:
-            page_id = "default-page-id"
-        if page_id in mock._pages:
-            del mock._pages[page_id]
-            return Ok(None)
-        return Error(Exception(f"Page '{page_id}' not found"))
-    
-    async def mock_pages():
-        return Ok(list(mock._pages.values()))
-    
-    mock.new_page = mock_new_page
-    mock.create_page = mock_create_page
-    mock.get_page = mock_get_page
-    mock.close_page = mock_close_page
-    mock.pages = mock_pages
-    mock.close = AsyncMock(return_value=Ok(None))
-    
-    return mock
+def make_context(
+    context_id: str,
+    page_values: list[Page] | None = None,
+) -> MagicMock:
+    """Return an identity-preserving browser-context double."""
+
+    context = MagicMock(spec=BrowserContext)
+    context.context_id = context_id
+    context.new_page = AsyncMock(return_value=Ok(make_page("new-page")))
+    context.pages = AsyncMock(return_value=Ok(page_values or []))
+    context.close = AsyncMock(return_value=Ok(None))
+    context.__copy__.return_value = context
+    context.__deepcopy__.return_value = context
+    return context
+
+
+def make_driver(context: BrowserContext) -> MagicMock:
+    """Return a driver double accepted by the typed capability wrapper."""
+
+    driver = MagicMock()
+    driver.new_context = AsyncMock(return_value=Ok(context))
+    return driver
 
 
 @pytest.mark.asyncio
-async def test_create_context_with_page(action_context, mock_driver, mock_browser_context, mock_page):
-    """Test CreateContext creates a new context with a page."""
-    mock_driver.new_context = AsyncMock(return_value=Ok(mock_browser_context))
-    mock_browser_context.new_page = AsyncMock(return_value=Ok(mock_page))
-    
-    action_context.driver = mock_driver
-    
-    create_context = CreateContext(create_page=True)
-    result = await create_context(context=action_context)
-    
-    assert result.is_ok(), f"CreateContext failed: {result.error if result.is_error() else ''}"
-    new_context = result.default_value(None)
-    
-    assert isinstance(new_context, ActionContext)
-    assert new_context.driver == mock_driver
-    assert new_context.context == mock_browser_context
-    assert new_context.page == mock_page
-    assert new_context.page_id is not None
-    
-    mock_driver.new_context.assert_called_once()
-    mock_browser_context.new_page.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_create_context_without_page(action_context, mock_driver, mock_browser_context):
-    """Test CreateContext without creating a page."""
-    mock_driver.new_context = AsyncMock(return_value=Ok(mock_browser_context))
-    
-    action_context.driver = mock_driver
-    
-    create_context = CreateContext(create_page=False)
-    result = await create_context(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    assert new_context.context == mock_browser_context
-    assert new_context.page is None
-    assert new_context.page_id is None
-    mock_browser_context.new_page.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_create_context_with_options(action_context, mock_driver, mock_browser_context):
-    """Test CreateContext with custom context options."""
-    context_options = {"viewport": {"width": 1920, "height": 1080}}
-    mock_driver.new_context = AsyncMock(return_value=Ok(mock_browser_context))
-    
-    action_context.driver = mock_driver
-    
-    create_context = CreateContext(context_options=context_options, create_page=False)
-    result = await create_context(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    mock_driver.new_context.assert_called_once_with(context_options)
-    assert new_context.metadata["context_options"] == context_options
-
-
-@pytest.mark.asyncio
-async def test_create_context_error_no_driver(action_context):
-    """Test CreateContext handles missing driver."""
-    action_context.driver = None
-    
-    create_context = CreateContext()
-    result = await create_context(context=action_context)
-    
-    assert result.is_error()
-    assert "No driver found" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_create_page_with_switch(action_context, mock_browser_context, mock_page):
-    """Test CreatePage creates a new page and switches to it."""
-    new_page = create_mock_page("new-page-id")
-    
-    mock_browser_context.new_page = AsyncMock(return_value=Ok(new_page))
-    
-    action_context.context = mock_browser_context
-    action_context.page_ids = {"existing-page"}
-    
-    create_page = CreatePage(switch_to=True)
-    result = await create_page(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    assert new_context.page == new_page
-    assert new_context.page_id is not None
-    assert len(new_context.page_ids) == 2
-    assert new_context.metadata.get("previous_page_id") == action_context.page_id
-    mock_browser_context.new_page.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_create_page_without_switch(action_context, mock_browser_context, mock_page):
-    """Test CreatePage creates a new page without switching."""
-    new_page = create_mock_page("new-page-id")
-    
-    mock_browser_context.new_page = AsyncMock(return_value=Ok(new_page))
-    
-    action_context.context = mock_browser_context
-    action_context.page = mock_page
-    action_context.page_id = "current-page"
-    action_context.page_ids = {"current-page"}
-    
-    create_page = CreatePage(switch_to=False)
-    result = await create_page(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    assert new_context.page == mock_page
-    assert new_context.page_id == "current-page"
-    assert len(new_context.page_ids) == 2
-    mock_browser_context.new_page.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_create_page_with_nickname(action_context, mock_browser_context):
-    """Test CreatePage with a specific nickname."""
-    new_page = create_mock_page("custom-nickname")
-    new_page.page_id = "custom-nickname"
-    
-    mock_browser_context.new_page = AsyncMock(return_value=Ok(new_page))
-    
-    action_context.context = mock_browser_context
-    
-    create_page = CreatePage(page_nickname="custom-nickname")
-    result = await create_page(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    assert new_context.page_id == "custom-nickname"
-    assert "custom-nickname" in new_context.page_ids
-
-
-@pytest.mark.asyncio
-async def test_create_page_error_no_context(action_context):
-    """Test CreatePage handles missing context."""
-    action_context.context = None
-    
-    create_page = CreatePage()
-    result = await create_page(context=action_context)
-    
-    assert result.is_error()
-    assert "No browser context found" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_switch_to_existing_page(action_context, mock_browser_context):
-    """Test switching to an existing page."""
-    page1 = create_mock_page("page-1")
-    page1.page_id = "page-1"
-    target_page = create_mock_page("target-page")
-    target_page.page_id = "target-page"
-    
-    mock_browser_context.pages = AsyncMock(return_value=Ok([page1, target_page]))
-    
-    action_context.context = mock_browser_context
-    action_context.page = page1
-    action_context.page_id = "page-1"
-    action_context.page_ids = {"page-1", "target-page"}
-    switch_to_page = SwitchToPage(page_id="target-page")
-    result = await switch_to_page(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    assert new_context.page_id == "target-page"
-    assert new_context.page == target_page
-    assert new_context.metadata.get("previous_page_id") == "page-1"
-
-
-@pytest.mark.asyncio
-async def test_switch_to_page_not_tracked(action_context, mock_browser_context):
-    """Test switching to a page that's not in tracked pages."""
-    action_context.context = mock_browser_context
-    action_context.page_ids = {"page-1"}
-    
-    switch_to_page = SwitchToPage(page_id="untracked-page")
-    result = await switch_to_page(context=action_context)
-    
-    assert result.is_error()
-    assert "not found in tracked pages" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_switch_to_page_by_index(action_context, mock_browser_context):
-    """Test switching to a page by numeric index."""
-    page0 = create_mock_page("page-0")
-    page1 = create_mock_page("page-1")
-    
-    mock_browser_context.pages = AsyncMock(return_value=Ok([page0, page1]))
-    
-    action_context.context = mock_browser_context
-    action_context.page = page0
-    action_context.page_id = "page-0"
-    action_context.page_ids = {"0", "1"}
-    
-    switch_to_page = SwitchToPage(page_id="1")
-    result = await switch_to_page(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    assert new_context.page == page1
-
-
-@pytest.mark.asyncio
-async def test_switch_to_page_error_no_context(action_context):
-    """Test SwitchToPage handles missing context."""
-    action_context.context = None
-    
-    switch_to_page = SwitchToPage(page_id="any-page")
-    result = await switch_to_page(context=action_context)
-    
-    assert result.is_error()
-    assert "No browser context found" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_close_current_page_with_switch(action_context, mock_browser_context):
-    """Test closing the current page and switching to another."""
-    page1 = create_mock_page("page-1")
-    page2 = create_mock_page("page-2")
-    
-    page1.close = AsyncMock(return_value=Ok(None))
-    
-    mock_browser_context.pages = AsyncMock(return_value=Ok([page2]))
-    
-    action_context.context = mock_browser_context
-    action_context.page = page1
-    action_context.page_id = "page-1"
-    action_context.page_ids = {"page-1", "page-2"}
-    
-    close_page = CloseCurrentPage(switch_to_last=True)
-    result = await close_page(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    page1.close.assert_called_once()
-    assert "page-1" not in new_context.page_ids
-    assert new_context.page == page2
-    assert new_context.metadata.get("closed_page_id") == "page-1"
-
-
-@pytest.mark.asyncio
-async def test_close_last_page(action_context, mock_browser_context):
-    """Test closing the last page in a context."""
-    page1 = create_mock_page("page-1")
-    
-    page1.close = AsyncMock(return_value=Ok(None))
-    
-    mock_browser_context.pages = AsyncMock(return_value=Ok([]))
-    
-    action_context.context = mock_browser_context
-    action_context.page = page1
-    action_context.page_id = "page-1"
-    action_context.page_ids = {"page-1"}
-    
-    close_page = CloseCurrentPage(switch_to_last=True)
-    result = await close_page(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    assert new_context.page is None
-    assert new_context.page_id is None
-    assert len(new_context.page_ids) == 0
-
-
-@pytest.mark.asyncio
-async def test_close_current_page_error_no_page(action_context):
-    """Test CloseCurrentPage handles missing page."""
-    action_context.page = None
-    
-    close_page = CloseCurrentPage()
-    result = await close_page(context=action_context)
-    
-    assert result.is_error()
-    assert "No page found" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_close_context(action_context, mock_browser_context):
-    """Test closing the current context."""
-    mock_browser_context.close = AsyncMock(return_value=Ok(None))
-    
-    action_context.context = mock_browser_context
-    action_context.context_id = "test-context"
-    
-    close_context = CloseContext()
-    result = await close_context(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    mock_browser_context.close.assert_called_once()
-    assert new_context.context is None
-    assert new_context.page is None
-    assert new_context.context_id is None
-    assert new_context.page_id is None
-    assert len(new_context.page_ids) == 0
-    assert new_context.metadata.get("closed_context_id") == "test-context"
-
-
-@pytest.mark.asyncio
-async def test_close_context_error_no_context(action_context):
-    """Test CloseContext handles missing context."""
-    action_context.context = None
-    
-    close_context = CloseContext()
-    result = await close_context(context=action_context)
-    
-    assert result.is_error()
-    assert "No browser context found" in str(result.error)
-
-
-@pytest.mark.asyncio
-async def test_with_new_tab(action_context, mock_browser_context, mock_page):
-    """Test WithNewTab creates a new tab and navigates."""
-    new_page = create_mock_page("new-tab")
-    new_page.goto = AsyncMock(return_value=Ok(None))
-    
-    mock_browser_context.new_page = AsyncMock(return_value=Ok(new_page))
-    
-    action_context.context = mock_browser_context
-    
-    with_new_tab = WithNewTab(url="https://example.com")
-    result = await with_new_tab(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    assert new_context.page == new_page
-    new_page.goto.assert_called_once_with("https://example.com")
-    assert new_context.metadata.get("current_url") == "https://example.com"
-
-
-@pytest.mark.asyncio
-async def test_with_new_tab_no_url(action_context, mock_browser_context):
-    """Test WithNewTab creates a new tab without navigation."""
-    new_page = create_mock_page("new-tab")
-    
-    mock_browser_context.new_page = AsyncMock(return_value=Ok(new_page))
-    
-    action_context.context = mock_browser_context
-    
-    with_new_tab = WithNewTab()
-    result = await with_new_tab(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    
-    assert new_context.page == new_page
-    new_page.goto.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_get_all_pages(action_context, mock_browser_context):
-    """Test GetAllPages returns list of page IDs."""
-    page1 = create_mock_page("page-1")
-    page1.page_id = "page-1"
-    page2 = create_mock_page("page-2")
-    page2.page_id = "page-2"
-    
-    mock_browser_context.pages = AsyncMock(return_value=Ok([page1, page2]))
-    
-    action_context.context = mock_browser_context
-    
-    get_all_pages = GetAllPages()
-    result = await get_all_pages(context=action_context)
-    
-    assert result.is_ok()
-    page_ids = result.default_value(None)
-    assert page_ids == ["page-1", "page-2"]
-
-
-@pytest.mark.asyncio
-async def test_focus_page(action_context, mock_page):
-    """Test FocusPage focuses the current page."""
-    mock_page.bring_to_front = AsyncMock(return_value=Ok(None))
-    
-    action_context.page = mock_page
-    action_context.page_id = "test-page"
-    
-    focus_page = FocusPage()
-    result = await focus_page(context=action_context)
-    
-    assert result.is_ok()
-    assert result.default_value(None) == action_context
-    mock_page.bring_to_front.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_reload_page(action_context, mock_page):
-    """Test ReloadPage reloads the current page."""
-    mock_page.reload = AsyncMock(return_value=Ok(None))
-    
-    action_context.page = mock_page
-    action_context.page_id = "test-page"
-    
-    reload_page = ReloadPage(wait_until="load")
-    result = await reload_page(context=action_context)
-    
-    assert result.is_ok()
-    assert result.default_value(None) == action_context
-    mock_page.reload.assert_called_once()
-    call_args = mock_page.reload.call_args[0]
-    assert call_args[0].wait_until == "load"
-
-
-@pytest.mark.asyncio
-async def test_get_current_url(action_context, mock_page):
-    """Test GetCurrentUrl returns the page URL."""
-    mock_page.get_url = AsyncMock(return_value=Ok("https://example.com"))
-    
-    action_context.page = mock_page
-    
-    get_url = GetCurrentUrl()
-    result = await get_url(context=action_context)
-    
-    assert result.is_ok()
-    assert result.default_value(None) == "https://example.com"
-
-
-@pytest.mark.asyncio
-async def test_get_page_title(action_context, mock_page):
-    """Test GetPageTitle returns the page title."""
-    mock_page.get_title = AsyncMock(return_value=Ok("Example Page"))
-    
-    action_context.page = mock_page
-    
-    get_title = GetPageTitle()
-    result = await get_title(context=action_context)
-    
-    assert result.is_ok()
-    assert result.default_value(None) == "Example Page"
-
-
-@pytest.mark.asyncio
-async def test_with_metadata_merge(action_context):
-    """Test WithMetadata merges metadata."""
-    action_context.metadata = {"existing": "value", "override": "old"}
-    
-    with_metadata = WithMetadata(
-        metadata={"new": "value", "override": "new"},
-        merge=True
+async def test_create_context_uses_the_exact_driver_capability() -> None:
+    context = make_context("created")
+    driver = make_driver(context)
+    capability = BrowserDriverCapability(driver.new_context)
+    environment = Environment().with_value(DRIVER, capability)
+    options = BrowserContextOptions(
+        viewport=BrowserViewport(width=1024, height=768),
+        permissions=("clipboard-read",),
     )
-    result = await with_metadata(context=action_context)
-    
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    assert new_context.metadata["existing"] == "value"
-    assert new_context.metadata["new"] == "value"
-    assert new_context.metadata["override"] == "new"
+
+    outcome = await create_context(_).run(options, environment=environment)
+
+    assert outcome == Ok(context)
+    assert outcome.ok is context
+    assert environment.require(DRIVER) is capability
+    assert not hasattr(capability, "driver")
+    driver.new_context.assert_awaited_once_with(options)
 
 
 @pytest.mark.asyncio
-async def test_with_metadata_replace(action_context):
-    """Test WithMetadata replaces metadata."""
-    initial_metadata_action = WithMetadata(
-        metadata={"existing": "value", "remove": "this"},
-        merge=True
+async def test_create_context_hands_the_adapter_the_immutable_options() -> None:
+    context = make_context("created")
+    driver = make_driver(context)
+    received: list[BrowserContextOptions] = []
+
+    async def capture_adapter_options(
+        options: BrowserContextOptions | None,
+    ) -> object:
+        assert options is not None
+        received.append(options)
+        return Ok(context)
+
+    driver.new_context.side_effect = capture_adapter_options
+    original = BrowserContextOptions(
+        viewport=BrowserViewport(width=1440, height=900),
+        permissions=("geolocation",),
+        extra_http_headers=BrowserHttpHeaders({"x-test": "original"}),
     )
-    initial_result = await initial_metadata_action(context=action_context)
-    assert initial_result.is_ok(), "Failed to set initial metadata"
-    context_with_initial_metadata = initial_result.default_value(None)
-    assert context_with_initial_metadata is not None
-
-    replace_metadata_action = WithMetadata(
-        metadata={"new": "value"},
-        merge=False
+    environment = Environment().with_value(
+        DRIVER,
+        BrowserDriverCapability(driver.new_context),
     )
-    result = await replace_metadata_action(context=context_with_initial_metadata)
 
-    assert result.is_ok()
-    new_context = result.default_value(None)
-    assert new_context.metadata == {"new": "value"}
+    outcome = await create_context(_).run(original, environment=environment)
 
-
-@pytest.mark.asyncio
-async def test_context_management_workflow(action_context, mock_driver):
-    """Test a complete workflow using multiple context management actions."""
-    context1 = create_mock_context("context-1")
-    context2 = create_mock_context("context-2")
-    page1 = create_mock_page("page-1")
-    page2 = create_mock_page("page-2")
-    new_page = create_mock_page("new-page")
-    
-    mock_driver.new_context = AsyncMock(side_effect=[
-        Ok(context1),
-        Ok(context2),
-    ])
-    
-    context1.new_page = AsyncMock(return_value=Ok(page1))
-    context1.pages = AsyncMock(return_value=Ok([page1]))
-    context1.close = AsyncMock(return_value=Ok(None))
-    
-    context2.new_page = AsyncMock(side_effect=[Ok(page2), Ok(new_page)])
-    context2.pages = AsyncMock(return_value=Ok([page2, new_page]))
-    
-    action_context.driver = mock_driver
-    
-    create_ctx = CreateContext(create_page=True)
-    result1 = await create_ctx(context=action_context)
-    assert result1.is_ok()
-    ctx1 = result1.default_value(None)
-    assert ctx1.context == context1
-    assert ctx1.page == page1
-    
-    create_ctx2 = CreateContext(context_options={"viewport": {"width": 1920, "height": 1080}})
-    result2 = await create_ctx2(context=ctx1)
-    assert result2.is_ok()
-    ctx2 = result2.default_value(None)
-    assert ctx2.context == context2
-    assert ctx2.metadata["context_options"]["viewport"]["width"] == 1920
-    
-    create_page = CreatePage(page_nickname="new-page")
-    result3 = await create_page(context=ctx2)
-    assert result3.is_ok()
-    ctx3 = result3.default_value(None)
-    assert ctx3.page_id is not None
-    assert "new-page" in str(ctx3.page_id) or ctx3.page == new_page
-    
-    get_pages = GetAllPages()
-    pages_result = await get_pages(context=ctx3)
-    assert pages_result.is_ok()
-    assert len(pages_result.default_value([])) >= 2
-    
-    with_meta = WithMetadata(metadata={"workflow": "test", "step": 5})
-    result5 = await with_meta(context=ctx3)
-    assert result5.is_ok()
-    ctx5 = result5.default_value(None)
-    assert ctx5.metadata["workflow"] == "test"
-    
-    ctx5.page.get_url = AsyncMock(return_value=Ok("https://example.com"))
-    get_url = GetCurrentUrl()
-    url_result = await get_url(context=ctx5)
-    assert url_result.is_ok()
-    assert url_result.default_value(None) == "https://example.com"
-    
-    ctx5.page.close = AsyncMock(return_value=Ok(None))
-    close_page = CloseCurrentPage()
-    result7 = await close_page(context=ctx5)
-    assert result7.is_ok()
-    
-    close_ctx = CloseContext()
-    result8 = await close_ctx(context=result7.default_value(None))
-    assert result8.is_ok()
-    final_ctx = result8.default_value(None)
-    
-    assert final_ctx.context is None
-    assert final_ctx.page is None
-    assert final_ctx.context_id is None
-    assert final_ctx.page_id is None
-    assert len(final_ctx.page_ids) == 0
+    assert outcome.ok is context
+    assert received[0] is original
+    assert original.viewport == BrowserViewport(width=1440, height=900)
+    assert original.permissions == ("geolocation",)
+    assert dict(original.extra_http_headers or {}) == {"x-test": "original"}
 
 
 @pytest.mark.asyncio
-async def test_multi_tab_workflow(action_context, mock_browser_context, mock_page):
-    """Test working with multiple tabs."""
-    page1 = create_mock_page("page-1")
-    page1.page_id = "page-1"
-    page2 = create_mock_page("page-2")
-    page2.page_id = "page-2"
-    page3 = create_mock_page("page-3")
-    page3.page_id = "page-3"
+async def test_create_context_requires_the_driver_before_running() -> None:
+    options = BrowserContextOptions()
 
-    mock_browser_context.new_page = AsyncMock(side_effect=[Ok(page2), Ok(page3)])
+    outcome = await create_context(_).run(options)
 
-    action_context.context = mock_browser_context
-    action_context.page = page1
-    action_context.page_id = "page-1"
-    action_context.page_ids = {"page-1"}
-
-    mock_browser_context.pages = AsyncMock(side_effect=[
-        Ok([page1, page2, page3]),
-        Ok([page1, page2, page3])
-    ])
-
-    page2.goto = AsyncMock(return_value=Ok(None))
-    with_tab = WithNewTab(url="https://example.com")
-    result1 = await with_tab(context=action_context)
-    assert result1.is_ok()
-    ctx1 = result1.default_value(None)
-    assert ctx1.page == page2
-    page2.goto.assert_called_once_with("https://example.com")
-    
-    create_page = CreatePage()
-    result2 = await create_page(context=ctx1)
-    assert result2.is_ok()
-    ctx2 = result2.default_value(None)
-    assert ctx2.page == page3
-    
-    get_pages = GetAllPages()
-    pages_result = await get_pages(context=ctx2)
-    assert pages_result.is_ok()
-    assert len(pages_result.default_value([])) == 3
-    
-    ctx2.page_ids = {"page-1", "page-2", "page-3"}
-    switch_page = SwitchToPage(page_id="page-1")
-    result4 = await switch_page(context=ctx2)
-    assert result4.is_ok()
-    ctx4 = result4.default_value(None)
-    assert ctx4.page == page1
-    assert ctx4.metadata.get("previous_page_id") == ctx2.page_id
-    
-    page1.bring_to_front = AsyncMock(return_value=Ok(None))
-    ctx4.page = page1
-    focus = FocusPage()
-    result5 = await focus(context=ctx4)
-    assert result5.is_ok()
-    page1.bring_to_front.assert_called_once()
+    assert outcome.is_error()
+    assert isinstance(outcome.error, EnvironmentError)
+    assert "browser_driver" in str(outcome.error)
 
 
-if __name__ == "__main__":
-    pytest.main(["-xvs", __file__])
+def test_environment_rejects_the_wrong_driver_capability() -> None:
+    wrong = BrowserSessionInfo(session_id="not-a-driver")
+
+    with pytest.raises(EnvironmentError, match="BrowserDriverCapability"):
+        Environment().with_value(DRIVER, wrong)
+
+
+@pytest.mark.asyncio
+async def test_create_context_preserves_the_browser_error_object() -> None:
+    context = make_context("unused")
+    driver = make_driver(context)
+    browser_error = RuntimeError("browser disconnected")
+    driver.new_context.return_value = Error(browser_error)
+    environment = Environment().with_value(
+        DRIVER,
+        BrowserDriverCapability(driver.new_context),
+    )
+
+    outcome = await create_context(_).run(
+        BrowserContextOptions(),
+        environment=environment,
+    )
+
+    assert outcome.is_error()
+    assert outcome.error is browser_error
+
+
+@pytest.mark.asyncio
+async def test_created_context_flows_directly_into_page_creation() -> None:
+    page = make_page("composed-page")
+    context = make_context("composed-context")
+    context.new_page.return_value = Ok(page)
+    driver = make_driver(context)
+    environment = Environment().with_value(
+        DRIVER,
+        BrowserDriverCapability(driver.new_context),
+    )
+    lifecycle = create_context(_).then(new_page(_))
+
+    outcome = await lifecycle.run(
+        BrowserContextOptions(),
+        environment=environment,
+    )
+
+    assert outcome.ok is page
+    context.new_page.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_new_page_and_pages_return_exact_browser_focus_values() -> None:
+    first = make_page("first")
+    second = make_page("second")
+    context = make_context("context", [first, second])
+    context.new_page.return_value = Ok(second)
+
+    created = await new_page(_).run(context)
+    listed = await pages(_).run(context)
+
+    assert created.ok is second
+    assert listed.ok[0] is first
+    assert listed.ok[1] is second
+    context.new_page.assert_awaited_once_with()
+    context.pages.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_page_by_id_supports_both_pipeline_operand_positions() -> None:
+    first = make_page("first")
+    second = make_page("second")
+    context = make_context("context", [first, second])
+
+    dynamic_id = await page_by_id(_, context).run("second")
+    dynamic_context = await page_by_id("first", _).run(context)
+
+    assert dynamic_id.ok is second
+    assert dynamic_context.ok is first
+    assert context.pages.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_page_by_id_reports_only_proven_absence() -> None:
+    context = make_context("context-7", [make_page("present")])
+
+    outcome = await page_by_id("missing", _).run(context)
+
+    assert outcome.is_error()
+    assert isinstance(outcome.error, PageNotFoundError)
+    assert outcome.error.page_id == "missing"
+    assert outcome.error.context_id == "context-7"
+    assert outcome.error.__cause__ is None
+
+
+@pytest.mark.asyncio
+async def test_page_by_id_does_not_translate_a_listing_failure() -> None:
+    context = make_context("context")
+    browser_error = RuntimeError("target closed")
+    context.pages.return_value = Error(browser_error)
+
+    outcome = await page_by_id("anything", _).run(context)
+
+    assert outcome.is_error()
+    assert outcome.error is browser_error
+
+
+@pytest.mark.asyncio
+async def test_close_actions_are_terminal_and_preserve_failures() -> None:
+    page = make_page("page")
+    context = make_context("context")
+
+    page_outcome = await close_page(_).run(page)
+    context_outcome = await close_context(_).run(context)
+
+    assert page_outcome == Ok(None)
+    assert context_outcome == Ok(None)
+    page.close.assert_awaited_once_with()
+    context.close.assert_awaited_once_with()
+
+    page_error = RuntimeError("page close failed")
+    context_error = RuntimeError("context close failed")
+    page.close.return_value = Error(page_error)
+    context.close.return_value = Error(context_error)
+
+    failed_page = await close_page(_).run(page)
+    failed_context = await close_context(_).run(context)
+
+    assert failed_page.error is page_error
+    assert failed_context.error is context_error
+
+
+@pytest.mark.asyncio
+async def test_new_page_and_pages_preserve_browser_failures() -> None:
+    context = make_context("context")
+    new_page_error = RuntimeError("new page failed")
+    pages_error = RuntimeError("list pages failed")
+    context.new_page.return_value = Error(new_page_error)
+
+    created = await new_page(_).run(context)
+    context.pages.return_value = Error(pages_error)
+    listed = await pages(_).run(context)
+
+    assert created.error is new_page_error
+    assert listed.error is pages_error
+
+
+def test_templates_require_exactly_one_direct_placeholder() -> None:
+    context = make_context("context")
+    page = make_page("page")
+
+    zero_hole_calls = (
+        lambda: create_context(BrowserContextOptions()),
+        lambda: new_page(context),
+        lambda: pages(context),
+        lambda: page_by_id("page", context),
+        lambda: close_page(page),
+        lambda: close_context(context),
+    )
+    for call in zero_hole_calls:
+        with pytest.raises(TypeError, match="exactly one direct placeholder"):
+            call()
+
+    with pytest.raises(TypeError, match="exactly one direct placeholder"):
+        page_by_id(_, _)
+    with pytest.raises(TypeError):
+        new_page(_, _)
+
+
+def test_public_surface_contains_pascal_case_lifecycle_templates() -> None:
+    expected = {
+        "CloseContext",
+        "ClosePage",
+        "CreateContext",
+        "NewPage",
+        "PageById",
+        "Pages",
+    }
+
+    assert set(browser_actions.__all__) == expected
+    assert inspect.signature(create_context).parameters.keys() == {"options"}
+    assert inspect.signature(page_by_id).parameters.keys() == {
+        "page_id",
+        "context",
+    }
+    assert all(name[0].isupper() for name in browser_actions.__all__)
+    assert not hasattr(browser_actions, "create_context")
+    assert create_context.__name__ == "CreateContext"
+
+    operations = (
+        create_context(_),
+        new_page(_),
+        pages(_),
+        page_by_id("page", _),
+        close_page(_),
+        close_context(_),
+    )
+    assert all(isinstance(operation, Operation) for operation in operations)
+    assert all(not callable(operation) for operation in operations)
+    assert all(not hasattr(operation, "execute") for operation in operations)
+    assert create_context(_).required_environment == (DRIVER,)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_real_chromium_context_and_page_lifecycle() -> None:
+    """Exercise the public lifecycle interface against a real browser."""
+
+    async with BrowserSession(
+        options=BrowserOptions(headless=True, timeout=10_000),
+    ) as session:
+        created = await create_context(_).run(
+            BrowserContextOptions(
+                viewport=BrowserViewport(width=800, height=600),
+            ),
+            environment=session.environment,
+        )
+        assert created.is_ok(), created
+        second_context = created.ok
+
+        first_page_outcome = await new_page(_).run(second_context)
+        second_page_outcome = await new_page(_).run(second_context)
+        assert first_page_outcome.is_ok(), first_page_outcome
+        assert second_page_outcome.is_ok(), second_page_outcome
+        first_page = first_page_outcome.ok
+        second_page = second_page_outcome.ok
+
+        listed = await pages(_).run(second_context)
+        assert listed.is_ok(), listed
+        assert [page.page_id for page in listed.ok] == [
+            first_page.page_id,
+            second_page.page_id,
+        ]
+
+        selected_by_id = await page_by_id(_, second_context).run(second_page.page_id)
+        selected_by_context = await page_by_id(first_page.page_id, _).run(
+            second_context
+        )
+        assert selected_by_id.ok.page_id == second_page.page_id
+        assert selected_by_context.ok.page_id == first_page.page_id
+
+        closed_page = await close_page(_).run(first_page)
+        assert closed_page == Ok(None)
+        remaining = await pages(_).run(second_context)
+        assert remaining.is_ok(), remaining
+        assert [page.page_id for page in remaining.ok] == [second_page.page_id]
+
+        closed_context = await close_context(_).run(second_context)
+        assert closed_context == Ok(None)

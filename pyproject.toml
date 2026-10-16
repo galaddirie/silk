@@ -1,13 +1,13 @@
 [project]
 name = "silk-scraper"
-version = "0.3.1"
-description = "A flexible browser automation library with support for multiple drivers"
+version = "0.4.0"
+description = "Typed Playwright browser automation built on FP-Ops unary pipelines"
 authors = [
     {name = "Galad Dirie", email = "hello@galad.ca"}
 ]
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.11,<3.14"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -20,34 +20,22 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: Browsers",
 ]
 dependencies = [
-    "expression (>=5.6.0,<6.0.0)",
-    "pydantic (>=2.11.2,<3.0.0)",
-    "pydantic-settings (>=2.8.1,<3.0.0)",
+    "fp-ops==0.3.1",
     "playwright (>=1.51.0,<2.0.0)",
-    "fp-ops (>=0.1.3,<1.0.0)",
+    "typing-extensions (>=4.12.0,<5.0.0)",
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/galaddirie/silk"
 "Bug Tracker" = "https://github.com/galaddirie/silk/issues"
 
-[project.optional-dependencies]
-playwright = [
-    "playwright (>=1.51.0,<2.0.0)",
-]
-patchright = [
-    "patchright (>=1.51.0,<2.0.0)",
-]
-all = [
-    "patchright (>=1.51.0,<2.0.0)",
-    "playwright (>=1.51.0,<2.0.0)",
-]
-
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7.4.0"
 pytest-asyncio = ">=0.21.1"
-pytest-cov = ">=4.1.0"
 mypy = "^1.15.0"
+pyright = "1.1.411"
+black = "25.1.0"
+pre-commit = "4.2.0"
 
 [tool.poetry]
 packages = [
@@ -60,6 +48,15 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
 python_version = "3.11"
+strict = true
+files = [
+    "src",
+    "examples",
+    "tests/browsers/unit/typecheck_*.py",
+    "tests/browsers/integration/playwright/test_action_concurrency.py",
+    "tests/policies/test_policies.py",
+    "tests/typecheck/*_good.py",
+]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -68,3 +65,15 @@ check_untyped_defs = true
 disallow_untyped_decorators = true
 no_implicit_optional = true
 strict_optional = true
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+include = [
+    "src",
+    "examples",
+    "tests/browsers/unit/typecheck_*.py",
+    "tests/browsers/integration/playwright/test_action_concurrency.py",
+    "tests/policies/test_policies.py",
+    "tests/typecheck/*_good.py",
+]

@@ -2,28 +2,35 @@ name: Publish to PyPI
 
 on:
   release:
-    types: [created]
+    types: [published]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  deploy:
+  verify-package:
+    uses: ./.github/workflows/package.yml
+
+  publish-verified-package:
+    needs: verify-package
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.13'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install poetry build
-    - name: Build package
-      run: |
-        poetry build
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
-        skip_existing: true
+      - name: Download verified distributions
+        uses: actions/download-artifact@v8
+        with:
+          name: silk-distributions
+          path: dist
+
+      - name: Require exactly one verified sdist and wheel
+        run: |
+          mapfile -t sdists < <(find dist -maxdepth 1 -type f -name '*.tar.gz' -print)
+          mapfile -t wheels < <(find dist -maxdepth 1 -type f -name '*.whl' -print)
+          test "${#sdists[@]}" -eq 1
+          test "${#wheels[@]}" -eq 1
+
+      - name: Publish verified distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}

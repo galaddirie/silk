@@ -1,88 +1,47 @@
-name: Run Tests and Coverage
+name: Runtime and browser tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  test:
+  runtime-browser-external:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
-
+        python-version: ["3.11", "3.13"]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  # Fetch all history for proper coverage reporting
+      - name: Check out source
+        uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: pip
 
-      - name: Install dependencies
+      - name: Install locked development dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install poetry
-          poetry config virtualenvs.create false
-          poetry install --with dev
+          python -m pip install poetry==2.1.1
+          poetry install --with dev --no-interaction
 
-      - name: Install Playwright
+      - name: Install Chromium and operating-system dependencies
+        run: poetry run playwright install --with-deps chromium
+
+      - name: Run runtime tests
         run: |
-          playwright install
-          playwright install-deps
+          poetry run python -m pytest \
+            tests/actions \
+            tests/browsers/unit \
+            tests/policies \
+            tests/selectors \
+            -v
 
-      - name: Run tests with coverage
-        run: |
-          pytest --cov=silk --cov-report=xml --cov-report=term tests/ -v
+      - name: Run live browser integration tests
+        run: poetry run python -m pytest tests/browsers/integration/playwright -v
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          directory: ./
-          env_vars: OS,PYTHON
-          fail_ci_if_error: false
-          files: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          verbose: true
-
-  coverage-report:
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install poetry
-          poetry config virtualenvs.create false
-          poetry install --all-groups
-          playwright install
-          playwright install-deps
-
-      - name: Generate HTML coverage report
-        run: |
-          pytest --cov=silk --cov-report=html tests/ -v
-
-      - name: Upload HTML coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-html-report
-          path: htmlcov/
+      - name: Run real Books to Scrape public pipeline without skipping
+        run: poetry run python -m pytest tests/examples/test_books_to_scrape.py -v
