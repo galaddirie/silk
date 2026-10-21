@@ -17,15 +17,11 @@ from silk.actions.browser import (
     PageById as page_by_id,
     Pages as pages,
 )
-from silk.browsers.capabilities import (
-    DRIVER,
-    BrowserDriverCapability,
-    BrowserSessionInfo,
-)
 from silk.browsers.models import (
+    BROWSER,
+    Browser,
     BrowserContext,
     BrowserContextOptions,
-    BrowserHttpHeaders,
     BrowserOptions,
     BrowserViewport,
     Page,
@@ -40,8 +36,6 @@ def make_page(page_id: str) -> MagicMock:
     page = MagicMock(spec=Page)
     page.page_id = page_id
     page.close = AsyncMock(return_value=Ok(None))
-    page.__copy__.return_value = page
-    page.__deepcopy__.return_value = page
     return page
 
 
@@ -56,25 +50,22 @@ def make_context(
     context.new_page = AsyncMock(return_value=Ok(make_page("new-page")))
     context.pages = AsyncMock(return_value=Ok(page_values or []))
     context.close = AsyncMock(return_value=Ok(None))
-    context.__copy__.return_value = context
-    context.__deepcopy__.return_value = context
     return context
 
 
 def make_driver(context: BrowserContext) -> MagicMock:
-    """Return a driver double accepted by the typed capability wrapper."""
+    """Return a browser double that creates ``context``."""
 
-    driver = MagicMock()
+    driver = MagicMock(spec=Browser)
     driver.new_context = AsyncMock(return_value=Ok(context))
     return driver
 
 
 @pytest.mark.asyncio
-async def test_create_context_uses_the_exact_driver_capability() -> None:
+async def test_create_context_uses_the_environment_browser() -> None:
     context = make_context("created")
     driver = make_driver(context)
-    capability = BrowserDriverCapability(driver.new_context)
-    environment = Environment().with_value(DRIVER, capability)
+    environment = Environment().with_value(BROWSER, driver)
     options = BrowserContextOptions(
         viewport=BrowserViewport(width=1024, height=768),
         permissions=("clipboard-read",),
@@ -84,8 +75,6 @@ async def test_create_context_uses_the_exact_driver_capability() -> None:
 
     assert outcome == Ok(context)
     assert outcome.ok is context
-    assert environment.require(DRIVER) is capability
-    assert not hasattr(capability, "driver")
     driver.new_context.assert_awaited_once_with(options)
 
 
@@ -106,12 +95,9 @@ async def test_create_context_hands_the_adapter_the_immutable_options() -> None:
     original = BrowserContextOptions(
         viewport=BrowserViewport(width=1440, height=900),
         permissions=("geolocation",),
-        extra_http_headers=BrowserHttpHeaders({"x-test": "original"}),
+        extra_http_headers={"x-test": "original"},
     )
-    environment = Environment().with_value(
-        DRIVER,
-        BrowserDriverCapability(driver.new_context),
-    )
+    environment = Environment().with_value(BROWSER, driver)
 
     outcome = await create_context(_).run(original, environment=environment)
 
@@ -123,21 +109,19 @@ async def test_create_context_hands_the_adapter_the_immutable_options() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_context_requires_the_driver_before_running() -> None:
+async def test_create_context_requires_the_browser_before_running() -> None:
     options = BrowserContextOptions()
 
     outcome = await create_context(_).run(options)
 
     assert outcome.is_error()
     assert isinstance(outcome.error, EnvironmentError)
-    assert "browser_driver" in str(outcome.error)
+    assert "browser" in str(outcome.error)
 
 
-def test_environment_rejects_the_wrong_driver_capability() -> None:
-    wrong = BrowserSessionInfo(session_id="not-a-driver")
-
-    with pytest.raises(EnvironmentError, match="BrowserDriverCapability"):
-        Environment().with_value(DRIVER, wrong)
+def test_environment_rejects_a_value_that_is_not_a_browser() -> None:
+    with pytest.raises(EnvironmentError, match="Browser"):
+        Environment().with_value(BROWSER, object())  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
@@ -146,10 +130,7 @@ async def test_create_context_preserves_the_browser_error_object() -> None:
     driver = make_driver(context)
     browser_error = RuntimeError("browser disconnected")
     driver.new_context.return_value = Error(browser_error)
-    environment = Environment().with_value(
-        DRIVER,
-        BrowserDriverCapability(driver.new_context),
-    )
+    environment = Environment().with_value(BROWSER, driver)
 
     outcome = await create_context(_).run(
         BrowserContextOptions(),
@@ -166,10 +147,7 @@ async def test_created_context_flows_directly_into_page_creation() -> None:
     context = make_context("composed-context")
     context.new_page.return_value = Ok(page)
     driver = make_driver(context)
-    environment = Environment().with_value(
-        DRIVER,
-        BrowserDriverCapability(driver.new_context),
-    )
+    environment = Environment().with_value(BROWSER, driver)
     lifecycle = create_context(_).then(new_page(_))
 
     outcome = await lifecycle.run(
@@ -330,7 +308,7 @@ def test_public_surface_contains_pascal_case_lifecycle_templates() -> None:
     assert all(isinstance(operation, Operation) for operation in operations)
     assert all(not callable(operation) for operation in operations)
     assert all(not hasattr(operation, "execute") for operation in operations)
-    assert create_context(_).required_environment == (DRIVER,)
+    assert create_context(_).required_environment == (BROWSER,)
 
 
 @pytest.mark.integration

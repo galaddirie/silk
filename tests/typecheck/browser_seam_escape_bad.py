@@ -1,7 +1,5 @@
 # pyright: strict
-"""Raw adapter ownership and native handles are not public focus capabilities."""
-
-from silk.browsers.capabilities import BrowserDriverCapability
+"""Raw adapter ownership and native handles are not part of the public interfaces."""
 
 # typecheck-case: browser_seam_escape.027
 from silk.browsers.drivers import PlaywrightDriver
@@ -10,7 +8,7 @@ from silk.browsers.drivers.playwright import (
     PlaywrightElementHandle,
     PlaywrightPage,
 )
-from silk.browsers.models import BrowserContext, ElementHandle, Page
+from silk.browsers.models import Browser, BrowserContext, ElementHandle, Page
 from silk.browsers.sessions import BrowserSession
 
 
@@ -68,18 +66,16 @@ def concrete_focus_escapes(
     element.element_id
     # typecheck-case: browser_seam_escape.021
     element._pointer_owner_identity
-    # typecheck-case: browser_seam_escape.022
-    element._bounding_box
     # typecheck-case: browser_seam_escape.023
     element._move_pointer
     # typecheck-case: browser_seam_escape.024
     element._drag_pointer
 
 
-async def capability_focus_cannot_recover_umbrella_close(
-    capability: BrowserDriverCapability,
+async def environment_browser_cannot_recover_umbrella_close(
+    browser: Browser,
 ) -> None:
-    outcome = await capability.new_context()
+    outcome = await browser.new_context()
     # typecheck-case: browser_seam_escape.025
     await outcome.ok.driver.close()
     # typecheck-case: browser_seam_escape.026

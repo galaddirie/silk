@@ -12,10 +12,7 @@ from a partial failure. Use :func:`Click` with an element target instead.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Self, final
-
 from fp_ops import Error, Ok, Result, result_operation_template
-from typing_extensions import TypeIs
 
 from silk.actions._scope import (
     Element,
@@ -33,63 +30,22 @@ from silk.browsers.models import (
 InputPage = Page
 
 
-class _ImmutableInputConfiguration:
-    """Identity-preserving copy policy for frozen input configuration."""
-
-    __slots__ = ()
-
-    def __copy__(self) -> Self:
-        return self
-
-    def __deepcopy__(self, memo: dict[int, object]) -> Self:
-        memo[id(self)] = self
-        return self
+def _require_non_negative(**values: int | None) -> None:
+    for name, value in values.items():
+        if value is not None and value < 0:
+            raise ValueError(f"{name} must be non-negative")
 
 
-def _validate_optional_non_negative_integer(
-    value: object,
-    name: str,
-) -> None:
-    if value is None:
-        return
-    if type(value) is not int:
-        raise TypeError(f"{name} must be an integer or None")
-    if value < 0:
-        raise ValueError(f"{name} must be non-negative")
-
-
-def _validate_button(button: object) -> None:
-    if type(button) is not str:
-        raise TypeError("button must be a string")
-    if button not in ("left", "middle", "right"):
-        raise ValueError("button must be left, middle, or right")
-
-
-def _validate_boolean(value: object, name: str) -> None:
-    if type(value) is not bool:
-        raise TypeError(f"{name} must be a boolean")
-
-
-def _is_exact_object_tuple(value: object) -> TypeIs[tuple[object, ...]]:
-    return type(value) is tuple
-
-
-def _validate_modifiers(modifiers: object) -> None:
-    if not _is_exact_object_tuple(modifiers):
-        raise TypeError("modifiers must be an immutable tuple")
-    for modifier in modifiers:
-        if type(modifier) is not KeyModifier:
-            raise TypeError("modifiers must contain KeyModifier values")
+def _require_distinct_active_modifiers(modifiers: tuple[KeyModifier, ...]) -> None:
     if KeyModifier.NONE in modifiers:
         raise ValueError("KeyModifier.NONE is not an active modifier")
     if len(set(modifiers)) != len(modifiers):
         raise ValueError("modifiers must not contain duplicates")
 
 
-@final
 @dataclass(frozen=True, slots=True)
-class ClickOptions(_ImmutableInputConfiguration):
-    """Immutable configuration implemented by a native element click."""
+class ClickOptions:
+    """Configuration for a native element click."""
 
     timeout_ms: int | None = None
     button: MouseButtonLiteral = "left"
@@ -99,21 +55,15 @@ class ClickOptions(_ImmutableInputConfiguration):
     force: bool = False
 
     def __post_init__(self) -> None:
-        _validate_optional_non_negative_integer(self.timeout_ms, "timeout_ms")
-        _validate_button(self.button)
-        _validate_modifiers(self.modifiers)
-        _validate_optional_non_negative_integer(self.delay_ms, "delay_ms")
-        if type(self.click_count) is not int:
-            raise TypeError("click_count must be an integer")
+        _require_non_negative(timeout_ms=self.timeout_ms, delay_ms=self.delay_ms)
+        _require_distinct_active_modifiers(self.modifiers)
         if self.click_count < 1:
             raise ValueError("click_count must be positive")
-        _validate_boolean(self.force, "force")
 
 
-@final
 @dataclass(frozen=True, slots=True)
-class DoubleClickOptions(_ImmutableInputConfiguration):
-    """Immutable configuration implemented by a native double click."""
+class DoubleClickOptions:
+    """Configuration for a native double click."""
 
     timeout_ms: int | None = None
     button: MouseButtonLiteral = "left"
@@ -122,43 +72,35 @@ class DoubleClickOptions(_ImmutableInputConfiguration):
     force: bool = False
 
     def __post_init__(self) -> None:
-        _validate_optional_non_negative_integer(self.timeout_ms, "timeout_ms")
-        _validate_button(self.button)
-        _validate_modifiers(self.modifiers)
-        _validate_optional_non_negative_integer(self.delay_ms, "delay_ms")
-        _validate_boolean(self.force, "force")
+        _require_non_negative(timeout_ms=self.timeout_ms, delay_ms=self.delay_ms)
+        _require_distinct_active_modifiers(self.modifiers)
 
 
-@final
 @dataclass(frozen=True, slots=True)
-class FillOptions(_ImmutableInputConfiguration):
+class FillOptions:
     """Configuration for replacement input, including an optional clear event."""
 
     timeout_ms: int | None = None
     clear: bool = False
 
     def __post_init__(self) -> None:
-        _validate_optional_non_negative_integer(self.timeout_ms, "timeout_ms")
-        _validate_boolean(self.clear, "clear")
+        _require_non_negative(timeout_ms=self.timeout_ms)
 
 
-@final
 @dataclass(frozen=True, slots=True)
-class TypeTextOptions(_ImmutableInputConfiguration):
+class TypeTextOptions:
     """Configuration for incremental text input."""
 
     timeout_ms: int | None = None
     delay_ms: int | None = None
 
     def __post_init__(self) -> None:
-        _validate_optional_non_negative_integer(self.timeout_ms, "timeout_ms")
-        _validate_optional_non_negative_integer(self.delay_ms, "delay_ms")
+        _require_non_negative(timeout_ms=self.timeout_ms, delay_ms=self.delay_ms)
 
 
-@final
 @dataclass(frozen=True, slots=True)
-class DragOptions(_ImmutableInputConfiguration):
-    """Immutable element-to-element drag configuration."""
+class DragOptions:
+    """Element-to-element drag configuration."""
 
     steps: int = 1
     move_to_center: bool = True
@@ -167,25 +109,8 @@ class DragOptions(_ImmutableInputConfiguration):
     target_offset: CoordinateType | None = None
 
     def __post_init__(self) -> None:
-        if type(self.steps) is not int:
-            raise TypeError("drag steps must be an integer")
         if self.steps < 1:
             raise ValueError("drag steps must be positive")
-        _validate_boolean(self.move_to_center, "move_to_center")
-        _validate_optional_coordinate(self.position_offset, "position_offset")
-        _validate_optional_coordinate(self.source_offset, "source_offset")
-        _validate_optional_coordinate(self.target_offset, "target_offset")
-
-
-def _validate_optional_coordinate(value: object, name: str) -> None:
-    if value is None:
-        return
-    if not _is_exact_object_tuple(value):
-        raise TypeError(f"{name} must be a tuple of two integers or None")
-    if len(value) != 2:
-        raise ValueError(f"{name} must contain exactly two integers")
-    if type(value[0]) is not int or type(value[1]) is not int:
-        raise TypeError(f"{name} must contain exactly two integers")
 
 
 def _retain_element(
@@ -476,7 +401,7 @@ async def Drag(
 ) -> Result[Element, Exception]:
     """Drag ``source`` to ``target`` and retain the source as focus.
 
-    Both endpoints must be live handles owned by the same driver and page.
+    Both endpoints must be elements on the same page.
     Bounding-box and pointer errors are returned unchanged.  Coordinates use
     each element's top-left corner unless ``move_to_center`` is enabled; the
     common ``position_offset`` and endpoint-specific offsets are then applied.

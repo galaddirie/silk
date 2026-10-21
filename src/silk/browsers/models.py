@@ -1,16 +1,17 @@
 # pyright: strict
-"""Small nominal browser seam and immutable session configuration."""
+"""Browser interfaces and immutable browser configuration."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Self, final, overload
+from types import MappingProxyType
+from typing import Literal, overload
 
-from fp_ops import Result
+from fp_ops import EnvKey, Result
 
 CoordinateType = tuple[int, int]
 MouseButtonLiteral = Literal["left", "middle", "right"]
@@ -29,56 +30,8 @@ class KeyModifier(Enum):
     SHIFT = 8
 
 
-class _ImmutableBrowserConfiguration:
-    """Identity-preserving copy policy for immutable configuration values."""
-
-    __slots__ = ()
-
-    def __copy__(self) -> Self:
-        return self
-
-    def __deepcopy__(self, memo: dict[int, object]) -> Self:
-        memo[id(self)] = self
-        return self
-
-
-def _require_exact_string(value: object, name: str) -> None:
-    if type(value) is not str:
-        raise TypeError(f"{name} must be a string")
-
-
-def _require_optional_string(value: object, name: str) -> None:
-    if value is not None:
-        _require_exact_string(value, name)
-
-
-def _require_optional_non_negative_integer(
-    value: object,
-    name: str,
-) -> None:
-    if value is None:
-        return
-    if type(value) is not int:
-        raise TypeError(f"{name} must be an integer or None")
-    if value < 0:
-        raise ValueError(f"{name} must be non-negative")
-
-
-class BrowserFocus:
-    """Nominal base for live browser values snapshotted by operations."""
-
-    @final
-    def __copy__(self) -> Self:
-        return self
-
-    @final
-    def __deepcopy__(self, memo: dict[int, object]) -> Self:
-        memo[id(self)] = self
-        return self
-
-
-class ElementHandle(BrowserFocus, ABC):
-    """Action-facing element focus with semantic pointer behavior."""
+class ElementHandle(ABC):
+    """A live element on a page."""
 
     @property
     @abstractmethod
@@ -193,8 +146,8 @@ class ElementHandle(BrowserFocus, ABC):
     ) -> Result[None, Exception]: ...
 
 
-class Page(BrowserFocus, ABC):
-    """Action-facing page focus."""
+class Page(ABC):
+    """A live browser page."""
 
     @property
     @abstractmethod
@@ -357,8 +310,8 @@ class Page(BrowserFocus, ABC):
     async def close(self) -> Result[None, Exception]: ...
 
 
-class BrowserContext(BrowserFocus, ABC):
-    """Action-facing identity and lifecycle for one isolated context."""
+class BrowserContext(ABC):
+    """One isolated browser context (cookies, storage, pages)."""
 
     @property
     @abstractmethod
@@ -374,119 +327,71 @@ class BrowserContext(BrowserFocus, ABC):
     async def close(self) -> Result[None, Exception]: ...
 
 
-@final
+class Browser(ABC):
+    """A running browser that pipelines can open new contexts in.
+
+    Closing the browser is owned by :class:`~silk.browsers.sessions.BrowserSession`,
+    so it is deliberately not part of this interface.
+    """
+
+    @abstractmethod
+    async def new_context(
+        self,
+        options: BrowserContextOptions | None = None,
+    ) -> Result[BrowserContext, Exception]: ...
+
+
+BROWSER = EnvKey("browser", Browser)  # type: ignore[type-abstract]
+"""Environment key under which a session provides its :class:`Browser`."""
+
+
 @dataclass(frozen=True, slots=True)
-class BrowserViewport(_ImmutableBrowserConfiguration):
-    """Strict immutable viewport dimensions for one browser context."""
+class BrowserViewport:
+    """Viewport dimensions for one browser context."""
 
     width: int
     height: int
 
     def __post_init__(self) -> None:
-        if type(self.width) is not int:
-            raise TypeError("viewport width must be an integer")
-        if type(self.height) is not int:
-            raise TypeError("viewport height must be an integer")
-        if self.width < 1:
-            raise ValueError("viewport width must be positive")
-        if self.height < 1:
-            raise ValueError("viewport height must be positive")
+        if self.width < 1 or self.height < 1:
+            raise ValueError("viewport width and height must be positive")
 
 
-@final
 @dataclass(frozen=True, slots=True)
-class BrowserProxy(_ImmutableBrowserConfiguration):
-    """Strict immutable per-context proxy settings."""
+class BrowserProxy:
+    """Proxy settings for the browser process or one context."""
 
     server: str
     bypass: str | None = None
     username: str | None = None
     password: str | None = None
 
-    def __post_init__(self) -> None:
-        _require_exact_string(self.server, "proxy server")
-        _require_optional_string(self.bypass, "proxy bypass")
-        _require_optional_string(self.username, "proxy username")
-        _require_optional_string(self.password, "proxy password")
 
-
-@final
 @dataclass(frozen=True, slots=True)
-class BrowserLaunchProxy(_ImmutableBrowserConfiguration):
-    """Strict immutable proxy endpoint for the Chromium process."""
-
-    server: str
-
-    def __post_init__(self) -> None:
-        _require_exact_string(self.server, "launch proxy server")
-
-
-@final
-@dataclass(frozen=True, slots=True)
-class BrowserOptions(_ImmutableBrowserConfiguration):
-    """Strict immutable Chromium process-launch configuration."""
+class BrowserOptions:
+    """Chromium process-launch configuration."""
 
     headless: bool = True
     timeout: int = 30_000
     args: tuple[str, ...] = ()
-    proxy: BrowserLaunchProxy | None = None
+    proxy: BrowserProxy | None = None
 
     def __post_init__(self) -> None:
-        if type(self.headless) is not bool:
-            raise TypeError("headless must be a boolean")
-        if type(self.timeout) is not int:
-            raise TypeError("timeout must be an integer")
         if self.timeout < 0:
             raise ValueError("timeout must be non-negative")
-        if type(self.args) is not tuple:
-            raise TypeError("args must be a tuple of strings")
-        for argument in self.args:
-            _require_exact_string(argument, "browser argument")
-        if self.proxy is not None and type(self.proxy) is not BrowserLaunchProxy:
-            raise TypeError("proxy must be BrowserLaunchProxy or None")
 
 
-@final
-@dataclass(frozen=True, slots=True, init=False)
-class BrowserHttpHeaders(_ImmutableBrowserConfiguration, Mapping[str, str]):
-    """Immutable HTTP header mapping copied from construction data."""
-
-    _items: tuple[tuple[str, str], ...]
-
-    def __init__(self, values: Mapping[str, str] | None = None) -> None:
-        if values is None:
-            items: tuple[tuple[str, str], ...] = ()
-        else:
-            collected: list[tuple[str, str]] = []
-            for name, value in values.items():
-                _require_exact_string(name, "HTTP header name")
-                _require_exact_string(value, f"HTTP header {name!r} value")
-                collected.append((name, value))
-            items = tuple(collected)
-        object.__setattr__(self, "_items", items)
-
-    def __getitem__(self, name: str) -> str:
-        for item_name, value in self._items:
-            if item_name == name:
-                return value
-        raise KeyError(name)
-
-    def __iter__(self) -> Iterator[str]:
-        return (name for name, _value in self._items)
-
-    def __len__(self) -> int:
-        return len(self._items)
-
-
-@final
 @dataclass(frozen=True, slots=True)
-class BrowserContextOptions(_ImmutableBrowserConfiguration):
-    """Strict deeply immutable configuration for one browser context."""
+class BrowserContextOptions:
+    """Configuration for one browser context.
+
+    ``extra_http_headers`` is copied into a read-only mapping on construction.
+    """
 
     viewport: BrowserViewport | None = None
     permissions: tuple[str, ...] | None = None
     user_agent: str | None = None
-    extra_http_headers: BrowserHttpHeaders | None = None
+    extra_http_headers: Mapping[str, str] | None = None
     proxy: BrowserProxy | None = None
     locale: str | None = None
     timezone_id: str | None = None
@@ -496,40 +401,23 @@ class BrowserContextOptions(_ImmutableBrowserConfiguration):
     java_script_enabled: bool = True
 
     def __post_init__(self) -> None:
-        if self.viewport is not None and type(self.viewport) is not BrowserViewport:
-            raise TypeError("viewport must be BrowserViewport or None")
-        if self.permissions is not None:
-            if type(self.permissions) is not tuple:
-                raise TypeError("permissions must be a tuple of strings or None")
-            for permission in self.permissions:
-                _require_exact_string(permission, "permission")
-        _require_optional_string(self.user_agent, "user agent")
-        if (
-            self.extra_http_headers is not None
-            and type(self.extra_http_headers) is not BrowserHttpHeaders
-        ):
-            raise TypeError("extra_http_headers must be BrowserHttpHeaders or None")
-        if self.proxy is not None and type(self.proxy) is not BrowserProxy:
-            raise TypeError("proxy must be BrowserProxy or None")
-        _require_optional_string(self.locale, "locale")
-        _require_optional_string(self.timezone_id, "timezone_id")
-        _require_optional_non_negative_integer(self.timeout, "timeout")
-        _require_optional_non_negative_integer(
-            self.navigation_timeout,
-            "navigation_timeout",
-        )
-        if type(self.ignore_https_errors) is not bool:
-            raise TypeError("ignore_https_errors must be a boolean")
-        if type(self.java_script_enabled) is not bool:
-            raise TypeError("java_script_enabled must be a boolean")
+        if self.extra_http_headers is not None:
+            object.__setattr__(
+                self,
+                "extra_http_headers",
+                MappingProxyType(dict(self.extra_http_headers)),
+            )
+        if self.timeout is not None and self.timeout < 0:
+            raise ValueError("timeout must be non-negative")
+        if self.navigation_timeout is not None and self.navigation_timeout < 0:
+            raise ValueError("navigation_timeout must be non-negative")
 
 
 __all__ = [
+    "BROWSER",
+    "Browser",
     "BrowserContext",
     "BrowserContextOptions",
-    "BrowserFocus",
-    "BrowserHttpHeaders",
-    "BrowserLaunchProxy",
     "BrowserOptions",
     "BrowserProxy",
     "BrowserViewport",

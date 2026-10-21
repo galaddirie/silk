@@ -8,14 +8,12 @@ from silk.actions.elements import WaitOptions
 from silk.actions.navigation import NavigateOptions, NavigationOptions
 from silk.browsers.models import (
     BrowserContextOptions,
-    BrowserHttpHeaders,
-    BrowserLaunchProxy,
     BrowserOptions,
     BrowserProxy,
     BrowserViewport,
 )
 
-launch_proxy = BrowserLaunchProxy(server="http://proxy.test:8080")
+launch_proxy = BrowserProxy(server="http://proxy.test:8080")
 context_proxy = BrowserProxy(
     server="http://proxy.test:8080",
     bypass="localhost",
@@ -32,7 +30,7 @@ context_options = BrowserContextOptions(
     viewport=BrowserViewport(width=1280, height=720),
     permissions=("geolocation",),
     user_agent="Silk/1.0",
-    extra_http_headers=BrowserHttpHeaders({"x-silk": "configured"}),
+    extra_http_headers={"x-silk": "configured"},
     proxy=context_proxy,
     locale="fr-CA",
     timezone_id="America/Toronto",

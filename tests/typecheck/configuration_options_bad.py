@@ -24,8 +24,6 @@ BrowserOptions(proxy="http://proxy.test")
 
 # typecheck-case: configuration_options.009
 BrowserContextOptions(viewport={"width": 1280, "height": 720})
-# typecheck-case: configuration_options.010
-BrowserContextOptions(extra_http_headers={"x-silk": "configured"})
 # typecheck-case: configuration_options.011
 BrowserContextOptions(proxy={"server": "http://proxy.test"})
 # typecheck-case: configuration_options.012

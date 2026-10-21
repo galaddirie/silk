@@ -13,10 +13,9 @@ from urllib.parse import quote
 import pytest
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from silk.browsers.capabilities import DRIVER
 from silk.browsers.models import (
+    BROWSER,
     BrowserContextOptions,
-    BrowserHttpHeaders,
     BrowserOptions,
     BrowserProxy,
     BrowserViewport,
@@ -145,7 +144,7 @@ async def test_chromium_honors_non_proxy_context_options() -> None:
                 viewport=BrowserViewport(width=913, height=617),
                 permissions=("geolocation",),
                 user_agent="SilkContextProbe/1.0",
-                extra_http_headers=BrowserHttpHeaders({"x-silk-context": "configured"}),
+                extra_http_headers={"x-silk-context": "configured"},
                 locale="fr-CA",
                 timezone_id="America/Toronto",
                 timeout=180,
@@ -247,8 +246,8 @@ async def test_chromium_honors_context_https_error_policy() -> None:
         async with BrowserSession(
             options=BrowserOptions(headless=True, timeout=10_000)
         ) as session:
-            capability = session.environment.require(DRIVER)
-            strict_outcome = await capability.new_context(
+            browser = session.environment.require(BROWSER)
+            strict_outcome = await browser.new_context(
                 BrowserContextOptions(ignore_https_errors=False)
             )
             assert strict_outcome.is_ok(), strict_outcome
@@ -263,7 +262,7 @@ async def test_chromium_honors_context_https_error_policy() -> None:
                 closed = await strict_context.close()
                 assert closed.is_ok(), closed
 
-            permissive_outcome = await capability.new_context(
+            permissive_outcome = await browser.new_context(
                 BrowserContextOptions(ignore_https_errors=True)
             )
             assert permissive_outcome.is_ok(), permissive_outcome

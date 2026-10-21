@@ -25,13 +25,12 @@ from silk.actions.input import (
     Fill as fill,
     TypeText as type_text,
 )
-from silk.browsers.drivers.playwright import _PlaywrightDriver
+from silk.browsers.drivers.playwright import PlaywrightBrowser
 from silk.browsers.models import ElementHandle, KeyModifier, Page
 from silk.errors import DragElementMismatchError
 
 
 async def public_element() -> tuple[Page, ElementHandle, MagicMock]:
-    driver = _PlaywrightDriver()
     browser = MagicMock(spec=Browser)
     context = MagicMock(spec=PWBrowserContext)
     page = MagicMock(spec=PWPage)
@@ -44,7 +43,7 @@ async def public_element() -> tuple[Page, ElementHandle, MagicMock]:
     element.dblclick = AsyncMock(return_value=None)
     element.fill = AsyncMock(return_value=None)
     element.type = AsyncMock(return_value=None)
-    driver._browser = browser
+    driver = PlaywrightBrowser(MagicMock(), browser)
 
     context_result = await driver.new_context()
     assert context_result.is_ok()
@@ -62,7 +61,6 @@ async def public_drag_elements() -> tuple[
     MagicMock,
     MagicMock,
 ]:
-    driver = _PlaywrightDriver()
     browser = MagicMock(spec=Browser)
     context = MagicMock(spec=PWBrowserContext)
     page = MagicMock(spec=PWPage)
@@ -83,7 +81,7 @@ async def public_drag_elements() -> tuple[
     mouse.move = AsyncMock(return_value=None)
     mouse.down = AsyncMock(return_value=None)
     mouse.up = AsyncMock(return_value=None)
-    driver._browser = browser
+    driver = PlaywrightBrowser(MagicMock(), browser)
 
     context_result = await driver.new_context()
     assert context_result.is_ok()
@@ -217,86 +215,6 @@ async def test_drag_releases_mouse_and_preserves_down_failure() -> None:
 
 
 @pytest.mark.asyncio
-async def test_drag_task_cancellation_during_down_joins_mouse_release() -> None:
-    source, target, mouse, _source_native, _target_native = await public_drag_elements()
-    down_started = asyncio.Event()
-    never_finishes = asyncio.Event()
-    release_started = asyncio.Event()
-    allow_release = asyncio.Event()
-
-    async def down() -> None:
-        down_started.set()
-        await never_finishes.wait()
-
-    async def release() -> None:
-        release_started.set()
-        await allow_release.wait()
-
-    mouse.down.side_effect = down
-    mouse.up.side_effect = release
-    operation = asyncio.create_task(drag(_, target).run(source))
-    await down_started.wait()
-    operation.cancel("cancelled while mouse down may have taken effect")
-    await release_started.wait()
-    assert not operation.done()
-    allow_release.set()
-
-    with pytest.raises(asyncio.CancelledError) as caught:
-        await operation
-
-    assert caught.value.args == ("cancelled while mouse down may have taken effect",)
-    mouse.down.assert_awaited_once_with()
-    mouse.up.assert_awaited_once_with()
-    assert mouse.move.await_count == 1
-
-
-@pytest.mark.asyncio
-async def test_drag_retains_down_and_release_failures_in_order() -> None:
-    source, target, mouse, _source_native, _target_native = await public_drag_elements()
-    primary = RuntimeError("mouse down failed after press")
-    release = RuntimeError("mouse release failed")
-    mouse.down.side_effect = primary
-    mouse.up.side_effect = release
-
-    outcome = await drag(_, target).run(source)
-
-    assert outcome.is_error()
-    assert isinstance(outcome.error, ExceptionGroup)
-    assert outcome.error.exceptions == (primary, release)
-    mouse.up.assert_awaited_once_with()
-
-
-@pytest.mark.asyncio
-async def test_drag_down_cancellation_and_release_failure_form_base_group() -> None:
-    source, target, mouse, _source_native, _target_native = await public_drag_elements()
-    primary = asyncio.CancelledError("mouse down cancelled after press")
-    release = RuntimeError("mouse release failed")
-    mouse.down.side_effect = primary
-    mouse.up.side_effect = release
-
-    with pytest.raises(BaseExceptionGroup) as caught:
-        await drag(_, target).run(source)
-
-    assert caught.value.exceptions == (primary, release)
-    mouse.up.assert_awaited_once_with()
-
-
-@pytest.mark.asyncio
-async def test_drag_down_failure_and_release_cancellation_form_base_group() -> None:
-    source, target, mouse, _source_native, _target_native = await public_drag_elements()
-    primary = RuntimeError("mouse down failed after press")
-    release = asyncio.CancelledError("mouse release cancelled")
-    mouse.down.side_effect = primary
-    mouse.up.side_effect = release
-
-    with pytest.raises(BaseExceptionGroup) as caught:
-        await drag(_, target).run(source)
-
-    assert caught.value.exceptions == (primary, release)
-    mouse.up.assert_awaited_once_with()
-
-
-@pytest.mark.asyncio
 async def test_drag_releases_mouse_and_preserves_target_move_failure() -> None:
     source, target, mouse, _source_native, _target_native = await public_drag_elements()
     primary = RuntimeError("target move failed")
@@ -306,65 +224,6 @@ async def test_drag_releases_mouse_and_preserves_target_move_failure() -> None:
 
     assert outcome.is_error()
     assert outcome.error is primary
-    mouse.down.assert_awaited_once_with()
-    mouse.up.assert_awaited_once_with()
-
-
-@pytest.mark.asyncio
-async def test_drag_retains_primary_and_release_failures_in_order() -> None:
-    source, target, mouse, _source_native, _target_native = await public_drag_elements()
-    primary = RuntimeError("target move failed")
-    release = RuntimeError("mouse release failed")
-    mouse.move.side_effect = [None, primary]
-    mouse.up.side_effect = release
-
-    outcome = await drag(_, target).run(source)
-
-    assert outcome.is_error()
-    assert isinstance(outcome.error, ExceptionGroup)
-    assert outcome.error.exceptions == (primary, release)
-    mouse.up.assert_awaited_once_with()
-
-
-@pytest.mark.asyncio
-async def test_drag_task_cancellation_settles_mouse_release() -> None:
-    source, target, mouse, _source_native, _target_native = await public_drag_elements()
-    target_move_started = asyncio.Event()
-    never_finishes = asyncio.Event()
-    release_started = asyncio.Event()
-    allow_release = asyncio.Event()
-    move_count = 0
-
-    async def move(
-        _x: float,
-        _y: float,
-        *,
-        steps: int = 1,
-    ) -> None:
-        nonlocal move_count
-        del steps
-        move_count += 1
-        if move_count == 2:
-            target_move_started.set()
-            await never_finishes.wait()
-
-    async def release() -> None:
-        release_started.set()
-        await allow_release.wait()
-
-    mouse.move.side_effect = move
-    mouse.up.side_effect = release
-    operation = asyncio.create_task(drag(_, target).run(source))
-    await target_move_started.wait()
-    operation.cancel()
-    await release_started.wait()
-    assert not operation.done()
-    allow_release.set()
-
-    with pytest.raises(asyncio.CancelledError) as caught:
-        await operation
-
-    assert caught.value is not None
     mouse.down.assert_awaited_once_with()
     mouse.up.assert_awaited_once_with()
 
@@ -425,7 +284,7 @@ async def test_drag_preserves_bounding_box_failure() -> None:
 
 
 @pytest.mark.asyncio
-async def test_drag_mismatch_diagnostic_retains_no_adapter_ownership() -> None:
+async def test_drag_rejects_elements_on_different_pages() -> None:
     source, _target, _mouse, source_native, _target_native = (
         await public_drag_elements()
     )
@@ -438,25 +297,6 @@ async def test_drag_mismatch_diagnostic_retains_no_adapter_ownership() -> None:
     assert outcome.is_error()
     error = outcome.error
     assert isinstance(error, DragElementMismatchError)
-    assert error.owner_mismatch is True
-    assert error.page_mismatch is True
-    assert not hasattr(error, "source_driver")
-    assert not hasattr(error, "target_driver")
-    assert not hasattr(error, "source_owner")
-    assert not hasattr(error, "target_owner")
+    assert error.source_page_id == source.page_id
+    assert error.target_page_id == other_target.page_id
     source_native.bounding_box.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_drag_cancellation_and_release_failure_form_base_group() -> None:
-    source, target, mouse, _source_native, _target_native = await public_drag_elements()
-    primary = asyncio.CancelledError("target move cancelled")
-    release = RuntimeError("mouse release failed")
-    mouse.move.side_effect = [None, primary]
-    mouse.up.side_effect = release
-
-    with pytest.raises(BaseExceptionGroup) as caught:
-        await drag(_, target).run(source)
-
-    assert caught.value.exceptions == (primary, release)
-    mouse.up.assert_awaited_once_with()

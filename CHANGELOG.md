@@ -7,39 +7,40 @@ tag remain the immutable legacy ActionContext/callable/binary-`&` release;
 the redesigned package begins at 0.4.0.
 
 ### Added
-- Add typed unary browser-action templates built on the exact `fp-ops==0.3.1`
+- Add typed unary browser-action templates built on the `fp-ops` 0.4
   contract: every action has one explicit input selected by `fp_ops._`, and
   pipelines compose with `.then(...)` before running one focus value.
-- Add explicit typed environment capabilities for the browser driver, session
-  identity, and browser options, separate from changing page, context, and
-  element focus values.
-- Add frozen, action-specific options and deeply immutable browser-context
-  configuration values whose caller-owned inputs are snapshotted at operation
-  construction.
+- Add a single typed environment key, `BROWSER`, holding a small `Browser`
+  interface (`new_context`), separate from page, context, and element values
+  that flow through pipelines.
+- Add frozen, action-specific options and frozen browser configuration
+  (`BrowserOptions`, `BrowserContextOptions`, `BrowserViewport`, one
+  `BrowserProxy` used for both launch and context proxies).
 - Add explicit missing-element and missing-attribute errors while preserving
   original browser exceptions through traversal and object-construction error
   wrappers.
-- Add truthfully named fail-fast, all-settled, lossy, retry, bounded-parallel,
-  and browser-cleanup policies with inspectable failure causes.
+- Add truthfully named fail-fast, all-settled, lossy, retry, and
+  bounded-parallel policies with inspectable failure causes.
 
 ### Changed
 - Replace hidden mutable browser focus with ordinary typed pipeline inputs and
-  outputs; stable capabilities flow through a read-only FP-Ops environment.
-- Define shared-driver concurrency explicitly: parallel branches reuse the
-  same driver capability, preserve declaration-order results, and use joined
+  outputs; the browser is provided through a read-only FP-Ops environment.
+- Define shared-browser concurrency explicitly: parallel branches reuse the
+  same browser, preserve declaration-order results, and use joined
   best-effort cancellation on fail-fast paths.
-- Harden browser lifecycle and registry cleanup across ordinary exceptions and
-  cancellation, including partial startup and close failures.
+- `BrowserSession.close()` closes the browser (and with it every context and
+  page); a failed startup closes the browser before re-raising.
 - Gate the supported interface with strict mypy and Pyright checks, local and
   live Playwright coverage, the real Books to Scrape pipeline, package-content
   inspection, and an isolated installed-wheel browser smoke.
 - Publish as `silk-scraper==0.4.0` so installers cannot be silently left on the
   immutable legacy 0.3.1 distribution.
-- Make Playwright the ordinary runtime adapter dependency, retain the exact
-  `fp-ops==0.3.1` contract, and declare the bounded `typing-extensions`
+- Make Playwright the ordinary runtime adapter dependency, depend on
+  `fp-ops>=0.4.0,<0.5.0`, and declare the bounded `typing-extensions`
   dependency used by Silk's public type surface.
 - Make `BrowserSession` the sole browser-lifecycle owner; it selects its
-  private Playwright implementation and exposes only focus and capabilities.
+  Playwright implementation and exposes `page`, `context`, `browser`, and
+  `environment`.
 
 ### Removed
 - Remove the legacy `ActionContext` execution model, callable action objects,

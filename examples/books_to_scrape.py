@@ -44,7 +44,7 @@ books_pipeline = (
 
 
 async def scrape_books() -> list[Book]:
-    """Run the pipeline with explicit page focus and session capabilities."""
+    """Run the pipeline on the session page with the session environment."""
 
     options = BrowserOptions(headless=True)
     async with BrowserSession(options=options) as session:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Self, final
 
 from fp_ops import Error, Ok, Result, result_operation_template
 
@@ -26,35 +25,16 @@ from silk.browsers.models import WaitStateLiteral
 from silk.errors import AttributeNotFoundError
 
 
-class _ImmutableElementConfiguration:
-    __slots__ = ()
-
-    def __copy__(self) -> Self:
-        return self
-
-    def __deepcopy__(self, memo: dict[int, object]) -> Self:
-        memo[id(self)] = self
-        return self
-
-
-@final
 @dataclass(frozen=True, slots=True)
-class WaitOptions(_ImmutableElementConfiguration):
-    """Strict immutable selector wait configuration."""
+class WaitOptions:
+    """Selector wait configuration."""
 
     timeout: int | None = None
     state: WaitStateLiteral = "visible"
 
     def __post_init__(self) -> None:
-        if self.timeout is not None:
-            if type(self.timeout) is not int:
-                raise TypeError("timeout must be an integer or None")
-            if self.timeout < 0:
-                raise ValueError("timeout must be non-negative")
-        if type(self.state) is not str:
-            raise TypeError("state must be a string")
-        if self.state not in ("visible", "hidden", "attached", "detached"):
-            raise ValueError("state must be visible, hidden, attached, or detached")
+        if self.timeout is not None and self.timeout < 0:
+            raise ValueError("timeout must be non-negative")
 
 
 @result_operation_template
@@ -188,8 +168,6 @@ async def WaitForElement(
     """Wait for one selector using the page's explicit wait-state policy."""
 
     compiled = snapshot_wait_selector(selector)
-    if options is not None and type(options) is not WaitOptions:
-        return Error(TypeError("options must be WaitOptions or None"))
     configured = options if options is not None else WaitOptions()
     return await page.wait_for_selector(
         compiled.query,

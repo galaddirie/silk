@@ -17,15 +17,14 @@ from fp_ops import __version__ as fp_ops_version
 import silk
 from silk.actions.elements import GetInnerText
 from silk.actions.navigation import Navigate
-from silk.browsers.capabilities import DRIVER, BrowserSessionNotStartedError
-from silk.browsers.models import BrowserOptions, Page
+from silk.browsers.models import BROWSER, BrowserOptions, Page
 from silk.browsers.sessions import BrowserSession
 
 BOOKS_URL = "https://books.toscrape.com/"
 EXPECTED_DISTRIBUTION_NAME = "silk-scraper"
 EXPECTED_SILK_VERSION = "0.4.0"
 EXPECTED_DIRECT_REQUIREMENTS = {
-    "fp-ops==0.3.1",
+    "fp-ops>=0.4.0,<0.5.0",
     "playwright>=1.51.0,<2.0.0",
     "typing-extensions>=4.12.0,<5.0.0",
 }
@@ -51,6 +50,7 @@ DELETED_MODULES = (
     "silk.text",
     "silk.utils",
     "silk.actions.utils",
+    "silk.browsers.capabilities",
 )
 
 
@@ -88,7 +88,7 @@ def verify_distribution() -> None:
     assert silk.__version__ == EXPECTED_SILK_VERSION
     assert distribution_version == silk.__version__
 
-    assert fp_ops_version == "0.3.1"
+    assert fp_ops_version == "0.4.0"
     requirements = metadata.requires(EXPECTED_DISTRIBUTION_NAME) or []
     normalized = {normalized_requirement(item) for item in requirements}
     assert normalized == EXPECTED_DIRECT_REQUIREMENTS, requirements
@@ -136,9 +136,6 @@ def verify_distribution() -> None:
         assert not hasattr(module, "Driver"), module.__name__
         assert not hasattr(module, "PlaywrightDriver"), module.__name__
     assert driver_package.__all__ == []
-    assert playwright_adapter.__all__ == []
-    assert "_PlaywrightDriver" not in playwright_adapter.__all__
-    assert not hasattr(playwright_adapter, "_SESSION_IMPLEMENTATION")
 
     session_parameters = signature(BrowserSession).parameters
     assert tuple(session_parameters) == ("options", "context_options")
@@ -165,17 +162,13 @@ def verify_distribution() -> None:
 
 
 async def verify_public_browser_pipeline() -> None:
-    pipeline: Operation[Page, str] = Navigate(_, BOOKS_URL).then(
-        GetInnerText("h1", _)
-    )
+    pipeline: Operation[Page, str] = Navigate(_, BOOKS_URL).then(GetInnerText("h1", _))
     assert isinstance(pipeline, Operation)
 
     async with BrowserSession(
         options=BrowserOptions(headless=True),
     ) as session:
-        capability = session.environment.require(DRIVER)
-        assert not hasattr(session, "driver")
-        assert not hasattr(session, "_driver")
+        browser = session.environment.require(BROWSER)
         result = await pipeline.run(
             session.page,
             environment=session.environment,
@@ -184,9 +177,8 @@ async def verify_public_browser_pipeline() -> None:
     assert result.is_ok(), result
     assert result.ok.strip() == "All products"
     assert session.is_started is False
-    stale = await capability.new_context()
+    stale = await browser.new_context()
     assert stale.is_error()
-    assert isinstance(stale.error, BrowserSessionNotStartedError)
 
 
 def main() -> None:

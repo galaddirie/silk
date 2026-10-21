@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Protocol, TypeGuard, runtime_checkable
+from typing import Protocol, TypeGuard, cast, runtime_checkable
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -32,8 +32,9 @@ from fp_ops import (
 
 from silk.actions.browser import CreateContext as create_context
 from silk.actions.navigation import CurrentUrl as current_url, Title as title
-from silk.browsers.capabilities import DRIVER, BrowserDriverCapability
 from silk.browsers.models import (
+    BROWSER,
+    Browser,
     BrowserContext,
     BrowserContextOptions,
     BrowserViewport,
@@ -64,9 +65,7 @@ class ActivityProbe:
     active: int = 0
     max_active: int = 0
     inputs: list[WorkItem] = field(default_factory=list[WorkItem])
-    capabilities: list[BrowserDriverCapability] = field(
-        default_factory=list[BrowserDriverCapability]
-    )
+    browsers: list[Browser] = field(default_factory=list[Browser])
     started: list[str] = field(default_factory=list[str])
     stopped: list[str] = field(default_factory=list[str])
     cancelled: list[str] = field(default_factory=list[str])
@@ -76,12 +75,12 @@ class ActivityProbe:
         self,
         label: str,
         item: WorkItem,
-        capability: BrowserDriverCapability,
+        browser: Browser,
     ) -> None:
         self.active += 1
         self.max_active = max(self.max_active, self.active)
         self.inputs.append(item)
-        self.capabilities.append(capability)
+        self.browsers.append(browser)
         self.started.append(label)
         if self.active >= self.threshold:
             self.threshold_reached.set()
@@ -113,16 +112,13 @@ def make_page(
     page = MagicMock(spec=Page)
     page.url = AsyncMock(return_value=url)
     page.title = AsyncMock(return_value=page_title)
-    page.__copy__.return_value = page
-    page.__deepcopy__.return_value = page
     return page
 
 
-def driver_environment() -> tuple[MagicMock, BrowserDriverCapability, Environment]:
-    driver = MagicMock()
-    capability = BrowserDriverCapability(driver.new_context)
-    environment = Environment().with_value(DRIVER, capability)
-    return driver, capability, environment
+def browser_environment() -> tuple[MagicMock, Environment]:
+    browser = MagicMock(spec=Browser)
+    environment = Environment().with_value(BROWSER, cast(Browser, browser))
+    return browser, environment
 
 
 def controlled_branch(
@@ -133,12 +129,12 @@ def controlled_branch(
     failure: Exception | None = None,
     finished: asyncio.Event | None = None,
 ) -> Operation[WorkItem, str]:
-    @environment_result_operation(DRIVER)
+    @environment_result_operation(BROWSER)
     async def branch(
         item: WorkItem,
-        capability: BrowserDriverCapability,
+        browser: Browser,
     ) -> Result[str, Exception]:
-        probe.enter(label, item, capability)
+        probe.enter(label, item, browser)
         try:
             await release.wait()
             if failure is not None:
@@ -240,8 +236,8 @@ async def test_traversal_policies_preserve_order_errors_and_reporting() -> None:
 
 
 @pytest.mark.asyncio
-async def test_retry_reuses_input_and_capability_and_keeps_final_error() -> None:
-    _, capability, environment = driver_environment()
+async def test_retry_reuses_input_and_browser_and_keeps_final_error() -> None:
+    browser, environment = browser_environment()
     item = WorkItem("retry-input")
     failures = [
         RuntimeError("first browser failure"),
@@ -249,16 +245,16 @@ async def test_retry_reuses_input_and_capability_and_keeps_final_error() -> None
         RuntimeError("final browser failure"),
     ]
     seen_inputs: list[WorkItem] = []
-    seen_capabilities: list[BrowserDriverCapability] = []
+    seen_browsers: list[Browser] = []
     backoffs: list[tuple[int, Exception]] = []
 
-    @environment_result_operation(DRIVER)
+    @environment_result_operation(BROWSER)
     async def always_fails(
         value: WorkItem,
-        seen_capability: BrowserDriverCapability,
+        seen_browser: Browser,
     ) -> Result[str, Exception]:
         seen_inputs.append(value)
-        seen_capabilities.append(seen_capability)
+        seen_browsers.append(seen_browser)
         return Error(failures[len(seen_inputs) - 1])
 
     def backoff(attempt: int, error: Exception) -> float:
@@ -275,27 +271,27 @@ async def test_retry_reuses_input_and_capability_and_keeps_final_error() -> None
     assert outcome.error is failures[-1]
     assert seen_inputs == [item, item, item]
     assert all(seen is item for seen in seen_inputs)
-    assert seen_capabilities == [capability, capability, capability]
-    assert all(seen is capability for seen in seen_capabilities)
+    assert seen_browsers == [browser, browser, browser]
+    assert all(seen is browser for seen in seen_browsers)
     assert backoffs == [(1, failures[0]), (2, failures[1])]
 
 
 @pytest.mark.asyncio
 async def test_retry_propagates_cancellation_without_retrying_or_orphaning() -> None:
-    _, _, environment = driver_environment()
+    _, environment = browser_environment()
     item = WorkItem("cancel-retry")
     started = asyncio.Event()
     finalized = asyncio.Event()
     attempts = 0
 
-    @environment_result_operation(DRIVER)
+    @environment_result_operation(BROWSER)
     async def blocks(
         value: WorkItem,
-        capability: BrowserDriverCapability,
+        browser: Browser,
     ) -> Result[str, Exception]:
         nonlocal attempts
         assert value is item
-        assert capability is environment.require(DRIVER)
+        assert browser is environment.require(BROWSER)
         attempts += 1
         started.set()
         try:
@@ -319,7 +315,7 @@ async def test_retry_propagates_cancellation_without_retrying_or_orphaning() -> 
 
 @pytest.mark.asyncio
 async def test_fanout_parallel_is_bounded_ordered_and_shares_identity() -> None:
-    _, capability, environment = driver_environment()
+    browser, environment = browser_environment()
     item = WorkItem("shared")
     release = asyncio.Event()
     probe = ActivityProbe(threshold=2)
@@ -346,13 +342,13 @@ async def test_fanout_parallel_is_bounded_ordered_and_shares_identity() -> None:
     assert probe.active == 0
     assert len(probe.inputs) == 4
     assert all(seen is item for seen in probe.inputs)
-    assert all(seen is capability for seen in probe.capabilities)
+    assert all(seen is browser for seen in probe.browsers)
     assert sorted(probe.stopped) == sorted(probe.started)
 
 
 @pytest.mark.asyncio
 async def test_fanout_parallel_failure_cancels_and_joins_siblings() -> None:
-    _, _, environment = driver_environment()
+    _, environment = browser_environment()
     item = WorkItem("fail-fast")
     probe = ActivityProbe(threshold=3)
     fail_now = asyncio.Event()
@@ -385,7 +381,7 @@ async def test_fanout_parallel_failure_cancels_and_joins_siblings() -> None:
 
 @pytest.mark.asyncio
 async def test_fanout_parallel_external_cancellation_joins_every_branch() -> None:
-    _, _, environment = driver_environment()
+    _, environment = browser_environment()
     item = WorkItem("cancel-fanout")
     probe = ActivityProbe(threshold=3)
     never_release = asyncio.Event()
@@ -410,7 +406,7 @@ async def test_fanout_parallel_external_cancellation_joins_every_branch() -> Non
 
 @pytest.mark.asyncio
 async def test_fanout_all_settled_retains_declaration_order_and_results() -> None:
-    _, _, environment = driver_environment()
+    _, environment = browser_environment()
     item = WorkItem("settled")
     probe = ActivityProbe(threshold=3)
     first_release = asyncio.Event()
@@ -455,18 +451,18 @@ async def test_fanout_all_settled_retains_declaration_order_and_results() -> Non
 
 
 @pytest.mark.asyncio
-async def test_traverse_parallel_is_bounded_ordered_and_shares_capability() -> None:
-    _, capability, environment = driver_environment()
+async def test_traverse_parallel_is_bounded_ordered_and_shares_browser() -> None:
+    browser, environment = browser_environment()
     items = [WorkItem(label) for label in ("one", "two", "three", "four")]
     release = asyncio.Event()
     probe = ActivityProbe(threshold=2)
 
-    @environment_result_operation(DRIVER)
+    @environment_result_operation(BROWSER)
     async def observe(
         item: WorkItem,
-        seen_capability: BrowserDriverCapability,
+        seen_browser: Browser,
     ) -> Result[str, Exception]:
-        probe.enter(item.label, item, seen_capability)
+        probe.enter(item.label, item, seen_browser)
         try:
             await release.wait()
             return Ok(item.label)
@@ -494,25 +490,25 @@ async def test_traverse_parallel_is_bounded_ordered_and_shares_capability() -> N
     assert probe.active == 0
     assert len(probe.inputs) == 4
     assert all(seen is expected for seen, expected in zip(probe.inputs, items))
-    assert all(seen is capability for seen in probe.capabilities)
+    assert all(seen is browser for seen in probe.browsers)
     assert sorted(probe.stopped) == sorted(probe.started)
 
 
 @pytest.mark.asyncio
 async def test_traverse_parallel_failure_wraps_cause_and_joins_work() -> None:
-    _, _, environment = driver_environment()
+    _, environment = browser_environment()
     items = [WorkItem(label) for label in ("failed", "blocked", "queued")]
     probe = ActivityProbe(threshold=2)
     fail_now = asyncio.Event()
     never_release = asyncio.Event()
     browser_error = RuntimeError("browser read failed")
 
-    @environment_result_operation(DRIVER)
+    @environment_result_operation(BROWSER)
     async def read(
         item: WorkItem,
-        capability: BrowserDriverCapability,
+        browser: Browser,
     ) -> Result[str, Exception]:
-        probe.enter(item.label, item, capability)
+        probe.enter(item.label, item, browser)
         try:
             if item.label == "failed":
                 await fail_now.wait()
@@ -547,8 +543,8 @@ async def test_traverse_parallel_failure_wraps_cause_and_joins_work() -> None:
 
 
 @pytest.mark.asyncio
-async def test_public_context_action_shares_driver_and_immutable_options() -> None:
-    driver, capability, environment = driver_environment()
+async def test_public_context_action_shares_browser_and_immutable_options() -> None:
+    browser, environment = browser_environment()
     contexts = [MagicMock(spec=BrowserContext), MagicMock(spec=BrowserContext)]
     options_seen: list[BrowserContextOptions] = []
     active = 0
@@ -572,7 +568,7 @@ async def test_public_context_action_shares_driver_and_immutable_options() -> No
         finally:
             active -= 1
 
-    driver.new_context.side_effect = new_context
+    browser.new_context.side_effect = new_context
     configured = BrowserContextOptions(
         viewport=BrowserViewport(width=910, height=620),
         permissions=("clipboard-read",),
@@ -586,8 +582,7 @@ async def test_public_context_action_shares_driver_and_immutable_options() -> No
     )
     await asyncio.wait_for(both_started.wait(), timeout=2)
 
-    assert environment.require(DRIVER) is capability
-    assert not hasattr(capability, "driver")
+    assert environment.require(BROWSER) is browser
     assert active == 2
     release.set()
     outcome = await task

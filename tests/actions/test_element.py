@@ -68,7 +68,6 @@ def make_element(
     element.inner_text = AsyncMock(return_value=Ok(inner_text))
     element.html = AsyncMock(return_value=Ok(html))
     element.attribute = AsyncMock(return_value=Ok(None))
-    element.__deepcopy__.return_value = element
     return element
 
 
@@ -77,7 +76,6 @@ def make_page() -> MagicMock:
     page.query_selector = AsyncMock(return_value=Ok(None))
     page.query_selector_all = AsyncMock(return_value=Ok([]))
     page.wait_for_selector = AsyncMock(return_value=Ok(None))
-    page.__deepcopy__.return_value = page
     return page
 
 
@@ -269,7 +267,6 @@ async def test_query_accepts_the_selector_as_runtime_data() -> None:
     result = await operation.run(text("Find me"))
 
     assert result == Ok(None)
-    page.__deepcopy__.assert_called_once()
     page.query_selector.assert_awaited_once_with("text=Find me")
 
 

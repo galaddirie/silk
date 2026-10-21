@@ -1,6 +1,7 @@
 # pyright: strict
 """Positive typing contracts for browser lifecycle operation templates."""
 
+from collections.abc import Mapping
 from typing import assert_type
 
 from fp_ops import Environment, Operation, Result, _
@@ -13,11 +14,11 @@ from silk.actions.browser import (
     PageById as page_by_id,
     Pages as pages,
 )
-from silk.browsers.capabilities import DRIVER, BrowserDriverCapability
 from silk.browsers.models import (
+    BROWSER,
+    Browser,
     BrowserContext,
     BrowserContextOptions,
-    BrowserHttpHeaders,
     BrowserProxy,
     BrowserViewport,
     Page,
@@ -64,7 +65,7 @@ def every_context_option_has_a_precise_type() -> None:
         viewport=BrowserViewport(width=1280, height=720),
         permissions=("geolocation",),
         user_agent="SilkContext/1.0",
-        extra_http_headers=BrowserHttpHeaders({"x-silk": "typed"}),
+        extra_http_headers={"x-silk": "typed"},
         proxy=BrowserProxy(server="http://proxy.test:8080"),
         locale="fr-CA",
         timezone_id="America/Toronto",
@@ -74,7 +75,7 @@ def every_context_option_has_a_precise_type() -> None:
     assert_type(options, BrowserContextOptions)
     assert_type(options.viewport, BrowserViewport | None)
     assert_type(options.permissions, tuple[str, ...] | None)
-    assert_type(options.extra_http_headers, BrowserHttpHeaders | None)
+    assert_type(options.extra_http_headers, Mapping[str, str] | None)
     assert_type(options.proxy, BrowserProxy | None)
     assert_type(options.locale, str | None)
     assert_type(options.timezone_id, str | None)
@@ -82,14 +83,14 @@ def every_context_option_has_a_precise_type() -> None:
 
 
 async def public_browser_types_are_valid(
-    capability: BrowserDriverCapability,
+    browser: Browser,
     context: BrowserContext,
     page: Page,
 ) -> None:
-    environment = Environment().with_value(DRIVER, capability)
+    environment = Environment().with_value(BROWSER, browser)
     assert_type(environment, Environment)
 
-    direct_context_outcome = await capability.new_context(BrowserContextOptions())
+    direct_context_outcome = await browser.new_context(BrowserContextOptions())
     context_outcome = await create_context(_).run(
         BrowserContextOptions(),
         environment=environment,
