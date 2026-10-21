@@ -1,8 +1,8 @@
 """Browser lifecycle templates with explicit context and page focus.
 
-The driver is stable session capability supplied through the FP-Ops
-environment.  Browser contexts and pages are changing pipeline data: creating
-or selecting one returns it directly and never updates hidden runner state.
+The :class:`Browser` comes from the FP-Ops environment under ``BROWSER``.
+Contexts and pages are ordinary pipeline data: creating or selecting one
+returns it directly.
 """
 
 # pyright: strict
@@ -17,23 +17,24 @@ from fp_ops import (
     result_operation_template,
 )
 
-from silk.browsers.capabilities import DRIVER, BrowserDriverCapability
-from silk.browsers.models import BrowserContext, BrowserContextOptions, Page
+from silk.browsers.models import (
+    BROWSER,
+    Browser,
+    BrowserContext,
+    BrowserContextOptions,
+    Page,
+)
 from silk.errors import PageNotFoundError
 
 
-@environment_result_operation_template(DRIVER)
+@environment_result_operation_template(BROWSER)
 async def CreateContext(
     options: BrowserContextOptions,
-    capability: BrowserDriverCapability,
+    browser: Browser,
 ) -> Result[BrowserContext, Exception]:
-    """Create a context from explicit options using the session driver.
+    """Create a context in the environment's browser."""
 
-    ``options`` is deeply immutable ordinary pipeline data and is safe to
-    retain or snapshot without defensive copies.
-    """
-
-    return await capability.new_context(options)
+    return await browser.new_context(options)
 
 
 @result_operation_template
@@ -43,6 +44,7 @@ async def NewPage(
     """Create and return a page in ``context``."""
 
     return await context.new_page()
+
 
 @result_operation_template
 async def Pages(

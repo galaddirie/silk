@@ -11,34 +11,15 @@ from silk.actions.browser import (
     PageById as page_by_id,
     Pages as pages,
 )
-from silk.browsers.capabilities import (
-    DRIVER,
-    BrowserDriverCapability,
-    BrowserSessionInfo,
-)
 from silk.browsers.models import (
+    BROWSER,
+    Browser,
     BrowserContext,
     BrowserContextOptions,
-    BrowserHttpHeaders,
     BrowserProxy,
     BrowserViewport,
     Page,
 )
-
-
-# typecheck-case: browser_actions.001
-class SubclassedBrowserViewport(BrowserViewport):
-    pass
-
-
-# typecheck-case: browser_actions.002
-class SubclassedBrowserProxy(BrowserProxy):
-    pass
-
-
-# typecheck-case: browser_actions.003
-class SubclassedBrowserHttpHeaders(BrowserHttpHeaders):
-    pass
 
 
 def zero_and_two_hole_calls(
@@ -85,12 +66,9 @@ async def wrong_pipeline_inputs(
     await close_context(_).run(page)
 
 
-def wrong_environment_capability() -> None:
+def wrong_environment_value() -> None:
     # typecheck-case: browser_actions.019
-    Environment().with_value(
-        DRIVER,
-        BrowserSessionInfo(session_id="wrong capability"),
-    )
+    Environment().with_value(BROWSER, "not a browser")
 
 
 def incompatible_focus_composition() -> None:
@@ -121,10 +99,6 @@ def invalid_context_options() -> None:
     BrowserContextOptions(permissions=(1,))
     # typecheck-case: browser_actions.031
     BrowserContextOptions(extra_http_headers={"x-value": 1})
-    # typecheck-case: browser_actions.032
-    BrowserContextOptions(extra_http_headers={"x-value": "valid"})
-    # typecheck-case: browser_actions.033
-    BrowserHttpHeaders({"x-value": 1})
     # typecheck-case: browser_actions.034
     BrowserContextOptions(proxy={"server": "http://proxy.test"})
     # typecheck-case: browser_actions.035
@@ -135,12 +109,11 @@ def invalid_context_options() -> None:
 
 def immutable_context_options_cannot_be_mutated() -> None:
     viewport = BrowserViewport(width=1280, height=720)
-    headers = BrowserHttpHeaders({"x-value": "original"})
     proxy = BrowserProxy(server="http://proxy.test")
     options = BrowserContextOptions(
         viewport=viewport,
         permissions=("geolocation",),
-        extra_http_headers=headers,
+        extra_http_headers={"x-value": "original"},
         proxy=proxy,
     )
 
@@ -150,16 +123,15 @@ def immutable_context_options_cannot_be_mutated() -> None:
     viewport.width = 1
     # typecheck-case: browser_actions.039
     options.permissions[0] = "camera"
-    # typecheck-case: browser_actions.040
-    headers["x-value"] = "changed"
+    if options.extra_http_headers is not None:
+        # typecheck-case: browser_actions.040
+        options.extra_http_headers["x-value"] = "changed"
     # typecheck-case: browser_actions.041
     proxy.server = "http://changed.test"
 
 
-def capability_does_not_expose_adapter_lifecycle(
-    capability: BrowserDriverCapability,
-) -> None:
+def browser_does_not_expose_adapter_lifecycle(browser: Browser) -> None:
     # typecheck-case: browser_actions.042
-    capability.driver
+    browser.driver
     # typecheck-case: browser_actions.043
-    capability.close()
+    browser.close()

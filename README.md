@@ -1,8 +1,8 @@
 # Silk
 
-Silk is a typed browser-automation and scraping library built on FP-Ops 0.3.1.
+Silk is a typed browser-automation and scraping library built on FP-Ops 0.4.
 Browser actions are immutable unary operations: they consume one explicit focus
-value, use stable capabilities from a read-only environment, and return an
+value, read shared dependencies from a read-only environment, and return an
 FP-Ops `Result` when run.
 
 Silk currently provides a Playwright-backed Chromium adapter and supports
@@ -57,9 +57,9 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-`BrowserSession` owns the driver, initial browser context, and initial page.
-The pipeline receives the page as ordinary input and the session's stable
-capabilities through the FP-Ops `Environment`; neither is inferred.
+`BrowserSession` owns the browser, initial browser context, and initial page.
+The pipeline receives the page as ordinary input and the session's browser
+through the FP-Ops `Environment`; neither is inferred.
 
 ## Typed unary composition
 
@@ -102,51 +102,44 @@ GetInnerText(selector, _)  # page or element scope is the input
 Each call still has exactly one construction-time placeholder. Configuration
 is never appended when the operation runs.
 
-## Focus and capabilities
-
-Silk separates changing browser focus from stable session capabilities.
+## Pipeline values and the environment
 
 | Role | Public values | How it flows |
 |---|---|---|
-| Changing focus | `Page`, `BrowserContext`, `ElementHandle`, lists of elements | Ordinary operation input and output |
-| Stable context creation | `DRIVER` / `BrowserDriverCapability` | `session.environment` |
-| Stable session identity | `BROWSER_SESSION` / `BrowserSessionInfo` | `session.environment` |
-| Browser launch configuration | `BROWSER_OPTIONS` / `BrowserOptionsCapability` | Exact immutable launch value |
+| Pipeline values | `Page`, `BrowserContext`, `ElementHandle`, lists of elements | Ordinary operation input and output |
+| The running browser | `BROWSER` key → `Browser` | `session.environment` |
 
 Creating or selecting a page returns that page. Querying returns an element or
-an ordered element list. No action changes hidden focus, and returning a
+an ordered element list. No action changes hidden state, and returning a
 browser value never changes the environment.
 
-Use the typed environment keys when defining a capability-aware operation:
+Read the browser from the environment when defining your own operation:
 
 ```python
 from fp_ops import Result, environment_result_operation_template
 
-from silk.browsers.capabilities import DRIVER, BrowserDriverCapability
-from silk.browsers.models import BrowserContext, BrowserContextOptions
+from silk.browsers.models import BROWSER, Browser, BrowserContext, BrowserContextOptions
 
 
-@environment_result_operation_template(DRIVER)
+@environment_result_operation_template(BROWSER)
 async def isolated_context(
     options: BrowserContextOptions,
-    capability: BrowserDriverCapability,
+    browser: Browser,
 ) -> Result[BrowserContext, Exception]:
-    return await capability.new_context(options)
+    return await browser.new_context(options)
 ```
 
-`BrowserDriverCapability` deliberately exposes neither the adapter handle nor
-an umbrella `close`. Context creation is coordinated by its owning
-`BrowserSession`; close the browser through `BrowserSession.close`,
-`close_fail_fast`, or `close_all_settled`. A capability retained after cleanup
-returns `BrowserSessionNotStartedError` from `new_context`.
+`Browser` only exposes `new_context`; closing it is the session's job
+(`BrowserSession.close`). A `Browser` used after its session closed returns an
+error from `new_context`.
 
-## Immutable configuration
+## Configuration
 
 Configuration is explicit and purpose-built:
 
 - `BrowserOptions` configures only the installed Chromium process: headless
-  mode, launch timeout, immutable command-line arguments, and an optional
-  `BrowserLaunchProxy` endpoint.
+  mode, launch timeout, command-line arguments, and an optional
+  `BrowserProxy`.
 - `NavigateOptions` is the frozen URL-navigation record and uniquely owns the
   optional HTTP referer. `NavigationOptions` contains only timeout/load-state
   policy for history, reload, and future navigation waits. `WaitOptions` is
@@ -154,18 +147,17 @@ Configuration is explicit and purpose-built:
 - `ClickOptions`, `DoubleClickOptions`, `FillOptions`, and `TypeTextOptions`
   are frozen action-specific values.
 - `DragOptions` is a frozen value for element-to-element movement and offsets.
-- `BrowserContextOptions` is a deeply immutable isolated-context record. It
-  composes `BrowserViewport`, `BrowserProxy`, `BrowserHttpHeaders`, and tuple
-  permissions instead of retaining mutable dictionaries or lists.
-- selectors and template operands are snapshotted during construction, so
-  later mutation of caller-owned configuration cannot retarget an action.
+- `BrowserContextOptions` is a frozen isolated-context record composed of
+  `BrowserViewport`, `BrowserProxy`, tuple permissions, and HTTP headers
+  (copied into a read-only mapping on construction).
+- selectors are compiled when an action is constructed, and builtin
+  `list`/`dict`/`set` operands are shallow-copied, so later mutation of
+  caller-owned configuration cannot retarget an action.
 
 ```python
 from silk.actions.navigation import NavigateOptions, NavigationOptions
 from silk.browsers.models import (
     BrowserContextOptions,
-    BrowserHttpHeaders,
-    BrowserLaunchProxy,
     BrowserOptions,
     BrowserProxy,
     BrowserViewport,
@@ -176,7 +168,7 @@ launch_options = BrowserOptions(
     headless=True,
     timeout=10_000,
     args=("--disable-gpu",),
-    proxy=BrowserLaunchProxy(server="http://proxy.example:8080"),
+    proxy=BrowserProxy(server="http://proxy.example:8080"),
 )
 navigate_options = NavigateOptions(
     timeout=10_000,
@@ -190,7 +182,7 @@ history_options = NavigationOptions(
 context_options = BrowserContextOptions(
     viewport=BrowserViewport(width=1280, height=720),
     permissions=("geolocation",),
-    extra_http_headers=BrowserHttpHeaders({"x-silk": "typed"}),
+    extra_http_headers={"x-silk": "typed"},
     proxy=BrowserProxy(server="http://proxy.example:8080"),
     navigation_timeout=10_000,
     ignore_https_errors=False,
@@ -198,17 +190,17 @@ context_options = BrowserContextOptions(
 )
 ```
 
-This keeps configuration separate from live browser handles. Pages, contexts,
-and elements retain identity when a template snapshots them because they are
-side-effecting focus values, not configuration records.
+Pages, contexts, elements, and other non-container operands are kept by
+identity; templates never copy live browser handles.
 
 ## Public modules
 
 - `silk.actions.browser`, `.navigation`, `.elements`, and `.input` contain the
   typed operation templates and their action-specific configuration values.
-- `silk.browsers.models` defines nominal focus types and immutable browser
-  configuration; `.capabilities` defines environment keys; `.sessions` owns
-  lifecycle. The Playwright adapter is an internal session implementation.
+- `silk.browsers.models` defines the `Browser`, `BrowserContext`, `Page`, and
+  `ElementHandle` interfaces, the `BROWSER` environment key, and browser
+  configuration; `.sessions` owns lifecycle. The Playwright adapter in
+  `.drivers.playwright` is what the session uses.
 - `silk.selectors` contains immutable selectors, and `silk.errors` contains
   Silk's public domain errors.
 - FP-Ops owns `Operation`, `Result`, `_`, composition, traversal, object
@@ -315,23 +307,17 @@ All-settled operations retain one `Result` per field, item, or branch. Lossy
 operations deliberately omit failed values. These return shapes are distinct,
 so policy is visible in both the name and the type.
 
-Browser cleanup follows the same explicit naming. `BrowserSession.close`
-attempts every acquired resource before raising retained cleanup failure(s),
-`close_fail_fast` joins an in-flight resource close but stops after the first
-failure, interruption, or observed caller cancellation, leaving later
-ownership available for an explicit retry, and
-`close_all_settled` returns every ordinary cleanup failure with its cause.
-Starting a session twice, or before a failed close has been retried
-successfully, raises without replacing the session's existing ownership.
+`BrowserSession.close` closes the browser, which closes every context and page
+opened in it, and raises if that fails. It is safe to call more than once.
+If startup fails partway, the browser is closed before the error is re-raised.
+Starting an already-started session raises.
 
-## Shared `DRIVER` concurrency contract
+## Shared browser concurrency contract
 
 Parallel FP-Ops combinators reuse the exact operation input, `Environment`, and
-`DRIVER` capability for every branch. They do not clone a context, page,
-element, or capability. A `limit` bounds active tasks; it does not create
-browser isolation or serialize access to shared focus. The session-owned
-capability does serialize context acquisition with session cleanup so browser
-ownership cannot change underneath either operation.
+`Browser` for every branch. They do not clone a context, page, or element. A
+`limit` bounds active tasks; it does not create browser isolation or serialize
+access to shared pages.
 
 Consequently:
 
@@ -345,8 +331,8 @@ Consequently:
 - expect fail-fast cancellation to be best effort because an external browser
   effect may finish before cancellation is observed.
 
-The environment mapping is read-only. Its browser capability is an immutable,
-session-owned context factory; raw adapter lifecycle control is not exposed.
+The environment mapping is read-only, and the `Browser` it holds can only
+create contexts; closing the browser is reserved for the session.
 
 ## Development gates
 

@@ -130,19 +130,21 @@ files = [
 
 [[package]]
 name = "fp-ops"
-version = "0.3.1"
+version = "0.4.0"
 description = "Typed, immutable, asynchronous unary pipelines for Python"
 optional = false
-python-versions = "<4.0,>=3.10"
+python-versions = ">=3.10,<4.0"
 groups = ["main"]
-files = [
-    {file = "fp_ops-0.3.1-py3-none-any.whl", hash = "sha256:e342e63d7b9ee2b6d3de77070726ca4e95c85f8453b138a853fc286769b3ffaa"},
-    {file = "fp_ops-0.3.1.tar.gz", hash = "sha256:533dfa7bc24b5fe4f1eaad001fa282811ca943d37db2be57aa2c981da7c82cbe"},
-]
+files = []
+develop = true
 
 [package.dependencies]
 expression = ">=5.6.0,<6.0.0"
 typing-extensions = ">=4.12.0"
+
+[package.source]
+type = "directory"
+url = "../fp-ops"
 
 [[package]]
 name = "greenlet"
@@ -642,4 +644,4 @@ python-discovery = ">=1.4.2"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.14"
-content-hash = "453720233d23c6a5e883a74006d7c253342ab00b72c3aa1756612dc86396f8a5"
+content-hash = "e553e8ae859ebbc92949d830d12d01c5f4615082f2c3635724aead9dda457d25"

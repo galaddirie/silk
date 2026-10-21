@@ -9,50 +9,8 @@
     "3.13"
   ],
   "message_normalization": "Trim and collapse every Unicode whitespace run to one ASCII space; the selected primary rule and full normalized message must match exactly.",
-  "case_count": 240,
+  "case_count": 229,
   "cases": [
-    {
-      "id": "browser_actions.001",
-      "fixture": "tests/typecheck/browser_actions_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "misc",
-          "message": "Cannot inherit from final class \"BrowserViewport\""
-        },
-        "pyright": {
-          "rule": "reportGeneralTypeIssues",
-          "message": "Base class \"BrowserViewport\" is marked final and cannot be subclassed"
-        }
-      }
-    },
-    {
-      "id": "browser_actions.002",
-      "fixture": "tests/typecheck/browser_actions_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "misc",
-          "message": "Cannot inherit from final class \"BrowserProxy\""
-        },
-        "pyright": {
-          "rule": "reportGeneralTypeIssues",
-          "message": "Base class \"BrowserProxy\" is marked final and cannot be subclassed"
-        }
-      }
-    },
-    {
-      "id": "browser_actions.003",
-      "fixture": "tests/typecheck/browser_actions_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "misc",
-          "message": "Cannot inherit from final class \"BrowserHttpHeaders\""
-        },
-        "pyright": {
-          "rule": "reportGeneralTypeIssues",
-          "message": "Base class \"BrowserHttpHeaders\" is marked final and cannot be subclassed"
-        }
-      }
-    },
     {
       "id": "browser_actions.004",
       "fixture": "tests/typecheck/browser_actions_bad.py",
@@ -273,7 +231,7 @@
         },
         "pyright": {
           "rule": "reportArgumentType",
-          "message": "Argument of type \"BrowserSessionInfo\" cannot be assigned to parameter \"value\" of type \"T@with_value\" in function \"with_value\" \"BrowserSessionInfo\" is not assignable to \"BrowserDriverCapability\""
+          "message": "Argument of type \"Literal['not a browser']\" cannot be assigned to parameter \"value\" of type \"T@with_value\" in function \"with_value\" \"Literal['not a browser']\" is not assignable to \"Browser\""
         }
       }
     },
@@ -436,40 +394,12 @@
       "fixture": "tests/typecheck/browser_actions_bad.py",
       "expectations": {
         "mypy": {
-          "rule": "arg-type",
-          "message": "Argument \"extra_http_headers\" to \"BrowserContextOptions\" has incompatible type \"dict[str, int]\"; expected \"BrowserHttpHeaders | None\""
-        },
-        "pyright": {
-          "rule": "reportArgumentType",
-          "message": "Argument of type \"dict[str, int]\" cannot be assigned to parameter \"extra_http_headers\" of type \"BrowserHttpHeaders | None\" in function \"__init__\" Type \"dict[str, int]\" is not assignable to type \"BrowserHttpHeaders | None\" \"dict[str, int]\" is not assignable to \"BrowserHttpHeaders\" \"dict[str, int]\" is not assignable to \"None\""
-        }
-      }
-    },
-    {
-      "id": "browser_actions.032",
-      "fixture": "tests/typecheck/browser_actions_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "arg-type",
-          "message": "Argument \"extra_http_headers\" to \"BrowserContextOptions\" has incompatible type \"dict[str, str]\"; expected \"BrowserHttpHeaders | None\""
-        },
-        "pyright": {
-          "rule": "reportArgumentType",
-          "message": "Argument of type \"dict[str, str]\" cannot be assigned to parameter \"extra_http_headers\" of type \"BrowserHttpHeaders | None\" in function \"__init__\" Type \"dict[str, str]\" is not assignable to type \"BrowserHttpHeaders | None\" \"dict[str, str]\" is not assignable to \"BrowserHttpHeaders\" \"dict[str, str]\" is not assignable to \"None\""
-        }
-      }
-    },
-    {
-      "id": "browser_actions.033",
-      "fixture": "tests/typecheck/browser_actions_bad.py",
-      "expectations": {
-        "mypy": {
           "rule": "dict-item",
           "message": "Dict entry 0 has incompatible type \"str\": \"int\"; expected \"str\": \"str\""
         },
         "pyright": {
           "rule": "reportArgumentType",
-          "message": "Argument of type \"dict[str, int]\" cannot be assigned to parameter \"values\" of type \"Mapping[str, str] | None\" in function \"__init__\" Type \"dict[str, int]\" is not assignable to type \"Mapping[str, str] | None\" \"dict[str, int]\" is not assignable to \"Mapping[str, str]\" Type parameter \"_VT_co@Mapping\" is covariant, but \"int\" is not a subtype of \"str\" \"int\" is not assignable to \"str\" \"dict[str, int]\" is not assignable to \"None\""
+          "message": "Argument of type \"dict[str, int]\" cannot be assigned to parameter \"extra_http_headers\" of type \"Mapping[str, str] | None\" in function \"__init__\" Type \"dict[str, int]\" is not assignable to type \"Mapping[str, str] | None\" \"dict[str, int]\" is not assignable to \"Mapping[str, str]\" Type parameter \"_VT_co@Mapping\" is covariant, but \"int\" is not a subtype of \"str\" \"int\" is not assignable to \"str\" \"dict[str, int]\" is not assignable to \"None\""
         }
       }
     },
@@ -563,11 +493,11 @@
       "expectations": {
         "mypy": {
           "rule": "index",
-          "message": "Unsupported target for indexed assignment (\"BrowserHttpHeaders\")"
+          "message": "Unsupported target for indexed assignment (\"Mapping[str, str]\")"
         },
         "pyright": {
           "rule": "reportIndexIssue",
-          "message": "\"__setitem__\" method not defined on type \"BrowserHttpHeaders\""
+          "message": "\"__setitem__\" method not defined on type \"Mapping[str, str]\""
         }
       }
     },
@@ -591,11 +521,11 @@
       "expectations": {
         "mypy": {
           "rule": "attr-defined",
-          "message": "\"BrowserDriverCapability\" has no attribute \"driver\""
+          "message": "\"Browser\" has no attribute \"driver\""
         },
         "pyright": {
           "rule": "reportAttributeAccessIssue",
-          "message": "Cannot access attribute \"driver\" for class \"BrowserDriverCapability\" Attribute \"driver\" is unknown"
+          "message": "Cannot access attribute \"driver\" for class \"Browser\" Attribute \"driver\" is unknown"
         }
       }
     },
@@ -605,11 +535,11 @@
       "expectations": {
         "mypy": {
           "rule": "attr-defined",
-          "message": "\"BrowserDriverCapability\" has no attribute \"close\""
+          "message": "\"Browser\" has no attribute \"close\""
         },
         "pyright": {
           "rule": "reportAttributeAccessIssue",
-          "message": "Cannot access attribute \"close\" for class \"BrowserDriverCapability\" Attribute \"close\" is unknown"
+          "message": "Cannot access attribute \"close\" for class \"Browser\" Attribute \"close\" is unknown"
         }
       }
     },
@@ -899,25 +829,11 @@
       "expectations": {
         "mypy": {
           "rule": "attr-defined",
-          "message": "\"PlaywrightElementHandle\" has no attribute \"_pointer_owner_identity\"; maybe \"__owner_identity\"?"
+          "message": "\"PlaywrightElementHandle\" has no attribute \"_pointer_owner_identity\""
         },
         "pyright": {
           "rule": "reportAttributeAccessIssue",
           "message": "Cannot access attribute \"_pointer_owner_identity\" for class \"PlaywrightElementHandle\" Attribute \"_pointer_owner_identity\" is unknown"
-        }
-      }
-    },
-    {
-      "id": "browser_seam_escape.022",
-      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "attr-defined",
-          "message": "\"PlaywrightElementHandle\" has no attribute \"_bounding_box\"; maybe \"__bounding_box\"?"
-        },
-        "pyright": {
-          "rule": "reportAttributeAccessIssue",
-          "message": "Cannot access attribute \"_bounding_box\" for class \"PlaywrightElementHandle\" Attribute \"_bounding_box\" is unknown"
         }
       }
     },
@@ -941,7 +857,7 @@
       "expectations": {
         "mypy": {
           "rule": "attr-defined",
-          "message": "\"PlaywrightElementHandle\" has no attribute \"_drag_pointer\"; maybe \"__drag_pointer\"?"
+          "message": "\"PlaywrightElementHandle\" has no attribute \"_drag_pointer\""
         },
         "pyright": {
           "rule": "reportAttributeAccessIssue",
@@ -1011,7 +927,7 @@
       "expectations": {
         "mypy": {
           "rule": "attr-defined",
-          "message": "\"BrowserSession\" has no attribute \"driver\"; maybe \"__driver\"?"
+          "message": "\"BrowserSession\" has no attribute \"driver\""
         },
         "pyright": {
           "rule": "reportAttributeAccessIssue",
@@ -1025,7 +941,7 @@
       "expectations": {
         "mypy": {
           "rule": "attr-defined",
-          "message": "\"BrowserSession\" has no attribute \"_driver\"; maybe \"__driver\"?"
+          "message": "\"BrowserSession\" has no attribute \"_driver\""
         },
         "pyright": {
           "rule": "reportAttributeAccessIssue",
@@ -1179,11 +1095,11 @@
       "expectations": {
         "mypy": {
           "rule": "arg-type",
-          "message": "Argument \"proxy\" to \"BrowserOptions\" has incompatible type \"str\"; expected \"BrowserLaunchProxy | None\""
+          "message": "Argument \"proxy\" to \"BrowserOptions\" has incompatible type \"str\"; expected \"BrowserProxy | None\""
         },
         "pyright": {
           "rule": "reportArgumentType",
-          "message": "Argument of type \"Literal['http://proxy.test']\" cannot be assigned to parameter \"proxy\" of type \"BrowserLaunchProxy | None\" in function \"__init__\" Type \"Literal['http://proxy.test']\" is not assignable to type \"BrowserLaunchProxy | None\" \"Literal['http://proxy.test']\" is not assignable to \"BrowserLaunchProxy\" \"Literal['http://proxy.test']\" is not assignable to \"None\""
+          "message": "Argument of type \"Literal['http://proxy.test']\" cannot be assigned to parameter \"proxy\" of type \"BrowserProxy | None\" in function \"__init__\" Type \"Literal['http://proxy.test']\" is not assignable to type \"BrowserProxy | None\" \"Literal['http://proxy.test']\" is not assignable to \"BrowserProxy\" \"Literal['http://proxy.test']\" is not assignable to \"None\""
         }
       }
     },
@@ -1198,20 +1114,6 @@
         "pyright": {
           "rule": "reportArgumentType",
           "message": "Argument of type \"dict[str, int]\" cannot be assigned to parameter \"viewport\" of type \"BrowserViewport | None\" in function \"__init__\" Type \"dict[str, int]\" is not assignable to type \"BrowserViewport | None\" \"dict[str, int]\" is not assignable to \"BrowserViewport\" \"dict[str, int]\" is not assignable to \"None\""
-        }
-      }
-    },
-    {
-      "id": "configuration_options.010",
-      "fixture": "tests/typecheck/configuration_options_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "arg-type",
-          "message": "Argument \"extra_http_headers\" to \"BrowserContextOptions\" has incompatible type \"dict[str, str]\"; expected \"BrowserHttpHeaders | None\""
-        },
-        "pyright": {
-          "rule": "reportArgumentType",
-          "message": "Argument of type \"dict[str, str]\" cannot be assigned to parameter \"extra_http_headers\" of type \"BrowserHttpHeaders | None\" in function \"__init__\" Type \"dict[str, str]\" is not assignable to type \"BrowserHttpHeaders | None\" \"dict[str, str]\" is not assignable to \"BrowserHttpHeaders\" \"dict[str, str]\" is not assignable to \"None\""
         }
       }
     },
@@ -1454,34 +1356,6 @@
       }
     },
     {
-      "id": "element_actions.001",
-      "fixture": "tests/typecheck/element_actions_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "misc",
-          "message": "Cannot override final attribute \"__copy__\" (previously declared in base class \"BrowserFocus\")"
-        },
-        "pyright": {
-          "rule": "reportIncompatibleMethodOverride",
-          "message": "Method \"__copy__\" cannot override final method defined in class \"BrowserFocus\""
-        }
-      }
-    },
-    {
-      "id": "element_actions.002",
-      "fixture": "tests/typecheck/element_actions_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "misc",
-          "message": "Cannot override final attribute \"__deepcopy__\" (previously declared in base class \"BrowserFocus\")"
-        },
-        "pyright": {
-          "rule": "reportIncompatibleMethodOverride",
-          "message": "Method \"__deepcopy__\" cannot override final method defined in class \"BrowserFocus\""
-        }
-      }
-    },
-    {
       "id": "element_actions.003",
       "fixture": "tests/typecheck/element_actions_bad.py",
       "expectations": {
@@ -1613,7 +1487,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"ScopeWithoutIdentityHooks\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"StructuralLookalikeScope\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1627,35 +1501,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"ScopeWithoutIdentityHooks\""
-        },
-        "pyright": {
-          "rule": "reportCallIssue",
-          "message": "No overloads for \"__call__\" match the provided arguments"
-        }
-      }
-    },
-    {
-      "id": "element_actions.014",
-      "fixture": "tests/typecheck/element_actions_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"CloningScope\""
-        },
-        "pyright": {
-          "rule": "reportCallIssue",
-          "message": "No overloads for \"__call__\" match the provided arguments"
-        }
-      }
-    },
-    {
-      "id": "element_actions.015",
-      "fixture": "tests/typecheck/element_actions_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"CloningScope\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"StructuralLookalikeScope\""
         },
         "pyright": {
           "rule": "reportCallIssue",

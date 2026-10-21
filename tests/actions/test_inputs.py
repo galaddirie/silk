@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import copy, deepcopy
 from dataclasses import FrozenInstanceError
 from unittest.mock import AsyncMock, MagicMock
 
@@ -205,8 +204,6 @@ def page_double() -> MagicMock:
     page.key_down = AsyncMock(return_value=Ok(None))
     page.key_up = AsyncMock(return_value=Ok(None))
     page.scroll = AsyncMock(return_value=Ok(None))
-    page.__copy__.return_value = page
-    page.__deepcopy__.return_value = page
     return page
 
 
@@ -483,32 +480,28 @@ def test_every_input_template_requires_exactly_one_direct_placeholder() -> None:
             construct()
 
 
-def test_input_configuration_is_strict_frozen_and_identity_preserving() -> None:
+def test_input_configuration_is_frozen_and_rejects_invalid_values() -> None:
     drag_options = DragOptions(
         steps=2,
         position_offset=(1, 2),
         source_offset=(3, 4),
         target_offset=(5, 6),
     )
-    assert copy(drag_options) is drag_options
-    assert deepcopy(drag_options) is drag_options
     with pytest.raises(FrozenInstanceError):
         drag_options.steps = 3
 
     invalid = (
-        lambda: DragOptions(steps=True),
         lambda: DragOptions(steps=0),
-        lambda: DragOptions(move_to_center="yes"),
-        lambda: DragOptions(position_offset=[1, 2]),
-        lambda: DragOptions(position_offset=(1,)),
-        lambda: DragOptions(source_offset=(1.0, 2)),
-        lambda: ClickOptions(button="primary"),
+        lambda: ClickOptions(click_count=0),
+        lambda: ClickOptions(timeout_ms=-1),
         lambda: ClickOptions(modifiers=(KeyModifier.NONE,)),
+        lambda: ClickOptions(modifiers=(KeyModifier.ALT, KeyModifier.ALT)),
+        lambda: DoubleClickOptions(delay_ms=-1),
         lambda: TypeTextOptions(delay_ms=-1),
-        lambda: FillOptions(clear=1),
+        lambda: FillOptions(timeout_ms=-1),
     )
     for construct in invalid:
-        with pytest.raises((TypeError, ValueError)):
+        with pytest.raises(ValueError):
             construct()
 
 

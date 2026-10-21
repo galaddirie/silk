@@ -54,13 +54,6 @@ class PageProbe:
         self.failure_method: str | None = None
         self.failure: Exception | None = None
 
-    def __copy__(self) -> PageProbe:
-        return self
-
-    def __deepcopy__(self, memo: dict[int, object]) -> PageProbe:
-        memo[id(self)] = self
-        return self
-
     def fail(self, method: str, error: Exception) -> None:
         self.failure_method = method
         self.failure = error
@@ -179,8 +172,6 @@ class PageProbe:
 
 def page_double(probe: PageProbe) -> Page:
     page = MagicMock(spec=Page, wraps=probe)
-    page.__copy__.return_value = page
-    page.__deepcopy__.return_value = page
     return page
 
 
@@ -289,33 +280,6 @@ async def test_history_options_are_forwarded_as_immutable_snapshots() -> None:
 
 
 @pytest.mark.asyncio
-async def test_navigation_option_families_reject_runtime_cross_use() -> None:
-    probe = PageProbe()
-    page = page_double(probe)
-    wrong_navigate = await navigate(
-        _,
-        "https://example.test",
-        options=NavigationOptions(),
-    ).run(page)
-    wrong_history_options = NavigateOptions(referer="https://referrer.test/source")
-    wrong_history = (
-        await go_back(_, options=wrong_history_options).run(page),
-        await go_forward(_, options=wrong_history_options).run(page),
-        await reload(_, options=wrong_history_options).run(page),
-        await wait_for_navigation(_, options=wrong_history_options).run(page),
-    )
-
-    assert wrong_navigate.is_error()
-    assert isinstance(wrong_navigate.error, TypeError)
-    assert str(wrong_navigate.error) == "options must be NavigateOptions or None"
-    for result in wrong_history:
-        assert result.is_error()
-        assert isinstance(result.error, TypeError)
-        assert str(result.error) == "options must be NavigationOptions or None"
-    assert probe.calls == []
-
-
-@pytest.mark.asyncio
 async def test_history_templates_preserve_exact_browser_error_identity() -> None:
     operations = (
         ("go_back", go_back(_)),
@@ -418,14 +382,14 @@ async def test_evaluate_supports_every_hole_and_exact_browser_call_shape() -> No
 async def test_evaluate_with_snapshots_configured_argument() -> None:
     probe = PageProbe()
     page = page_double(probe)
-    argument = {"values": [1]}
+    argument: dict[str, object] = {"value": 1}
     operation = evaluate_with(_, "value => value", argument)
-    argument["values"].append(2)
+    argument["value"] = 2
 
     outcome = await operation.run(page)
 
     assert outcome == Ok(probe.script_value)
-    assert probe.script_args == ({"values": [1]},)
+    assert probe.script_args == ({"value": 1},)
 
 
 def test_every_navigation_template_requires_exactly_one_direct_placeholder() -> None:

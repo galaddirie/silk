@@ -15,7 +15,7 @@ from silk.actions.navigation import (
     Navigate as navigate,
     Title as title,
 )
-from silk.browsers.models import BrowserLaunchProxy, BrowserOptions
+from silk.browsers.models import BrowserOptions, BrowserProxy
 from silk.browsers.sessions import BrowserSession
 
 
@@ -100,7 +100,7 @@ async def test_chromium_launch_honors_the_typed_proxy_endpoint() -> None:
             options=BrowserOptions(
                 headless=True,
                 timeout=10_000,
-                proxy=BrowserLaunchProxy(server=proxy.server),
+                proxy=BrowserProxy(server=proxy.server),
             ),
         ) as session:
             navigated = await navigate(

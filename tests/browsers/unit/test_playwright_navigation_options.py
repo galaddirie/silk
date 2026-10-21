@@ -18,12 +18,11 @@ from silk.actions.navigation import (
     Navigate as navigate,
     WaitForNavigation as wait_for_navigation,
 )
-from silk.browsers.drivers.playwright import _PlaywrightDriver
+from silk.browsers.drivers.playwright import PlaywrightBrowser
 from silk.browsers.models import Page
 
 
 async def public_page() -> tuple[Page, MagicMock, MagicMock]:
-    driver = _PlaywrightDriver()
     browser = MagicMock(spec=Browser)
     context = MagicMock(spec=PWBrowserContext)
     native_page = MagicMock(spec=PWPage)
@@ -36,7 +35,7 @@ async def public_page() -> tuple[Page, MagicMock, MagicMock]:
     navigation_waiter.__aenter__ = AsyncMock(return_value=None)
     navigation_waiter.__aexit__ = AsyncMock(return_value=None)
     native_page.expect_navigation = MagicMock(return_value=navigation_waiter)
-    driver._browser = browser
+    driver = PlaywrightBrowser(MagicMock(), browser)
 
     context_result = await driver.new_context()
     assert context_result.is_ok()

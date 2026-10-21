@@ -38,28 +38,18 @@ class AttributeNotFoundError(LookupError):
 
 
 class DragElementMismatchError(ValueError):
-    """Drag endpoints do not belong to one pointer owner and page."""
+    """Drag source and target are not on the same page."""
 
-    def __init__(
-        self,
-        owner_mismatch: bool,
-        source_page_id: str,
-        target_page_id: str,
-    ) -> None:
+    def __init__(self, source_page_id: str, target_page_id: str) -> None:
         self.source_page_id = source_page_id
         self.target_page_id = target_page_id
-        self.owner_mismatch = owner_mismatch
-        self.page_mismatch = source_page_id != target_page_id
-        mismatches: list[str] = []
-        if self.owner_mismatch:
-            mismatches.append("owner")
-        if self.page_mismatch:
-            mismatches.append("page")
-        self.mismatches = tuple(mismatches)
-        super().__init__(owner_mismatch, source_page_id, target_page_id)
+        super().__init__(source_page_id, target_page_id)
 
     def __str__(self) -> str:
-        return "drag elements have mismatched " + " and ".join(self.mismatches)
+        return (
+            f"cannot drag from page {self.source_page_id!r} "
+            f"to an element on page {self.target_page_id!r}"
+        )
 
 
 class PageNotFoundError(LookupError):

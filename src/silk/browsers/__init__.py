@@ -1,20 +1,10 @@
-"""Nominal browser focus, session lifecycle, and immutable configuration."""
+"""Browser interfaces, configuration, and session lifecycle."""
 
-from silk.browsers.capabilities import (
-    BROWSER_OPTIONS,
-    BROWSER_SESSION,
-    DRIVER,
-    BrowserDriverCapability,
-    BrowserOptionsCapability,
-    BrowserSessionInfo,
-    BrowserSessionNotStartedError,
-)
 from silk.browsers.models import (
+    BROWSER,
+    Browser,
     BrowserContext,
     BrowserContextOptions,
-    BrowserFocus,
-    BrowserHttpHeaders,
-    BrowserLaunchProxy,
     BrowserOptions,
     BrowserProxy,
     BrowserViewport,
@@ -22,25 +12,16 @@ from silk.browsers.models import (
     KeyModifier,
     Page,
 )
-from silk.browsers.sessions import BrowserSession, BrowserSessionCleanupError
+from silk.browsers.sessions import BrowserSession
 
 __all__ = [
-    "BROWSER_OPTIONS",
-    "BROWSER_SESSION",
-    "DRIVER",
+    "BROWSER",
+    "Browser",
     "BrowserContext",
     "BrowserContextOptions",
-    "BrowserDriverCapability",
-    "BrowserFocus",
-    "BrowserHttpHeaders",
-    "BrowserLaunchProxy",
     "BrowserOptions",
-    "BrowserOptionsCapability",
     "BrowserProxy",
     "BrowserSession",
-    "BrowserSessionCleanupError",
-    "BrowserSessionInfo",
-    "BrowserSessionNotStartedError",
     "BrowserViewport",
     "ElementHandle",
     "KeyModifier",
