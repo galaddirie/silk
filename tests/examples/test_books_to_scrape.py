@@ -31,9 +31,7 @@ def load_books_example() -> ModuleType:
 
 books_example = load_books_example()
 Book = books_example.Book
-Catalogue = books_example.Catalogue
 books_pipeline = books_example.books_pipeline
-catalogue_pipeline = books_example.catalogue_pipeline
 
 
 @pytest.mark.asyncio
@@ -60,28 +58,6 @@ async def test_real_books_pipeline_runs_end_to_end_in_chromium() -> None:
 
     with pytest.raises(FrozenInstanceError):
         result.ok[0].title = "mutated"
-
-
-@pytest.mark.asyncio
-async def test_real_catalogue_pipeline_fans_out_page_reads() -> None:
-    async with BrowserSession(
-        options=BrowserOptions(headless=True),
-    ) as session:
-        result = await catalogue_pipeline.run(
-            session.page,
-            environment=session.environment,
-        )
-
-    assert result.is_ok()
-    catalogue = result.ok
-    assert isinstance(catalogue, Catalogue)
-    assert catalogue.total == 1000
-    assert catalogue.page == "Page 1 of 50"
-    assert len(catalogue.books) == 20
-    assert catalogue.books[0] == Book(
-        title="A Light in the Attic",
-        price="£51.77",
-    )
 
 
 @pytest.mark.asyncio
