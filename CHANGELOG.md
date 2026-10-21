@@ -1,6 +1,14 @@
 # Changelog
 
-## [0.4.0] - 2026-08-09
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+### Changed
+
+## [0.4.0] - 2026-10-21
 
 This is a breaking pre-1.0 release. Version 0.3.1 on PyPI and the `v0.3.1`
 tag remain the immutable legacy ActionContext/callable/binary-`&` release;
@@ -9,7 +17,8 @@ the redesigned package begins at 0.4.0.
 ### Added
 - Add typed unary browser-action templates built on the `fp-ops` 0.4
   contract: every action has one explicit input selected by `fp_ops._`, and
-  pipelines compose with `.then(...)` before running one focus value.
+  pipelines compose with `>>` (then), `&` (typed, fail-fast parallel fanout
+  with flat tuple results), and `|` (or else) before running one focus value.
 - Add a single typed environment key, `BROWSER`, holding a small `Browser`
   interface (`new_context`), separate from page, context, and element values
   that flow through pipelines.
@@ -38,13 +47,16 @@ the redesigned package begins at 0.4.0.
 - Make Playwright the ordinary runtime adapter dependency, depend on
   `fp-ops>=0.4.0,<0.5.0`, and declare the bounded `typing-extensions`
   dependency used by Silk's public type surface.
+- Require `playwright>=1.61.0`, the first release that can install Chromium
+  on Ubuntu 26.04.
 - Make `BrowserSession` the sole browser-lifecycle owner; it selects its
   Playwright implementation and exposes `page`, `context`, `browser`, and
   `environment`.
 
 ### Removed
 - Remove the legacy `ActionContext` execution model, callable action objects,
-  binary `&` composition, hidden-focus helpers, and the compatibility modules
+  the context-cloning `&` composition (superseded by FP-Ops' typed `&`
+  fanout), hidden-focus helpers, and the compatibility modules
   `silk.composition`, `silk.flow`, `silk.objects`, `silk.operation`,
   `silk.placeholder`, `silk.text`, `silk.utils`, and `silk.actions.utils`.
 - Remove compatibility call forms that appended configuration at runtime or
