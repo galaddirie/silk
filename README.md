@@ -1,119 +1,419 @@
-# Silk
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/49798c93-66b4-448b-8450-0d9233f915e3" alt="Silk">
+</p>
+<p align="center">
+    <em><b>Silk</b> — a declarative, fully typed web scraping library for building resilient browser automations in Python.</em>
+</p>
 
-Silk is a typed browser-automation and scraping library built on FP-Ops 0.4.
-Browser actions are immutable unary operations: they consume one explicit focus
-value, read shared dependencies from a read-only environment, and return an
-FP-Ops `Result` when run.
+---
+[![PyPI version](https://img.shields.io/badge/pypi-v0.4.0-blue.svg)](https://pypi.org/project/silk-scraper/)
+[![Python versions](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/silk-scraper/)
+[![PyPI Downloads](https://static.pepy.tech/badge/silk-scraper)](https://pepy.tech/projects/silk-scraper)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Type check: mypy](https://img.shields.io/badge/type%20check-mypy%20strict-blue)](https://github.com/python/mypy)
+[![Type check: pyright](https://img.shields.io/badge/type%20check-pyright%20strict-blue)](https://github.com/microsoft/pyright)
 
-Silk currently provides a Playwright-backed Chromium adapter and supports
-Python 3.11 through 3.13.
+Silk lets you write elegant, resilient scrapers as small typed pipelines. You
+describe **what** to extract; Silk handles the browser.
+
+```python
+book = (
+    Navigate(_, "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html")
+    >> (GetText("h1", _) & GetText("p.price_color", _) & GetText("table td", _))
+)
+# Operation[Page, tuple[str, str, str]] — three reads, run concurrently
+# Ok(('A Light in the Attic', '£51.77', 'a897fe39b1053632'))
+```
+
+## Key Features
+
+- **Composable DSL**: Chain with `>>`, run in parallel with `&`, fall back with `|`.
+- **Errors as values**: Every run returns `Ok(value)` or `Error(exception)`; nothing is swallowed.
+- **Typed end to end**: Pipelines are `Operation[In, Out]`, checked by strict mypy and Pyright.
+- **Immutable by design**: Actions are frozen values with no hidden browser state.
+- **Resilient**: Selector fallback groups, `retry`, recovery, and explicit failure policies.
+- **Schema-first extraction**: Build dataclasses, Pydantic models, or dicts straight from the page.
+
+## First-Class Composition
+
+Silk treats composition as a **first-class citizen**:
+
+- **Actions as values**: Browser actions are immutable operations you can store, pass, and combine.
+- **Intuitive operators**: Compose with `>>`, `&`, and `|` for pipelines that read top to bottom.
+- **Composition is associative**: `(a >> b) >> c` is the same pipeline as `a >> (b >> c)`.
+- **Modular architecture**: Complex workflows emerge from small, reusable, independently tested pieces.
+
+| Operator | Name | Meaning |
+|---|---|---|
+| `a >> b` | then | Feed `a`'s output into `b` |
+| `a & b` | fan out | Run `a` and `b` on the same input concurrently, collect `(a, b)` |
+| `a \| b` | or else | If `a` fails, run `b` on the original input |
+
+```python
+from fp_ops import _
+
+from silk.actions.elements import GetText, RequireAttribute, RequireElement
+from silk.actions.navigation import Navigate
+
+first_card = RequireElement("article.product_pod", _)
+title = RequireAttribute("h3 > a", _, attribute="title")
+price = GetText(".sale-price", _) | GetText("p.price_color", _)
+
+first_book = (
+    Navigate(_, "https://books.toscrape.com/")
+    >> first_card
+    >> (title & price)
+)
+# Operation[Page, tuple[str, str]]
+```
+
+### Developer Experience
+
+Actions are type-safe operations (`Operation[In, Out]`). Describe the shape;
+Silk does the work:
+
+```python
+from dataclasses import dataclass
+
+from fp_ops import _, build, traverse
+
+from silk.actions.elements import GetText, QueryAll, RequireAttribute
+from silk.actions.navigation import Navigate
+
+
+@dataclass(frozen=True, slots=True)
+class Book:
+    title: str
+    price: str
+
+
+extract_book = build(  # dataclasses, Pydantic models, any class, or a plain dict
+    {
+        "title": RequireAttribute("h3 > a", _, attribute="title"),
+        "price": GetText("p.price_color", _),
+    },
+    Book,
+)
+
+books = (
+    Navigate(_, "https://books.toscrape.com/")  # load the page
+    >> QueryAll("article.product_pod", _)       # list[ElementHandle]
+    >> traverse(extract_book)                   # list[Book]
+)
+# Operation[Page, list[Book]]
+```
+
+Why it feels great:
+
+- **Actions as values**: Drop actions directly into a schema, with no glue code or lambdas.
+- **Types flow through**: Your editor knows `books` produces `list[Book]` before it runs.
+- **Honest failures**: A failed field reports *which* item and *which* field, with the original browser error attached.
+
+Silk also provides utilities such as selector groups for handling fallbacks:
+
+```python
+from silk.selectors import SelectorGroup, css, xpath
+
+title_selector = SelectorGroup(
+    "book_title",
+    css("h3 > a[title]"),
+    css(".product_pod h3 a"),
+    xpath("//article[contains(@class, 'product_pod')]//h3/a"),
+)
+price_selector = SelectorGroup(
+    "book_price",
+    css("p.price_color"),
+    xpath("//p[contains(@class, 'price')]"),
+)
+
+extract_book = build(
+    {
+        "title": RequireAttribute(title_selector, _, attribute="title"),
+        "price": GetText(price_selector, _),
+    },
+    Book,
+)
+```
+
+### Declarative API
+
+Silk embraces **declarative programming** that focuses on **what** to
+accomplish, not **how**:
+
+```python
+# Imperative: HOW to read the first book
+await page.goto("https://books.toscrape.com/")
+card = await page.query_selector("article.product_pod")
+if card is None:
+    raise LookupError("no product card")
+link = await card.query_selector("h3 > a")
+title = await link.get_attribute("title") if link else None
+price_element = await card.query_selector("p.price_color")
+price = await price_element.text_content() if price_element else None
+
+# Declarative: WHAT to read with Silk
+first_book = (
+    Navigate(_, "https://books.toscrape.com/")
+    >> RequireElement("article.product_pod", _)
+    >> (RequireAttribute("h3 > a", _, attribute="title") & GetText("p.price_color", _))
+)
+```
+
+Missing elements and attributes become explicit `ElementNotFoundError` and
+`AttributeNotFoundError` values instead of `None` checks scattered through
+your code.
 
 ## Installation
 
-Install Silk and the Chromium browser binary it drives:
-
 ```bash
-python -m pip install silk-scraper
+pip install silk-scraper
 python -m playwright install chromium
 ```
 
-Linux CI images normally also need Playwright's operating-system packages:
+Linux CI images usually also need Playwright's system packages:
 
 ```bash
 python -m playwright install --with-deps chromium
 ```
 
-## Quick start
+## Quick Start
 
 ```python
 import asyncio
 
-from fp_ops import Operation, _
+from fp_ops import _
 
-from silk.actions.elements import GetInnerText
+from silk.actions.elements import GetText, RequireAttribute
 from silk.actions.navigation import Navigate
-from silk.browsers.models import BrowserOptions, Page
+from silk.browsers.models import BrowserOptions
 from silk.browsers.sessions import BrowserSession
 
-
-pipeline: Operation[Page, str] = (
-    Navigate(_, "https://example.com")
-    .then(GetInnerText("h1", _))
+pipeline = (
+    Navigate(_, "https://books.toscrape.com/")
+    >> (
+        GetText("li.current", _).map(str.strip)
+        & RequireAttribute("h3 > a", _, attribute="title")
+    )
 )
 
 
 async def main() -> None:
-    options = BrowserOptions(headless=True)
-    async with BrowserSession(options=options) as session:
-        result = await pipeline.run(
-            session.page,
-            environment=session.environment,
-        )
-        if result.is_error():
-            raise result.error
-        print(result.ok)
+    async with BrowserSession(options=BrowserOptions(headless=True)) as session:
+        result = await pipeline.run(session.page, environment=session.environment)
+
+        if result.is_ok():
+            page_label, first_title = result.ok
+            print(f"{page_label}: {first_title}")  # Page 1 of 50: A Light in the Attic
+        else:
+            print(f"Error: {result.error}")
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-`BrowserSession` owns the browser, initial browser context, and initial page.
-The pipeline receives the page as ordinary input and the session's browser
-through the FP-Ops `Environment`; neither is inferred.
+`BrowserSession` owns the browser, its first context, and its first page. The
+page goes in as the pipeline's input; the browser is shared through the
+read-only `session.environment`.
 
-## Typed unary composition
+## Core Concepts
 
-Every public action is a construction-time operation template. A template call
-must contain exactly one direct `fp_ops._` placeholder. The placeholder selects
-the operation's unary input, while every other argument is configuration
-captured when the operation is constructed.
+### Actions
+
+Actions are the building blocks of your scraping logic. Each action:
+
+- is an immutable, typed `Operation[In, Out]` built when you call it;
+- takes exactly one input, marked by the `_` placeholder;
+- returns a `Result`, either `Ok(value)` or `Error(exception)`, when run.
+
+The `_` decides which argument is the pipeline input. Everything else is
+configuration fixed at construction:
 
 ```python
-from fp_ops import Operation, _
-
-from silk.actions.elements import ElementScope, GetInnerText
-
-
-read_heading: Operation[ElementScope, str] = GetInnerText("h1", _)
+GetText("h1", _)           # input: the page or element to search in
+GetText(_, card)           # input: the selector or element to read
+Drag(_, basket)            # input: the element being dragged
+Drag(book, _)              # input: the drop target
 ```
 
-Compose operations left to right with `.then`; `.run` always receives exactly
-one value:
+Run any pipeline with exactly one value:
 
 ```python
-result = await first.then(second).run(value, environment=environment)
+result = await pipeline.run(session.page, environment=session.environment)
 ```
 
-Templates keep each meaningful positional operand flexible. For example, both
-ends of a drag can be pipeline data:
+### Sequential Operations (`>>`)
+
+`>>` feeds each step's output into the next. Actions move the focus forward:
+querying returns an element, so the next step is scoped to it.
 
 ```python
-Drag(_, cart)  # source is the input
-Drag(cart, _)  # target is the input
+add_first_book_to_basket = (
+    Navigate(_, "https://books.toscrape.com/")   # Page
+    >> RequireElement("article.product_pod", _)  # that book's card
+    >> Click("button.btn-primary", _)            # its own "Add to basket"
+)
 ```
 
-Element extraction provides the same flexibility:
+Plain Python functions join a pipeline with `@operation`:
 
 ```python
-GetInnerText(_, parent)    # selector or element target is the input
-GetInnerText(selector, _)  # page or element scope is the input
+from fp_ops import operation
+
+
+@operation
+def parse_price(text: str) -> float:
+    return float(text.removeprefix("£"))
+
+
+price = GetText("p.price_color", _) >> parse_price  # Operation[ElementScope, float]
 ```
 
-Each call still has exactly one construction-time placeholder. Configuration
-is never appended when the operation runs.
+### Parallel Operations (`&`)
 
-## Pipeline values and the environment
+`&` runs branches concurrently on the **same input** and collects their
+results into one flat tuple, in declaration order:
 
-| Role | Public values | How it flows |
-|---|---|---|
-| Pipeline values | `Page`, `BrowserContext`, `ElementHandle`, lists of elements | Ordinary operation input and output |
-| The running browser | `BROWSER` key → `Browser` | `session.environment` |
+```python
+summary = (
+    GetText("form.form-horizontal strong", _).map(int)  # total results
+    & GetText("li.current", _).map(str.strip)           # pager label
+    & QueryAll("article.product_pod", _).map(len)       # books on this page
+)
+# Operation[ElementScope, tuple[int, str, int]] -> Ok((1000, 'Page 1 of 50', 20))
+```
 
-Creating or selecting a page returns that page. Querying returns an element or
-an ordered element list. No action changes hidden state, and returning a
-browser value never changes the environment.
+`a & b & c` yields `(a, b, c)`. A branch that itself returns a tuple stays a
+single value, and `a & (b & c)` nests as `(a, (b, c))`. If any branch fails,
+the others are cancelled and the error is returned.
 
-Read the browser from the environment when defining your own operation:
+For truly independent work, give each branch its own page:
+
+```python
+from fp_ops import Operation
+
+from silk.actions.browser import NewPage
+from silk.browsers.models import BrowserContext
+
+CATALOGUE = "https://books.toscrape.com/catalogue"
+
+
+def book_title(slug: str) -> Operation[BrowserContext, str]:
+    return NewPage(_) >> Navigate(_, f"{CATALOGUE}/{slug}/index.html") >> GetText("h1", _)
+
+
+titles = (
+    book_title("a-light-in-the-attic_1000")
+    & book_title("tipping-the-velvet_999")
+    & book_title("soumission_998")
+)
+
+result = await titles.run(session.context, environment=session.environment)
+# Ok(('A Light in the Attic', 'Tipping the Velvet', 'Soumission'))
+```
+
+### Fallback Operations (`|`)
+
+`|` tries an alternative, with the **original input**, when the first
+operation fails:
+
+```python
+price = GetText(".sale-price", _) | GetText(".regular-price", _) | GetText("p.price_color", _)
+```
+
+Fallbacks combine with every other operator. Each strategy below is a whole
+pipeline, and the first one to succeed wins:
+
+```python
+from fp_ops import constant
+
+page_label = GetText("li.current", _).map(str.strip) | constant("Page 1 of 1")
+
+title = (
+    RequireAttribute("h3 > a", _, attribute="title")      # full title attribute
+    | GetText("h3 > a", _)                                # truncated link text
+    | constant("Untitled")                                # last resort
+)
+```
+
+`|` gives up on *any* failure, including browser errors. Use selector groups
+when only the selector should vary, and `|` when the whole strategy should.
+
+## Resilience
+
+Every policy has a truthful name, so failure behavior is visible in the code:
+
+```python
+from fp_ops import default_on_error, recover, retry
+
+price = (
+    retry(GetText("p.price_color", _), attempts=3, backoff=0.5)  # 3 tries in total
+    | GetText(".price", _)
+    | constant("unknown")
+)
+
+title = default_on_error(GetText("h1", _), "untitled")
+length = recover(GetText("h1", _).map(len), lambda error: 0)
+```
+
+| Work | Fail fast | Keep every result | Keep successes |
+|---|---|---|---|
+| Parallel branches | `a & b` / `fanout_parallel` | `fanout_all_settled` | — |
+| Collection items | `traverse` / `traverse_parallel` | `traverse_all_settled` | `traverse_lossy` |
+| Object fields | `build` | `build_all_settled` | `build_lossy` |
+| Predicates | `filter_operation` | — | `filter_best_effort` |
+
+Failures keep their causes. If one field of one book fails, the error reads:
+
+```text
+TraversalItemError(index=3)
+  -> BuildFieldError(field="title")
+     -> original browser exception
+```
+
+## Collections and Objects
+
+Silk's collection and object helpers come from
+[FP-Ops](https://github.com/galaddirie/fp-ops) and work directly with actions:
+
+```python
+from fp_ops import filter_each, traverse, traverse_parallel
+
+
+def under_20(price: float) -> bool:
+    return price < 20
+
+
+cards = QueryAll("article.product_pod", _)
+
+books = cards >> traverse_parallel(extract_book, limit=5)               # list[Book]
+prices = cards >> traverse(GetText("p.price_color", _) >> parse_price)  # list[float]
+bargains = prices >> filter_each(under_20)                              # list[float]
+```
+
+`build` constructs any class (dataclasses, Pydantic models, …) or, without
+one, a plain `dict`. Collection results always preserve input order.
+
+## Creating Custom Actions
+
+Turn any function into an action with a configurable template. The `_` marks
+the input, just like Silk's own actions:
+
+```python
+from fp_ops import operation_template
+
+
+@operation_template
+def strip_prefix(prefix: str, text: str) -> str:
+    return text.removeprefix(prefix)
+
+
+price = GetText("p.price_color", _) >> strip_prefix("£", _) >> parse_price
+```
+
+`result_operation_template` returns a `Result` directly, and
+`environment_result_operation_template(BROWSER)` receives the running browser:
 
 ```python
 from fp_ops import Result, environment_result_operation_template
@@ -129,253 +429,132 @@ async def isolated_context(
     return await browser.new_context(options)
 ```
 
-`Browser` only exposes `new_context`; closing it is the session's job
-(`BrowserSession.close`). A `Browser` used after its session closed returns an
-error from `new_context`.
-
-## Configuration
-
-Configuration is explicit and purpose-built:
-
-- `BrowserOptions` configures only the installed Chromium process: headless
-  mode, launch timeout, command-line arguments, and an optional
-  `BrowserProxy`.
-- `NavigateOptions` is the frozen URL-navigation record and uniquely owns the
-  optional HTTP referer. `NavigationOptions` contains only timeout/load-state
-  policy for history, reload, and future navigation waits. `WaitOptions` is
-  likewise restricted to selector-wait behavior.
-- `ClickOptions`, `DoubleClickOptions`, `FillOptions`, and `TypeTextOptions`
-  are frozen action-specific values.
-- `DragOptions` is a frozen value for element-to-element movement and offsets.
-- `BrowserContextOptions` is a frozen isolated-context record composed of
-  `BrowserViewport`, `BrowserProxy`, tuple permissions, and HTTP headers
-  (copied into a read-only mapping on construction).
-- selectors are compiled when an action is constructed, and builtin
-  `list`/`dict`/`set` operands are shallow-copied, so later mutation of
-  caller-owned configuration cannot retarget an action.
+## Browser Configuration
 
 ```python
-from silk.actions.navigation import NavigateOptions, NavigationOptions
+from silk.actions.navigation import NavigateOptions
 from silk.browsers.models import (
     BrowserContextOptions,
     BrowserOptions,
     BrowserProxy,
     BrowserViewport,
 )
+from silk.browsers.sessions import BrowserSession
 
-
-launch_options = BrowserOptions(
-    headless=True,
+options = BrowserOptions(
+    headless=False,  # show the browser while debugging
     timeout=10_000,
     args=("--disable-gpu",),
     proxy=BrowserProxy(server="http://proxy.example:8080"),
 )
-navigate_options = NavigateOptions(
-    timeout=10_000,
-    wait_until="domcontentloaded",
-    referer="https://example.com/source",
-)
-history_options = NavigationOptions(
-    timeout=10_000,
-    wait_until="domcontentloaded",
-)
+
 context_options = BrowserContextOptions(
-    viewport=BrowserViewport(width=1280, height=720),
-    permissions=("geolocation",),
-    extra_http_headers={"x-silk": "typed"},
-    proxy=BrowserProxy(server="http://proxy.example:8080"),
+    viewport=BrowserViewport(width=1280, height=800),
+    extra_http_headers={"accept-language": "en"},
     navigation_timeout=10_000,
-    ignore_https_errors=False,
-    java_script_enabled=True,
 )
+
+navigate = Navigate(
+    _,
+    "https://books.toscrape.com/",
+    options=NavigateOptions(wait_until="domcontentloaded"),
+)
+
+async with BrowserSession(options=options) as session:
+    ...
 ```
 
-Pages, contexts, elements, and other non-container operands are kept by
-identity; templates never copy live browser handles.
+Every option type is frozen. Each action has its own options (`ClickOptions`,
+`FillOptions`, `WaitOptions`, `DragOptions`, …), and later changes to your own
+lists or dicts can never retarget an action you already built.
 
-## Public modules
+---
 
-- `silk.actions.browser`, `.navigation`, `.elements`, and `.input` contain the
-  typed operation templates and their action-specific configuration values.
-- `silk.browsers.models` defines the `Browser`, `BrowserContext`, `Page`, and
-  `ElementHandle` interfaces, the `BROWSER` environment key, and browser
-  configuration; `.sessions` owns lifecycle. The Playwright adapter in
-  `.drivers.playwright` is what the session uses.
-- `silk.selectors` contains immutable selectors, and `silk.errors` contains
-  Silk's public domain errors.
-- FP-Ops owns `Operation`, `Result`, `_`, composition, traversal, object
-  construction, and policy combinators.
+## API Reference
 
-## Action surface
+### Module Structure
 
-PascalCase distinguishes Silk's DSL actions from ordinary Python functions;
-each action below constructs a typed unary operation.
+```
+silk/
+├── actions/
+│   ├── browser.py      # contexts and pages (CreateContext, NewPage, Pages, …)
+│   ├── elements.py     # lookup and extraction (Query, GetText, ExtractTable, …)
+│   ├── input.py        # pointer, keyboard, and forms (Click, Fill, Drag, …)
+│   └── navigation.py   # navigation and page data (Navigate, Title, Screenshot, …)
+├── browsers/
+│   ├── models.py       # Browser/Page/ElementHandle interfaces, BROWSER key, options
+│   ├── sessions.py     # BrowserSession, the browser lifecycle owner
+│   └── drivers/        # the Playwright adapter
+├── selectors/          # Selector, SelectorGroup, css, xpath, text
+└── errors.py           # ElementNotFoundError, AttributeNotFoundError, …
+```
+
+Composition (`>>`, `&`, `|`), `Result`, `_`, and the collection, object, and
+policy combinators come from [FP-Ops](https://github.com/galaddirie/fp-ops).
+
+### Actions
 
 | Area | Actions |
 |---|---|
-| Browser lifecycle | `CreateContext`, `NewPage`, `Pages`, `PageById`, `ClosePage`, `CloseContext` |
+| Browser | `CreateContext`, `NewPage`, `Pages`, `PageById`, `ClosePage`, `CloseContext` |
 | Navigation and page data | `Navigate`, `GoBack`, `GoForward`, `Reload`, `WaitForNavigation`, `CurrentUrl`, `Title`, `Content`, `Screenshot`, `ScreenshotTo`, `Evaluate`, `EvaluateWith` |
 | Elements and extraction | `Query`, `RequireElement`, `QueryAll`, `GetText`, `GetInnerText`, `GetAttribute`, `RequireAttribute`, `GetHtml`, `ElementExists`, `WaitForElement`, `ExtractTable` |
 | Pointer, keyboard, and forms | `Click`, `DoubleClick`, `Fill`, `TypeText`, `SelectValue`, `SelectText`, `ScrollIntoView`, `ScrollTo`, `MouseMove`, `MouseMoveTo`, `MouseDown`, `MouseUp`, `KeyPress`, `KeyDown`, `KeyUp`, `Drag` |
 
-`Query` returns `None` only when no selector matches. `RequireElement` turns
-that absence into `ElementNotFoundError`. Similarly, `GetAttribute` returns a
-successful `None` for an absent attribute, while `RequireAttribute` returns
-`AttributeNotFoundError`.
+- `Query` returns `None` when nothing matches; `RequireElement` returns `ElementNotFoundError`.
+- `GetAttribute` returns `None` for a missing attribute; `RequireAttribute` returns `AttributeNotFoundError`.
+- Element actions such as `Click` and `Fill` return the element they acted on; page actions such as `KeyPress` and `Navigate` return the page.
+- `WaitForNavigation` waits for the *next* main-frame navigation, not the current one.
 
-Selectors may be CSS strings or immutable `Selector`/`SelectorGroup` values.
-A selector group tries its entries in declaration order, but a browser error is
-preserved as an error rather than mistaken for a missing element.
+### Selectors
 
-`WaitForNavigation` arms a wait for the next main-frame navigation and then
-waits for its configured load state. It does not merely inspect the current
-page's already-reached load state.
+- `css(value)`, `xpath(value)`, `text(value)` create a selector; plain strings are CSS.
+- `SelectorGroup(name, *selectors)` tries each selector in order. A browser error stays an error and is never mistaken for "not found".
 
-## Object and collection pipelines
+### Sharing a page
 
-FP-Ops supplies typed object construction and traversal. The complete public
-books example builds an immutable model for every product card:
+`&` and the parallel helpers give every branch the same input and browser; they
+never clone a page or element. Concurrent *reads* of one page are safe. For
+concurrent clicks, typing, or navigation, give each branch its own page with
+`NewPage` or its own context with `CreateContext`. A `limit` bounds how many
+tasks run at once, but it does not isolate them.
 
-```python
-from dataclasses import dataclass
+---
 
-from fp_ops import Operation, _, build, traverse
+## Roadmap
 
-from silk.actions.elements import ElementScope, GetText, QueryAll, RequireAttribute
-from silk.actions.navigation import Navigate
-from silk.browsers.models import Page
+- [x] Initial release with Playwright support
+- [x] Improve manager ergonomics
+- [x] Mapped tasks over collections (`QueryAll >> traverse(...)`)
+- [x] Run multiple actions on one page ergonomically (`GetText & GetAttribute & GetHtml`)
+- [x] Typed action signatures, checked by mypy and Pyright
+- [x] Proxy options
+- [ ] Selenium integration
+- [ ] Puppeteer integration
+- [ ] Explore stealth options (Patchright, nodriver, …)
+- [ ] Support computer-using agents (browser-use, OpenAI CUA, Claude computer use)
+- [ ] Enhanced caching
+- [ ] Distributed scraping
+- [ ] Rate limiting and polite scraping utilities
+- [ ] Integrations with data and scraping libraries (Pandas, Scrapy, …)
 
-
-@dataclass(frozen=True, slots=True)
-class Book:
-    title: str
-    price: str
-
-
-extract_book: Operation[ElementScope, Book] = build(
-    {
-        "title": RequireAttribute("h3 > a", _, attribute="title"),
-        "price": GetText("p.price_color", _),
-    },
-    Book,
-)
-
-books: Operation[Page, list[Book]] = (
-    Navigate(_, "https://books.toscrape.com/")
-    .then(QueryAll("article.product_pod", _))
-    .then(traverse(extract_book))
-)
-```
-
-See the
-[complete runnable example](https://github.com/galaddirie/silk/blob/main/examples/books_to_scrape.py).
-
-## Error policies and inspectable causes
-
-Once `.run` begins, ordinary exceptions stay in the operation's
-`Result[..., Exception]` error channel. Cancellation and other
-`BaseException` subclasses propagate.
-
-The default policies are deliberately fail-fast:
-
-- `build` stops at the first failed field and returns `BuildFieldError`.
-- `traverse` stops at the first failed item and returns `TraversalItemError`.
-- `fanout_parallel` cancels and joins unfinished siblings after a failure.
-
-The wrappers retain the original browser exception. `BuildFieldError` exposes
-`.field` and `.cause`; `TraversalItemError` exposes `.index` and `.cause`; both
-also preserve Python exception chaining through `.__cause__`. A failed books
-pipeline therefore remains inspectable as:
-
-```text
-TraversalItemError(index=...)
-  -> BuildFieldError(field=...)
-     -> original browser exception
-```
-
-Choose a different policy only by using a truthfully named combinator:
-
-- all-settled: `build_all_settled`, `traverse_all_settled`,
-  `fanout_all_settled`;
-- lossy: `build_lossy`, `traverse_lossy`, `filter_best_effort`;
-- retry: `retry`, whose `attempts` count includes the first call and whose final
-  error is retained;
-- bounded parallel: `fanout_parallel`, `traverse_parallel`;
-- sequential fail-fast: `build`, `traverse`, `filter_operation`.
-
-All-settled operations retain one `Result` per field, item, or branch. Lossy
-operations deliberately omit failed values. These return shapes are distinct,
-so policy is visible in both the name and the type.
-
-`BrowserSession.close` closes the browser, which closes every context and page
-opened in it, and raises if that fails. It is safe to call more than once.
-If startup fails partway, the browser is closed before the error is re-raised.
-Starting an already-started session raises.
-
-## Shared browser concurrency contract
-
-Parallel FP-Ops combinators reuse the exact operation input, `Environment`, and
-`Browser` for every branch. They do not clone a context, page, or element. A
-`limit` bounds active tasks; it does not create browser isolation or serialize
-access to shared pages.
-
-Consequently:
-
-- use bounded limits for browser work;
-- use separate pages or contexts when the underlying workflow requires
-  isolation;
-- avoid concurrent state-changing operations on the same page or element
-  unless the browser adapter explicitly guarantees that interaction;
-- expect declaration-order results even though effect completion order is not
-  specified;
-- expect fail-fast cancellation to be best effort because an external browser
-  effect may finish before cancellation is observed.
-
-The environment mapping is read-only, and the `Browser` it holds can only
-create contexts; closing the browser is reserved for the session.
-
-## Development gates
-
-Install the locked development environment and Chromium from clean caches,
-then run the same core gates as CI:
+## Development
 
 ```bash
-poetry cache clear pypi --all --no-interaction
-poetry install --with dev --no-interaction
+poetry install --with dev
 poetry run playwright install --with-deps chromium
 poetry run pre-commit run --all-files
-poetry check --lock --strict
 poetry run python -m pytest tests -v
 poetry run mypy
 poetry run pyright
 poetry run python tests/typecheck/check_bad_fixtures.py --all-python-versions
-poetry build --clean
 ```
 
-`pre-commit run --all-files` is the exact repository quality gate used by CI.
-The locked development environment pins the runner; `.pre-commit-config.yaml`
-pins every hook and Flake8 plugin used by that gate.
-
-Every deliberately invalid expression in `tests/typecheck/*_bad.py` has a
-stable `# typecheck-case: ...` marker. The negative harness associates that
-marker with the following AST statement, requires a pinned rule and semantic
-message from both strict mypy and pinned Pyright, and rejects diagnostics
-outside marked statements. After an intentional public typing change, refresh
-the marker-keyed artifact only by running:
-
-```bash
-poetry run python tests/typecheck/check_bad_fixtures.py --write-contract
-```
-
-That command observes both Python 3.11 and 3.13 targets and fails unless every
-case has a shared semantic diagnostic. Review the generated rule/message pair
-for each intentionally changed case; secondary checker cascades are confined
-and counted but are not blessed into the contract.
-
-The runtime suite includes local browser integration tests and the real
-`https://books.toscrape.com/` pipeline. CI also installs the built wheel into a
-fresh virtual environment outside the checkout and repeats a real Chromium
-public-pipeline smoke.
+The suite includes live Chromium tests, the real
+[Books to Scrape example](examples/books_to_scrape.py), and an installed-wheel
+smoke test. After an intentional public typing change, refresh the negative
+type-check contract with
+`poetry run python tests/typecheck/check_bad_fixtures.py --write-contract`.
 
 ## License
 
