@@ -6,16 +6,18 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fp_ops import _
-from playwright.async_api import Browser
-from playwright.async_api import BrowserContext as PWBrowserContext
-from playwright.async_api import Page as PWPage
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import (
+    Browser,
+    BrowserContext as PWBrowserContext,
+    Page as PWPage,
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 from silk.actions.navigation import (
-    NavigateOptions,
-    NavigationOptions,
     GoBack as go_back,
     Navigate as navigate,
+    NavigateOptions,
+    NavigationOptions,
     WaitForNavigation as wait_for_navigation,
 )
 from silk.browsers.drivers.playwright import PlaywrightBrowser

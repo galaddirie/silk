@@ -7,9 +7,9 @@ from fp_ops import _
 
 from silk.actions.elements import RequireElement as require_element
 from silk.actions.input import (
-    DragOptions,
     Click as click,
     Drag as drag,
+    DragOptions,
     Fill as fill,
     KeyDown as key_down,
     KeyPress as key_press,

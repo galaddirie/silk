@@ -69,12 +69,14 @@ async def test_failed_launch_stops_playwright_and_raises_the_cause() -> None:
     starter, playwright = fake_playwright(MagicMock())
     playwright.chromium.launch = AsyncMock(side_effect=cause)
 
-    with patch(
-        "silk.browsers.drivers.playwright.async_playwright",
-        return_value=starter,
+    with (
+        patch(
+            "silk.browsers.drivers.playwright.async_playwright",
+            return_value=starter,
+        ),
+        pytest.raises(RuntimeError) as raised,
     ):
-        with pytest.raises(RuntimeError) as raised:
-            await PlaywrightBrowser.launch(BrowserOptions())
+        await PlaywrightBrowser.launch(BrowserOptions())
 
     assert raised.value is cause
     playwright.stop.assert_awaited_once_with()

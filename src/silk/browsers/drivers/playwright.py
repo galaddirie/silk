@@ -9,13 +9,17 @@ from typing import Literal, TypeVar, overload
 from uuid import uuid4
 
 from fp_ops import Error, Ok, Result
-from playwright.async_api import Browser as PWBrowser
-from playwright.async_api import BrowserContext as PWBrowserContext
-from playwright.async_api import ElementHandle as PWElementHandle
-from playwright.async_api import FloatRect
-from playwright.async_api import Page as PWPage
-from playwright.async_api import Playwright, ProxySettings, ViewportSize
-from playwright.async_api import async_playwright
+from playwright.async_api import (
+    Browser as PWBrowser,
+    BrowserContext as PWBrowserContext,
+    ElementHandle as PWElementHandle,
+    FloatRect,
+    Page as PWPage,
+    Playwright,
+    ProxySettings,
+    ViewportSize,
+    async_playwright,
+)
 
 from silk.browsers.models import (
     Browser,

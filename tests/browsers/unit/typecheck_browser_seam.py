@@ -10,13 +10,13 @@ from fp_ops import Operation, Result, _
 
 from silk.actions.elements import Element, ElementScope, QueryAll as query_all
 from silk.actions.navigation import (
-    NavigationOptions,
     CurrentUrl as current_url,
     Evaluate as evaluate,
     EvaluateWith as evaluate_with,
     GoBack as go_back,
     GoForward as go_forward,
     Navigate as navigate,
+    NavigationOptions,
     Reload as reload,
     ScreenshotTo as screenshot_to,
     Title as title,

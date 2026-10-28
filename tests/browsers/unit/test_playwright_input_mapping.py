@@ -7,23 +7,25 @@ from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 from fp_ops import _
-from playwright.async_api import Browser
-from playwright.async_api import BrowserContext as PWBrowserContext
-from playwright.async_api import ElementHandle as PWElementHandle
-from playwright.async_api import Mouse as PWMouse
-from playwright.async_api import Page as PWPage
+from playwright.async_api import (
+    Browser,
+    BrowserContext as PWBrowserContext,
+    ElementHandle as PWElementHandle,
+    Mouse as PWMouse,
+    Page as PWPage,
+)
 
 from silk.actions.input import (
-    ClickOptions,
-    DoubleClickOptions,
-    DragOptions,
-    FillOptions,
-    TypeTextOptions,
     Click as click,
+    ClickOptions,
     DoubleClick as double_click,
+    DoubleClickOptions,
     Drag as drag,
+    DragOptions,
     Fill as fill,
+    FillOptions,
     TypeText as type_text,
+    TypeTextOptions,
 )
 from silk.browsers.drivers.playwright import PlaywrightBrowser
 from silk.browsers.models import ElementHandle, KeyModifier, Page

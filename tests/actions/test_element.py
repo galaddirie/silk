@@ -20,12 +20,8 @@ from fp_ops import (
 import silk.actions.elements as element_actions
 from silk.actions.elements import (
     Element,
-    ElementScope,
-    SelectorInput,
-    WaitOptions,
-    WaitPage,
-    WaitSelectorInput,
     ElementExists as element_exists,
+    ElementScope,
     ExtractTable as extract_table,
     GetAttribute as get_attribute,
     GetHtml as get_html,
@@ -35,7 +31,11 @@ from silk.actions.elements import (
     QueryAll as query_all,
     RequireAttribute as require_attribute,
     RequireElement as require_element,
+    SelectorInput,
     WaitForElement as wait_for_element,
+    WaitOptions,
+    WaitPage,
+    WaitSelectorInput,
 )
 from silk.browsers.models import ElementHandle, Page
 from silk.errors import AttributeNotFoundError, ElementNotFoundError

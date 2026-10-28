@@ -6,8 +6,7 @@ from dataclasses import FrozenInstanceError
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from playwright.async_api import Browser
-from playwright.async_api import BrowserContext as PWBrowserContext
+from playwright.async_api import Browser, BrowserContext as PWBrowserContext
 
 from silk.browsers.drivers.playwright import PlaywrightBrowser
 from silk.browsers.models import (
