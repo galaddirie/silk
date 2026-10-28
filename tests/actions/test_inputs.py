@@ -10,15 +10,14 @@ from fp_ops import Error, Ok, Result, _
 
 import silk.actions.input as input_actions
 from silk.actions.input import (
-    ClickOptions,
-    DoubleClickOptions,
-    DragOptions,
-    FillOptions,
-    TypeTextOptions,
     Click as click,
+    ClickOptions,
     DoubleClick as double_click,
+    DoubleClickOptions,
     Drag as drag,
+    DragOptions,
     Fill as fill,
+    FillOptions,
     KeyDown as key_down,
     KeyPress as key_press,
     KeyUp as key_up,
@@ -31,6 +30,7 @@ from silk.actions.input import (
     SelectText as select_text,
     SelectValue as select_value,
     TypeText as type_text,
+    TypeTextOptions,
 )
 from silk.browsers.models import ElementHandle, KeyModifier, MouseButtonLiteral, Page
 

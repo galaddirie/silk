@@ -8,12 +8,9 @@ from fp_ops import Operation, Result, _, build, traverse
 
 from silk.actions.elements import (
     Element,
+    ElementExists as element_exists,
     ElementScope,
     ElementTarget,
-    SelectorInput,
-    WaitPage,
-    WaitSelectorInput,
-    ElementExists as element_exists,
     ExtractTable as extract_table,
     GetAttribute as get_attribute,
     GetHtml as get_html,
@@ -23,7 +20,10 @@ from silk.actions.elements import (
     QueryAll as query_all,
     RequireAttribute as require_attribute,
     RequireElement as require_element,
+    SelectorInput,
     WaitForElement as wait_for_element,
+    WaitPage,
+    WaitSelectorInput,
 )
 from silk.browsers.drivers.playwright import (
     PlaywrightElementHandle,

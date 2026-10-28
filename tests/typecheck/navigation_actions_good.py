@@ -7,8 +7,6 @@ from typing import assert_type
 from fp_ops import Operation, Result, _
 
 from silk.actions.navigation import (
-    NavigateOptions,
-    NavigationOptions,
     Content as content,
     CurrentUrl as current_url,
     Evaluate as evaluate,
@@ -16,6 +14,8 @@ from silk.actions.navigation import (
     GoBack as go_back,
     GoForward as go_forward,
     Navigate as navigate,
+    NavigateOptions,
+    NavigationOptions,
     Reload as reload,
     Screenshot as screenshot,
     ScreenshotTo as screenshot_to,

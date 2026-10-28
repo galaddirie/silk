@@ -12,6 +12,7 @@ from a partial failure. Use :func:`Click` with an element target instead.
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 from fp_ops import Error, Ok, Result, result_operation_template
 
 from silk.actions._scope import (

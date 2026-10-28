@@ -5,14 +5,13 @@ from fp_ops import _
 
 from silk.actions.elements import Element, ElementScope, ElementTarget
 from silk.actions.input import (
-    ClickOptions,
-    DoubleClickOptions,
-    FillOptions,
-    TypeTextOptions,
     Click as click,
+    ClickOptions,
     DoubleClick as double_click,
+    DoubleClickOptions,
     Drag as drag,
     Fill as fill,
+    FillOptions,
     KeyDown as key_down,
     KeyPress as key_press,
     KeyUp as key_up,
@@ -25,6 +24,7 @@ from silk.actions.input import (
     SelectText as select_text,
     SelectValue as select_value,
     TypeText as type_text,
+    TypeTextOptions,
 )
 from silk.browsers.models import KeyModifier, Page
 

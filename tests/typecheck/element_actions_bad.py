@@ -9,12 +9,12 @@ from silk.actions.elements import (
     Element,
     ElementScope,
     ElementTarget,
-    SelectorInput,
-    WaitOptions,
     GetAttribute as get_attribute,
     GetInnerText as get_inner_text,
     Query as query,
+    SelectorInput,
     WaitForElement as wait_for_element,
+    WaitOptions,
 )
 from silk.selectors.selector import SelectorGroup
 

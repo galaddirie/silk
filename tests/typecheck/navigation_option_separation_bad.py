@@ -4,11 +4,11 @@
 from fp_ops import _
 
 from silk.actions.navigation import (
-    NavigateOptions,
-    NavigationOptions,
     GoBack as go_back,
     GoForward as go_forward,
     Navigate as navigate,
+    NavigateOptions,
+    NavigationOptions,
     Reload as reload,
     WaitForNavigation as wait_for_navigation,
 )

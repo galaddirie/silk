@@ -11,8 +11,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Protocol, runtime_checkable
 
-from fp_ops import Operation, _
-from fp_ops import __version__ as fp_ops_version
+from fp_ops import Operation, _, __version__ as fp_ops_version
 
 import silk
 from silk.actions.elements import GetInnerText

@@ -7,16 +7,15 @@ from fp_ops import Operation, Result, _
 
 from silk.actions.elements import Element, ElementScope, ElementTarget
 from silk.actions.input import (
+    Click as click,
     ClickOptions,
+    DoubleClick as double_click,
     DoubleClickOptions,
+    Drag as drag,
     DragOptions,
+    Fill as fill,
     FillOptions,
     InputPage,
-    TypeTextOptions,
-    Click as click,
-    DoubleClick as double_click,
-    Drag as drag,
-    Fill as fill,
     KeyDown as key_down,
     KeyPress as key_press,
     KeyUp as key_up,
@@ -29,6 +28,7 @@ from silk.actions.input import (
     SelectText as select_text,
     SelectValue as select_value,
     TypeText as type_text,
+    TypeTextOptions,
 )
 from silk.browsers.drivers.playwright import (
     PlaywrightElementHandle,

@@ -9,10 +9,10 @@ import pytest
 from fp_ops import _
 
 from silk.actions.navigation import (
-    NavigateOptions,
-    NavigationOptions,
     CurrentUrl as current_url,
     Navigate as navigate,
+    NavigateOptions,
+    NavigationOptions,
     WaitForNavigation as wait_for_navigation,
 )
 from silk.browsers.models import BrowserOptions

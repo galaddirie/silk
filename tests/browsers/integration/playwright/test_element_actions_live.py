@@ -6,9 +6,9 @@ import pytest
 from fp_ops import _
 
 from silk.actions.elements import (
-    WaitOptions,
     GetInnerText as get_inner_text,
     WaitForElement as wait_for_element,
+    WaitOptions,
 )
 from silk.actions.navigation import Navigate as navigate
 from silk.browsers.sessions import BrowserSession
