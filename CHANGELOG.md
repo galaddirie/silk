@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## [0.4.1] - 2026-10-28
+
+### Added
 - Add pluggable browser drivers: `BrowserSession(driver=...)` accepts any
   `BrowserDriver`, whose `launch(options)` returns a `LaunchedBrowser` (a
   `Browser` that only the session can close).

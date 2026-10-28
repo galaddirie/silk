@@ -21,7 +21,7 @@ from silk.browsers.sessions import BrowserSession
 
 BOOKS_URL = "https://books.toscrape.com/"
 EXPECTED_DISTRIBUTION_NAME = "silk-scraper"
-EXPECTED_SILK_VERSION = "0.4.0"
+EXPECTED_SILK_VERSION = "0.4.1"
 EXPECTED_DIRECT_REQUIREMENTS = {
     "fp-ops>=0.4.0,<0.5.0",
     "playwright>=1.61.0,<2.0.0",
