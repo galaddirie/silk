@@ -24,7 +24,7 @@ EXPECTED_DISTRIBUTION_NAME = "silk-scraper"
 EXPECTED_SILK_VERSION = "0.4.0"
 EXPECTED_DIRECT_REQUIREMENTS = {
     "fp-ops>=0.4.0,<0.5.0",
-    "playwright>=1.51.0,<2.0.0",
+    "playwright>=1.61.0,<2.0.0",
     "typing-extensions>=4.12.0,<5.0.0",
 }
 FORBIDDEN_DIRECT_REQUIREMENTS = (
