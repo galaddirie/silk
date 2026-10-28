@@ -3,10 +3,21 @@
 ## [Unreleased]
 
 ### Added
+- Add pluggable browser drivers: `BrowserSession(driver=...)` accepts any
+  `BrowserDriver`, whose `launch(options)` returns a `LaunchedBrowser` (a
+  `Browser` that only the session can close).
+- Add `PlaywrightDriver`, the default driver, with `browser_type`
+  (`"chromium"`, `"firefox"`, `"webkit"`), `channel`, `executable_path`, and
+  `package` for Playwright-compatible forks such as Patchright
+  (`PlaywrightDriver(package="patchright")`).
+- Add `attempt` and `attempt_blocking` in `silk.browsers.drivers` for turning
+  async or blocking backend calls into `Result` values in custom drivers.
 
 ### Fixed
 
 ### Changed
+- `PlaywrightBrowser.launch(options)` is replaced by
+  `PlaywrightDriver().launch(options)`.
 
 ## [0.4.0] - 2026-10-21
 

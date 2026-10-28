@@ -341,6 +341,45 @@ class Browser(ABC):
     ) -> Result[BrowserContext, Exception]: ...
 
 
+class LaunchedBrowser(Browser):
+    """A browser a :class:`BrowserDriver` launched, plus the right to close it.
+
+    Only :class:`~silk.browsers.sessions.BrowserSession` calls :meth:`close`;
+    pipelines see the same object through the narrower :class:`Browser`
+    interface.
+    """
+
+    @abstractmethod
+    async def close(self) -> None:
+        """Close the browser and every context and page in it.
+
+        Called at most once per successful launch. Raise on failure.
+        """
+
+        ...
+
+
+class BrowserDriver(ABC):
+    """Launches browsers for a :class:`~silk.browsers.sessions.BrowserSession`.
+
+    Implement this, together with :class:`LaunchedBrowser`,
+    :class:`BrowserContext`, :class:`Page`, and :class:`ElementHandle`, to run
+    Silk pipelines on another automation backend::
+
+        async with BrowserSession(driver=MyDriver()) as session:
+            ...
+    """
+
+    @abstractmethod
+    async def launch(self, options: BrowserOptions) -> LaunchedBrowser:
+        """Start a browser, raising if it cannot be started.
+
+        Anything acquired before a failure must be released before raising.
+        """
+
+        ...
+
+
 BROWSER = EnvKey("browser", Browser)  # type: ignore[type-abstract]
 """Environment key under which a session provides its :class:`Browser`."""
 
@@ -369,7 +408,7 @@ class BrowserProxy:
 
 @dataclass(frozen=True, slots=True)
 class BrowserOptions:
-    """Chromium process-launch configuration."""
+    """Browser process-launch configuration, passed to the session's driver."""
 
     headless: bool = True
     timeout: int = 30_000
@@ -418,12 +457,14 @@ __all__ = [
     "Browser",
     "BrowserContext",
     "BrowserContextOptions",
+    "BrowserDriver",
     "BrowserOptions",
     "BrowserProxy",
     "BrowserViewport",
     "CoordinateType",
     "ElementHandle",
     "KeyModifier",
+    "LaunchedBrowser",
     "MouseButtonLiteral",
     "NavigationWaitLiteral",
     "Page",

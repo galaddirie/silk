@@ -133,11 +133,19 @@ def verify_distribution() -> None:
         session_module,
     ):
         assert not hasattr(module, "Driver"), module.__name__
-        assert not hasattr(module, "PlaywrightDriver"), module.__name__
-    assert driver_package.__all__ == []
+    assert driver_package.__all__ == [
+        "PlaywrightDriver",
+        "attempt",
+        "attempt_blocking",
+    ]
+    assert driver_package.PlaywrightDriver is playwright_adapter.PlaywrightDriver
+    assert issubclass(driver_package.PlaywrightDriver, browser_models.BrowserDriver)
+    assert issubclass(
+        playwright_adapter.PlaywrightBrowser, browser_models.LaunchedBrowser
+    )
 
     session_parameters = signature(BrowserSession).parameters
-    assert tuple(session_parameters) == ("options", "context_options")
+    assert tuple(session_parameters) == ("options", "context_options", "driver")
     assert "driver_class" not in session_parameters
     assert "driver_factory" not in session_parameters
 
@@ -145,7 +153,6 @@ def verify_distribution() -> None:
     assert not hasattr(BrowserSession, "_for_testing")
     for forbidden_access in (
         "driver",
-        "_driver",
         "driver_factory",
         "_driver_factory",
         "_resources",

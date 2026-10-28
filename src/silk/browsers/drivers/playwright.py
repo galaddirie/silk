@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable
+from collections.abc import Callable
+from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
-from typing import Literal, TypeVar, overload
+from typing import Literal, Protocol, cast, overload
 from uuid import uuid4
 
 from fp_ops import Error, Ok, Result
@@ -21,15 +23,17 @@ from playwright.async_api import (
     async_playwright,
 )
 
+from silk.browsers.drivers.support import attempt as _attempt
 from silk.browsers.models import (
-    Browser,
     BrowserContext,
     BrowserContextOptions,
+    BrowserDriver,
     BrowserOptions,
     BrowserProxy,
     CoordinateType,
     ElementHandle,
     KeyModifier,
+    LaunchedBrowser,
     MouseButtonLiteral,
     NavigationWaitLiteral,
     Page,
@@ -37,7 +41,7 @@ from silk.browsers.models import (
 )
 from silk.errors import DragElementMismatchError
 
-T = TypeVar("T")
+BrowserTypeLiteral = Literal["chromium", "firefox", "webkit"]
 
 _NO_EVALUATION_ARGUMENT = object()
 _MODIFIERS: dict[KeyModifier, Literal["Alt", "Control", "Meta", "Shift"]] = {
@@ -48,13 +52,8 @@ _MODIFIERS: dict[KeyModifier, Literal["Alt", "Control", "Meta", "Shift"]] = {
 }
 
 
-async def _attempt(awaitable: Awaitable[T]) -> Result[T, Exception]:
-    """Await a Playwright call, turning ordinary exceptions into ``Error``."""
-
-    try:
-        return Ok(await awaitable)
-    except Exception as error:
-        return Error(error)
+class _PlaywrightStarter(Protocol):
+    async def start(self) -> Playwright: ...
 
 
 def _modifiers(
@@ -567,28 +566,13 @@ class PlaywrightBrowserContext(BrowserContext):
         return closed
 
 
-class PlaywrightBrowser(Browser):
-    """A launched Chromium process. Owned and closed by a ``BrowserSession``."""
+class PlaywrightBrowser(LaunchedBrowser):
+    """A launched browser process. Owned and closed by a ``BrowserSession``."""
 
     def __init__(self, playwright: Playwright, native: PWBrowser) -> None:
         self._playwright = playwright
         self._native = native
         self._closed = False
-
-    @classmethod
-    async def launch(cls, options: BrowserOptions) -> PlaywrightBrowser:
-        playwright = await async_playwright().start()
-        try:
-            native = await playwright.chromium.launch(
-                headless=options.headless,
-                timeout=options.timeout,
-                args=list(options.args),
-                proxy=_proxy_settings(options.proxy),
-            )
-        except BaseException:
-            await playwright.stop()
-            raise
-        return cls(playwright, native)
 
     async def new_context(
         self,
@@ -642,9 +626,58 @@ class PlaywrightBrowser(Browser):
             await self._playwright.stop()
 
 
+@dataclass(frozen=True, slots=True)
+class PlaywrightDriver(BrowserDriver):
+    """Launch browsers with Playwright or a Playwright-compatible package.
+
+    ``package`` names any module that ships Playwright's ``async_api``, such
+    as the Patchright stealth fork::
+
+        BrowserSession(driver=PlaywrightDriver(package="patchright"))
+
+    ``channel`` selects a branded build (``"chrome"``, ``"msedge"``) and
+    ``executable_path`` a specific browser binary.
+    """
+
+    package: str = "playwright"
+    browser_type: BrowserTypeLiteral = "chromium"
+    channel: str | None = None
+    executable_path: Path | None = None
+
+    async def launch(self, options: BrowserOptions) -> PlaywrightBrowser:
+        playwright = await self._async_playwright()().start()
+        try:
+            browser_types = {
+                "chromium": playwright.chromium,
+                "firefox": playwright.firefox,
+                "webkit": playwright.webkit,
+            }
+            native = await browser_types[self.browser_type].launch(
+                headless=options.headless,
+                timeout=options.timeout,
+                args=list(options.args),
+                proxy=_proxy_settings(options.proxy),
+                channel=self.channel,
+                executable_path=self.executable_path,
+            )
+        except BaseException:
+            await playwright.stop()
+            raise
+        return PlaywrightBrowser(playwright, native)
+
+    def _async_playwright(self) -> Callable[[], _PlaywrightStarter]:
+        if self.package == "playwright":
+            return async_playwright
+        module = import_module(f"{self.package}.async_api")
+        # Compatible forks mirror Playwright's API under their own classes.
+        return cast(Callable[[], _PlaywrightStarter], module.async_playwright)
+
+
 __all__ = [
+    "BrowserTypeLiteral",
     "PlaywrightBrowser",
     "PlaywrightBrowserContext",
+    "PlaywrightDriver",
     "PlaywrightElementHandle",
     "PlaywrightPage",
 ]

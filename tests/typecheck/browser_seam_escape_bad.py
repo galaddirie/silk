@@ -1,9 +1,13 @@
 # pyright: strict
-"""Raw adapter ownership and native handles are not part of the public interfaces."""
+"""Raw adapter ownership and native handles are not part of the public interfaces.
 
-# typecheck-case: browser_seam_escape.027
+Drivers are injected only through ``BrowserSession(driver=...)``; pipelines see
+a ``Browser`` that cannot close the session's browser.
+"""
+
 from silk.browsers.drivers import PlaywrightDriver
 from silk.browsers.drivers.playwright import (
+    PlaywrightBrowser,
     PlaywrightBrowserContext,
     PlaywrightElementHandle,
     PlaywrightPage,
@@ -80,19 +84,23 @@ async def environment_browser_cannot_recover_umbrella_close(
     await outcome.ok.driver.close()
     # typecheck-case: browser_seam_escape.026
     await outcome.ok.context_ref.close()
+    # typecheck-case: browser_seam_escape.034
+    await browser.close()
 
 
-def session_selection_is_not_caller_injectable() -> None:
+def session_driver_injection_is_typed() -> None:
     # typecheck-case: browser_seam_escape.028
     BrowserSession(driver_class=PlaywrightDriver)
     session = BrowserSession()
     # typecheck-case: browser_seam_escape.029
     session.driver
-    # typecheck-case: browser_seam_escape.030
-    session._driver
     # typecheck-case: browser_seam_escape.031
     session._driver_factory
     # typecheck-case: browser_seam_escape.032
     BrowserSession(driver_factory=object)
     # typecheck-case: browser_seam_escape.033
     BrowserSession._for_testing(object)
+    # typecheck-case: browser_seam_escape.035
+    BrowserSession(driver=PlaywrightBrowser)
+    # typecheck-case: browser_seam_escape.036
+    BrowserSession(driver=PlaywrightDriver(browser_type="chrome"))

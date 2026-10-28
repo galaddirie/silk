@@ -23,12 +23,16 @@ from silk.actions.navigation import (
     WaitForNavigation as wait_for_navigation,
 )
 from silk.browsers import (
+    Browser,
     BrowserContextOptions,
+    BrowserDriver,
     BrowserOptions,
     BrowserSession,
     ElementHandle,
+    LaunchedBrowser,
     Page,
 )
+from silk.browsers.drivers import PlaywrightDriver, attempt, attempt_blocking
 
 
 async def nominal_browser_values_are_public_inputs(
@@ -101,4 +105,31 @@ def session_selects_and_owns_its_adapter() -> None:
     _ = BrowserSession(
         options=BrowserOptions(),
         context_options=BrowserContextOptions(),
+    )
+    _ = BrowserSession(driver=PlaywrightDriver(package="patchright", channel="chrome"))
+    _ = BrowserSession(driver=PlaywrightDriver(browser_type="firefox"))
+
+
+class ReusedBrowserDriver(BrowserDriver):
+    def __init__(self, browser: LaunchedBrowser) -> None:
+        self._browser = browser
+
+    async def launch(self, options: BrowserOptions) -> LaunchedBrowser:
+        return self._browser
+
+
+async def custom_drivers_plug_into_sessions(browser: LaunchedBrowser) -> None:
+    session = BrowserSession(driver=ReusedBrowserDriver(browser))
+    assert_type(session.browser, Browser)
+
+    async def native_title() -> str:
+        return "title"
+
+    def blocking_title(prefix: str) -> str:
+        return prefix + "title"
+
+    assert_type(await attempt(native_title()), Result[str, Exception])
+    assert_type(
+        await attempt_blocking(blocking_title, "a "),
+        Result[str, Exception],
     )

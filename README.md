@@ -468,6 +468,90 @@ Every option type is frozen. Each action has its own options (`ClickOptions`,
 `FillOptions`, `WaitOptions`, `DragOptions`, …), and later changes to your own
 lists or dicts can never retarget an action you already built.
 
+## Browser Drivers
+
+A driver launches the browser a session owns. `BrowserSession` uses Chromium
+through Playwright unless you pass `driver=`. Your pipelines stay the same
+whichever driver you pick.
+
+```python
+from pathlib import Path
+
+from silk.browsers.drivers import PlaywrightDriver
+
+BrowserSession(driver=PlaywrightDriver(browser_type="firefox"))
+BrowserSession(driver=PlaywrightDriver(channel="chrome"))  # installed Google Chrome
+BrowserSession(driver=PlaywrightDriver(executable_path=Path("/opt/chromium/chrome")))
+```
+
+### Stealth browsers (Patchright and other Playwright forks)
+
+`package` loads any library that copies Playwright's `async_api`, such as
+[Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python):
+
+```bash
+pip install patchright
+python -m patchright install chromium
+```
+
+```python
+stealth = PlaywrightDriver(package="patchright")
+
+async with BrowserSession(driver=stealth) as session:
+    result = await pipeline.run(session.page, environment=session.environment)
+```
+
+### Writing your own driver
+
+To use another backend (Selenium, nodriver, a remote browser service, …),
+subclass `BrowserDriver` and the browser interfaces in `silk.browsers`:
+
+| Interface | You provide |
+|---|---|
+| `BrowserDriver` | `launch(options) -> LaunchedBrowser` |
+| `LaunchedBrowser` | `new_context(options)`, `close()` |
+| `BrowserContext` | `context_id`, `new_page()`, `pages()`, `close()` |
+| `Page` | navigation, queries, `evaluate`, `screenshot`, mouse and keyboard |
+| `ElementHandle` | queries, reads, clicks, typing, pointer moves, `drag_to` |
+
+Abstract base classes enforce the contract: Python raises a `TypeError` that
+names any method you have not implemented yet. Methods return
+`Result` values instead of raising. `attempt` wraps an awaitable, and
+`attempt_blocking` runs a synchronous call in a worker thread:
+
+```python
+from fp_ops import Result
+from selenium import webdriver
+
+from silk.browsers import BrowserDriver, BrowserOptions, LaunchedBrowser, Page
+from silk.browsers.drivers import attempt_blocking
+
+
+class SeleniumDriver(BrowserDriver):
+    async def launch(self, options: BrowserOptions) -> LaunchedBrowser:
+        chrome_options = webdriver.ChromeOptions()
+        if options.headless:
+            chrome_options.add_argument("--headless=new")
+        for argument in options.args:
+            chrome_options.add_argument(argument)
+        native = await attempt_blocking(webdriver.Chrome, options=chrome_options)
+        if native.is_error():
+            raise native.error
+        return SeleniumBrowser(native.ok)  # your LaunchedBrowser subclass
+
+
+class SeleniumPage(Page):
+    async def title(self) -> Result[str, Exception]:
+        return await attempt_blocking(lambda: self._driver.title)
+
+    ...
+```
+
+`launch` should raise if the browser cannot start. Only the session calls
+`close()`; pipelines get the browser as a plain `Browser` and cannot close it.
+If `launch` succeeds but the first context or page fails, the session closes
+the browser before raising the error.
+
 ---
 
 ## API Reference
@@ -484,7 +568,7 @@ silk/
 ├── browsers/
 │   ├── models.py       # Browser/Page/ElementHandle interfaces, BROWSER key, options
 │   ├── sessions.py     # BrowserSession, the browser lifecycle owner
-│   └── drivers/        # the Playwright adapter
+│   └── drivers/        # PlaywrightDriver and helpers for custom drivers
 ├── selectors/          # Selector, SelectorGroup, css, xpath, text
 └── errors.py           # ElementNotFoundError, AttributeNotFoundError, …
 ```
@@ -529,9 +613,11 @@ tasks run at once, but it does not isolate them.
 - [x] Run multiple actions on one page ergonomically (`GetText & GetAttribute & GetHtml`)
 - [x] Typed action signatures, checked by mypy and Pyright
 - [x] Proxy options
+- [x] Pluggable browser drivers (`BrowserSession(driver=...)`)
+- [x] Patchright and other Playwright forks (`PlaywrightDriver(package=...)`)
 - [ ] Selenium integration
 - [ ] Puppeteer integration
-- [ ] Explore stealth options (Patchright, nodriver, …)
+- [ ] Explore more stealth options (nodriver, …)
 - [ ] Support computer-using agents (browser-use, OpenAI CUA, Claude computer use)
 - [ ] Enhanced caching
 - [ ] Distributed scraping

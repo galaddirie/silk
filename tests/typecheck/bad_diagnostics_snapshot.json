@@ -9,7 +9,7 @@
     "3.13"
   ],
   "message_normalization": "Trim and collapse every Unicode whitespace run to one ASCII space; the selected primary rule and full normalized message must match exactly.",
-  "case_count": 229,
+  "case_count": 230,
   "cases": [
     {
       "id": "browser_actions.004",
@@ -894,20 +894,6 @@
       }
     },
     {
-      "id": "browser_seam_escape.027",
-      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "attr-defined",
-          "message": "Module \"silk.browsers.drivers\" has no attribute \"PlaywrightDriver\""
-        },
-        "pyright": {
-          "rule": "reportAttributeAccessIssue",
-          "message": "\"PlaywrightDriver\" is unknown import symbol"
-        }
-      }
-    },
-    {
       "id": "browser_seam_escape.028",
       "fixture": "tests/typecheck/browser_seam_escape_bad.py",
       "expectations": {
@@ -927,25 +913,11 @@
       "expectations": {
         "mypy": {
           "rule": "attr-defined",
-          "message": "\"BrowserSession\" has no attribute \"driver\""
+          "message": "\"BrowserSession\" has no attribute \"driver\"; maybe \"_driver\"?"
         },
         "pyright": {
           "rule": "reportAttributeAccessIssue",
           "message": "Cannot access attribute \"driver\" for class \"BrowserSession\" Attribute \"driver\" is unknown"
-        }
-      }
-    },
-    {
-      "id": "browser_seam_escape.030",
-      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "attr-defined",
-          "message": "\"BrowserSession\" has no attribute \"_driver\""
-        },
-        "pyright": {
-          "rule": "reportAttributeAccessIssue",
-          "message": "Cannot access attribute \"_driver\" for class \"BrowserSession\" Attribute \"_driver\" is unknown"
         }
       }
     },
@@ -988,6 +960,48 @@
         "pyright": {
           "rule": "reportAttributeAccessIssue",
           "message": "Cannot access attribute \"_for_testing\" for class \"type[BrowserSession]\" Attribute \"_for_testing\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.034",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "attr-defined",
+          "message": "\"Browser\" has no attribute \"close\""
+        },
+        "pyright": {
+          "rule": "reportAttributeAccessIssue",
+          "message": "Cannot access attribute \"close\" for class \"Browser\" Attribute \"close\" is unknown"
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.035",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"driver\" to \"BrowserSession\" has incompatible type \"type[PlaywrightBrowser]\"; expected \"BrowserDriver | None\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"type[PlaywrightBrowser]\" cannot be assigned to parameter \"driver\" of type \"BrowserDriver | None\" in function \"__init__\" Type \"type[PlaywrightBrowser]\" is not assignable to type \"BrowserDriver | None\" Type \"type[PlaywrightBrowser]\" is not assignable to type \"BrowserDriver\" Type is not assignable to \"None\""
+        }
+      }
+    },
+    {
+      "id": "browser_seam_escape.036",
+      "fixture": "tests/typecheck/browser_seam_escape_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"browser_type\" to \"PlaywrightDriver\" has incompatible type \"Literal['chrome']\"; expected \"Literal['chromium', 'firefox', 'webkit']\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Literal['chrome']\" cannot be assigned to parameter \"browser_type\" of type \"BrowserTypeLiteral\" in function \"__init__\" Type \"Literal['chrome']\" is not assignable to type \"BrowserTypeLiteral\" \"Literal['chrome']\" is not assignable to type \"Literal['chromium']\" \"Literal['chrome']\" is not assignable to type \"Literal['firefox']\" \"Literal['chrome']\" is not assignable to type \"Literal['webkit']\""
         }
       }
     },

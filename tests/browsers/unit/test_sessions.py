@@ -9,11 +9,13 @@ from silk.browsers import (
     BROWSER,
     BrowserContext,
     BrowserContextOptions,
+    BrowserDriver,
     BrowserOptions,
     BrowserSession,
+    LaunchedBrowser,
     Page,
 )
-from silk.browsers.drivers.playwright import PlaywrightBrowser
+from silk.browsers.drivers import PlaywrightDriver
 
 
 @pytest.fixture
@@ -21,12 +23,46 @@ def browser_harness(monkeypatch: pytest.MonkeyPatch):
     page = MagicMock(spec=Page)
     context = MagicMock(spec=BrowserContext)
     context.new_page = AsyncMock(return_value=Ok(page))
-    browser = MagicMock(spec=PlaywrightBrowser)
+    browser = MagicMock(spec=LaunchedBrowser)
     browser.new_context = AsyncMock(return_value=Ok(context))
     browser.close = AsyncMock(return_value=None)
     launch = AsyncMock(return_value=browser)
-    monkeypatch.setattr(PlaywrightBrowser, "launch", launch)
+    monkeypatch.setattr(PlaywrightDriver, "launch", launch)
     return launch, browser, context, page
+
+
+class FakeDriver(BrowserDriver):
+    def __init__(self, browser: LaunchedBrowser) -> None:
+        self.browser = browser
+        self.launched_with: list[BrowserOptions] = []
+
+    async def launch(self, options: BrowserOptions) -> LaunchedBrowser:
+        self.launched_with.append(options)
+        return self.browser
+
+
+@pytest.mark.asyncio
+async def test_session_launches_through_a_custom_driver(browser_harness):
+    default_launch, browser, context, page = browser_harness
+    driver = FakeDriver(browser)
+    options = BrowserOptions(headless=False)
+
+    async with BrowserSession(options, driver=driver) as session:
+        assert session.page is page
+        assert session.context is context
+        assert session.environment.require(BROWSER) is browser
+
+    assert driver.launched_with == [options]
+    default_launch.assert_not_awaited()
+    browser.close.assert_awaited_once_with()
+
+
+def test_custom_driver_must_implement_launch() -> None:
+    class Incomplete(BrowserDriver):
+        pass
+
+    with pytest.raises(TypeError, match="launch"):
+        Incomplete()  # type: ignore[abstract]
 
 
 @pytest.mark.asyncio
@@ -45,7 +81,8 @@ async def test_started_session_exposes_page_context_and_environment(
     assert session.context is context
     assert session.browser is browser
     assert session.environment.require(BROWSER) is browser
-    launch.assert_awaited_once_with(options)
+    launch.assert_awaited_once()
+    assert launch.await_args.args[-1] is options
     browser.new_context.assert_awaited_once_with(context_options)
 
     @operation

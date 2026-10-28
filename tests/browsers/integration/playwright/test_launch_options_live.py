@@ -15,7 +15,13 @@ from silk.actions.navigation import (
     Navigate as navigate,
     Title as title,
 )
-from silk.browsers.models import BrowserOptions, BrowserProxy
+from silk.browsers.drivers import PlaywrightDriver
+from silk.browsers.models import (
+    BrowserDriver,
+    BrowserOptions,
+    BrowserProxy,
+    LaunchedBrowser,
+)
 from silk.browsers.sessions import BrowserSession
 
 
@@ -115,3 +121,25 @@ async def test_chromium_launch_honors_the_typed_proxy_endpoint() -> None:
             page_title = await title(_).run(session.page)
             assert page_title.is_ok(), page_title
             assert page_title.ok == "launch proxy reached"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_session_runs_pipelines_through_a_wrapping_custom_driver() -> None:
+    launched: list[BrowserOptions] = []
+
+    class RecordingDriver(BrowserDriver):
+        async def launch(self, options: BrowserOptions) -> LaunchedBrowser:
+            launched.append(options)
+            return await PlaywrightDriver(browser_type="chromium").launch(options)
+
+    options = BrowserOptions(headless=True, timeout=10_000)
+    async with BrowserSession(options=options, driver=RecordingDriver()) as session:
+        script = "() => document.title = 'custom driver'"
+        evaluated = await evaluate(_, script).run(session.page)
+        assert evaluated.is_ok(), evaluated
+        page_title = await title(_).run(session.page)
+        assert page_title.is_ok(), page_title
+        assert page_title.ok == "custom driver"
+
+    assert launched == [options]

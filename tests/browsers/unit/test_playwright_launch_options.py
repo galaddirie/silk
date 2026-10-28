@@ -1,12 +1,14 @@
-"""Native Playwright mapping for the public Chromium launch value."""
+"""Native Playwright mapping for the public launch value and driver settings."""
 
 from __future__ import annotations
 
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from silk.browsers.drivers.playwright import PlaywrightBrowser
+from silk.browsers.drivers.playwright import PlaywrightBrowser, PlaywrightDriver
 from silk.browsers.models import BrowserOptions, BrowserProxy
 
 
@@ -34,7 +36,7 @@ async def test_launch_forwards_every_modeled_chromium_option_exactly() -> None:
         "silk.browsers.drivers.playwright.async_playwright",
         return_value=starter,
     ):
-        browser = await PlaywrightBrowser.launch(options)
+        browser = await PlaywrightDriver().launch(options)
 
     assert browser._native is native_browser
     playwright.chromium.launch.assert_awaited_once_with(
@@ -42,6 +44,8 @@ async def test_launch_forwards_every_modeled_chromium_option_exactly() -> None:
         timeout=1_234,
         args=["--disable-gpu", "--js-flags=--expose-gc"],
         proxy={"server": "http://proxy.test:8080", "username": "silk"},
+        channel=None,
+        executable_path=None,
     )
 
 
@@ -53,14 +57,66 @@ async def test_launch_maps_defaults() -> None:
         "silk.browsers.drivers.playwright.async_playwright",
         return_value=starter,
     ):
-        await PlaywrightBrowser.launch(BrowserOptions())
+        await PlaywrightDriver().launch(BrowserOptions())
 
     playwright.chromium.launch.assert_awaited_once_with(
         headless=True,
         timeout=30_000,
         args=[],
         proxy=None,
+        channel=None,
+        executable_path=None,
     )
+
+
+@pytest.mark.asyncio
+async def test_driver_selects_browser_type_channel_and_executable() -> None:
+    native_browser = MagicMock()
+    starter, playwright = fake_playwright(native_browser)
+    playwright.firefox.launch = AsyncMock(return_value=native_browser)
+    driver = PlaywrightDriver(
+        browser_type="firefox",
+        channel="beta",
+        executable_path=Path("/opt/firefox"),
+    )
+
+    with patch(
+        "silk.browsers.drivers.playwright.async_playwright",
+        return_value=starter,
+    ):
+        browser = await driver.launch(BrowserOptions())
+
+    assert browser._native is native_browser
+    playwright.chromium.launch.assert_not_awaited()
+    playwright.firefox.launch.assert_awaited_once_with(
+        headless=True,
+        timeout=30_000,
+        args=[],
+        proxy=None,
+        channel="beta",
+        executable_path=Path("/opt/firefox"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_driver_loads_a_playwright_compatible_package() -> None:
+    native_browser = MagicMock()
+    starter, playwright = fake_playwright(native_browser)
+    fork = SimpleNamespace(async_playwright=MagicMock(return_value=starter))
+
+    with (
+        patch(
+            "silk.browsers.drivers.playwright.import_module",
+            return_value=fork,
+        ) as import_module,
+        patch("silk.browsers.drivers.playwright.async_playwright") as default,
+    ):
+        browser = await PlaywrightDriver(package="patchright").launch(BrowserOptions())
+
+    import_module.assert_called_once_with("patchright.async_api")
+    default.assert_not_called()
+    assert browser._native is native_browser
+    assert browser._playwright is playwright
 
 
 @pytest.mark.asyncio
@@ -76,7 +132,7 @@ async def test_failed_launch_stops_playwright_and_raises_the_cause() -> None:
         ),
         pytest.raises(RuntimeError) as raised,
     ):
-        await PlaywrightBrowser.launch(BrowserOptions())
+        await PlaywrightDriver().launch(BrowserOptions())
 
     assert raised.value is cause
     playwright.stop.assert_awaited_once_with()

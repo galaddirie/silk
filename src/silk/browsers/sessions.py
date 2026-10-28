@@ -9,13 +9,15 @@ from typing import Self, TypeVar
 
 from fp_ops import Environment
 
-from silk.browsers.drivers.playwright import PlaywrightBrowser
+from silk.browsers.drivers.playwright import PlaywrightDriver
 from silk.browsers.models import (
     BROWSER,
     Browser,
     BrowserContext,
     BrowserContextOptions,
+    BrowserDriver,
     BrowserOptions,
+    LaunchedBrowser,
     Page,
 )
 
@@ -37,6 +39,9 @@ class BrowserSession:
 
     Closing the session closes the browser, which closes every context and
     page opened in it.
+
+    ``driver`` launches the browser; it defaults to Chromium through
+    :class:`~silk.browsers.drivers.PlaywrightDriver`.
     """
 
     def __init__(
@@ -44,10 +49,12 @@ class BrowserSession:
         options: BrowserOptions | None = None,
         *,
         context_options: BrowserContextOptions | None = None,
+        driver: BrowserDriver | None = None,
     ) -> None:
         self._options = options if options is not None else BrowserOptions()
         self._context_options = context_options
-        self._browser: PlaywrightBrowser | None = None
+        self._driver = driver if driver is not None else PlaywrightDriver()
+        self._browser: LaunchedBrowser | None = None
         self._context: BrowserContext | None = None
         self._page: Page | None = None
 
@@ -76,7 +83,7 @@ class BrowserSession:
 
         if self._browser is not None:
             raise RuntimeError("browser session is already started")
-        browser = await PlaywrightBrowser.launch(self._options)
+        browser = await self._driver.launch(self._options)
         try:
             context = await browser.new_context(self._context_options)
             if context.is_error():
