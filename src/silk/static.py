@@ -207,9 +207,9 @@ def _compile_css(selector: str, css: str) -> Result[_Query, Exception]:
 def _compile(selector: str) -> Result[_Query, Exception]:
     stripped = selector.strip()
     if stripped.startswith("xpath="):
-        return Ok(_XPathQuery(stripped[len("xpath=") :].strip()))
+        return Ok(_XPathQuery(stripped.removeprefix("xpath=").strip()))
     if stripped.startswith("css="):
-        return _compile_css(selector, stripped[len("css=") :])
+        return _compile_css(selector, stripped.removeprefix("css="))
     if stripped.startswith(("//", "..")):
         return Ok(_XPathQuery(stripped))
     if stripped.startswith(("'", '"')):
@@ -1068,7 +1068,7 @@ def decode_body(body: bytes, headers: Mapping[str, str]) -> str:
     become U+FFFD."""
 
     if body.startswith(codecs.BOM_UTF8):
-        return body[len(codecs.BOM_UTF8) :].decode("utf-8", "replace")
+        return body.removeprefix(codecs.BOM_UTF8).decode("utf-8", "replace")
     encoding = _content_type_charset(headers)
     if encoding is None:
         meta = _META_CHARSET.search(body[:1024])

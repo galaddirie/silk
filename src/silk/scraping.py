@@ -74,7 +74,9 @@ def in_new_page(
     keep: Operation[str, str] = identity()
     new_context: Operation[object, BrowserContext] = constant(None) >> CreateContext(_)
     url_of: Operation[tuple[str, BrowserContext], str] = operation(_first)
-    context_of: Operation[tuple[str, BrowserContext], BrowserContext] = operation(_second)
+    context_of: Operation[tuple[str, BrowserContext], BrowserContext] = operation(
+        _second
+    )
     return bracket(
         keep & new_context,
         provide(CONTEXT, context_of, url_of >> page_scope),
@@ -110,7 +112,9 @@ def await_change(
     """
 
     if timeout_ms < 0 or interval_ms < 1 or attempts < 1:
-        raise ValueError("await_change needs timeout_ms >= 0, interval_ms >= 1, attempts >= 1")
+        raise ValueError(
+            "await_change needs timeout_ms >= 0, interval_ms >= 1, attempts >= 1"
+        )
 
     before = EnvKey("silk.await_change.before", _Observed)
     keep: Operation[S, S] = identity()

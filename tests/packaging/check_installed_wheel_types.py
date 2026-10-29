@@ -16,6 +16,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKER_REQUIREMENTS = ("mypy==1.15.0", "pyright==1.1.411")
+# The copied consumers include fixtures for the optional ``silk.http`` and
+# ``silk.static`` modules, so install the wheel the way their users would.
+WHEEL_EXTRAS = ("httpx", "static")
 PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
 PYRIGHT_CONFIG = {
     "include": ["consumer"],
@@ -159,7 +162,7 @@ def check_installed_wheel(wheel: Path) -> None:
                 "install",
                 "--disable-pip-version-check",
                 "--quiet",
-                str(resolved_wheel),
+                f"silk-scraper[{','.join(WHEEL_EXTRAS)}] @ {resolved_wheel.as_uri()}",
                 *CHECKER_REQUIREMENTS,
             ),
             cwd=sandbox,

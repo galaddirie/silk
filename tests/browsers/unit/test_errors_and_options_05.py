@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from playwright.async_api import Error as PlaywrightError
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import (
+    Error as PlaywrightError,
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 from silk.actions.input import ClickOptions
 from silk.browsers.drivers.playwright import translate_error
@@ -38,14 +40,18 @@ def test_playwright_errors_translate_and_keep_the_cause() -> None:
     generic = translate_error(PlaywrightError("boom"))
     assert type(generic) is BrowserError
 
-    navigation = translate_error(PlaywrightError("refused"), navigation_url="https://x.test")
+    navigation = translate_error(
+        PlaywrightError("refused"), navigation_url="https://x.test"
+    )
     assert isinstance(navigation, NavigationError)
     assert navigation.url == "https://x.test"
 
 
 def test_fork_errors_translate_by_class_name() -> None:
     assert isinstance(translate_error(fork_error("TimeoutError")), BrowserTimeoutError)
-    assert isinstance(translate_error(fork_error("TargetClosedError")), TargetClosedError)
+    assert isinstance(
+        translate_error(fork_error("TargetClosedError")), TargetClosedError
+    )
     assert type(translate_error(fork_error("Error"))) is BrowserError
 
 

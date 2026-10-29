@@ -40,9 +40,6 @@ def templates() -> None:
     assert_type(FetchJson(_), Operation[HttpRequest | str, object])
     assert_type(FetchJson(_).map(item_id), Operation[HttpRequest | str, int])
 
-    _by_url: Operation[str, HttpResponse] = Fetch(_)
-    _by_request: Operation[HttpRequest, HttpResponse] = Fetch(_)
-
     resilient = retry(Fetch(_), attempts=3, on=HttpStatusError)
     assert_type(resilient, Operation[HttpRequest | str, HttpResponse])
 
@@ -94,3 +91,8 @@ async def values(client: HttpClient) -> None:
     assert_type(error.status, int)
     browser_error: BrowserError = error
     assert isinstance(browser_error, BrowserError)
+
+
+# A bare URL or a full request can be the operation's input.
+by_url: Operation[str, HttpResponse] = Fetch(_)
+by_request: Operation[HttpRequest, HttpResponse] = Fetch(_)

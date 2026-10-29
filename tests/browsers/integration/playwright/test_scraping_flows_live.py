@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import threading
 from collections.abc import Iterator
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from html import escape
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote
 
 import pytest
@@ -68,7 +68,9 @@ class _Site(BaseHTTPRequestHandler):
             content_type = "text/html"
         else:
             body = b""
-            content_type = "image/png" if self.path.endswith(".png") else "text/javascript"
+            content_type = (
+                "image/png" if self.path.endswith(".png") else "text/javascript"
+            )
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
@@ -91,7 +93,9 @@ def site() -> Iterator[str]:
         server.shutdown()
 
 
-async def test_native_failures_become_silk_errors(browser_session: BrowserSession) -> None:
+async def test_native_failures_become_silk_errors(
+    browser_session: BrowserSession,
+) -> None:
     page = browser_session.page
     refused = await Navigate(_, "http://127.0.0.1:9/").run(page)
     assert isinstance(refused.error, NavigationError)
@@ -99,9 +103,9 @@ async def test_native_failures_become_silk_errors(browser_session: BrowserSessio
     assert refused.error.__cause__ is not None
 
     await Navigate(_, html("<p>x</p>")).run(page)
-    waited = await WaitForElement(
-        "#never", _, options=WaitOptions(timeout=100)
-    ).run(page)
+    waited = await WaitForElement("#never", _, options=WaitOptions(timeout=100)).run(
+        page
+    )
     assert isinstance(waited.error, BrowserTimeoutError)
 
 
@@ -151,7 +155,9 @@ async def test_self_optional_and_owner_page(browser_session: BrowserSession) -> 
     on_page = await GetText(SELF, _).run(page)
     assert isinstance(on_page.error, TypeError)
 
-    owner = await (QueryAll("li", _).map(lambda items: items[0]) >> OwnerPage(_)).run(page)
+    owner = await (QueryAll("li", _).map(lambda items: items[0]) >> OwnerPage(_)).run(
+        page
+    )
     assert owner.ok is page
 
 
@@ -183,14 +189,14 @@ async def test_frames_and_positional_clicks(browser_session: BrowserSession) -> 
         "style='width:120px;height:40px'>press</button>",
         quote=True,
     )
-    await Navigate(_, html(f"<iframe id=f srcdoc=\"{inner}\"></iframe>")).run(page)
+    await Navigate(_, html(f'<iframe id=f srcdoc="{inner}"></iframe>')).run(page)
     await asyncio.sleep(0.2)
 
     frame = await ContentFrame("#f", _).run(page)
     assert frame.is_ok()
-    clicked = await Click(
-        "#b", _, options=ClickOptions(position=(10, 10))
-    ).run(frame.ok)
+    clicked = await Click("#b", _, options=ClickOptions(position=(10, 10))).run(
+        frame.ok
+    )
     assert clicked.is_ok()
     assert (await GetText("#b", _).run(frame.ok)).ok == "clicked"
 
@@ -199,13 +205,15 @@ async def test_frames_and_positional_clicks(browser_session: BrowserSession) -> 
 
 
 CLICK_PAGE = html(
-    "<p id=count>0</p><button id=next onclick=\"setTimeout(() => {"
+    '<p id=count>0</p><button id=next onclick="setTimeout(() => {'
     "const c = document.querySelector('#count'); c.textContent = +c.textContent + 1"
-    "}, DELAY)\">next</button>"
+    '}, DELAY)">next</button>'
 )
 
 
-async def test_await_change_waits_for_the_dom_swap(browser_session: BrowserSession) -> None:
+async def test_await_change_waits_for_the_dom_swap(
+    browser_session: BrowserSession,
+) -> None:
     page = browser_session.page
     await Navigate(_, CLICK_PAGE.replace("DELAY", "150")).run(page)
 
@@ -251,7 +259,9 @@ async def test_in_new_page_always_closes_pages(browser_session: BrowserSession) 
     from fp_ops import operation
 
     failing = in_new_page(GetText("h1", _) >> operation(slow_or_fail))
-    outcome = await traverse_parallel(failing, limit=4).run(urls, environment=environment)
+    outcome = await traverse_parallel(failing, limit=4).run(
+        urls, environment=environment
+    )
     assert outcome.is_error()
     assert len((await context.pages()).ok) == 1
 

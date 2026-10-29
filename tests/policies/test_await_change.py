@@ -22,7 +22,10 @@ class Board:
 
     def probe(self, _state: object) -> int:
         self.reads += 1
-        if self.reveal_after_reads is not None and self.reads >= self.reveal_after_reads:
+        if (
+            self.reveal_after_reads is not None
+            and self.reads >= self.reveal_after_reads
+        ):
             self.value = 1
         return self.value
 
@@ -31,7 +34,10 @@ class Board:
 async def test_change_ends_the_wait() -> None:
     board = Board(reveal_after_reads=4)
     waited = await_change(
-        operation(board.act), probe=operation(board.probe), timeout_ms=100, interval_ms=1
+        operation(board.act),
+        probe=operation(board.probe),
+        timeout_ms=100,
+        interval_ms=1,
     )
     assert (await waited.run("page")).ok == "page"
     assert board.actions == 1

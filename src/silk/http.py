@@ -44,8 +44,16 @@ if TYPE_CHECKING:
     import httpx
 
 ParamValue = str | int | float | bool | None
-_EMPTY_PARAMS: Mapping[str, ParamValue] = MappingProxyType({})
-_EMPTY_HEADERS: Mapping[str, str] = MappingProxyType({})
+
+
+def _empty_params() -> Mapping[str, ParamValue]:
+    return MappingProxyType({})
+
+
+def _empty_headers() -> Mapping[str, str]:
+    return MappingProxyType({})
+
+
 _SUCCESS = range(200, 300)
 
 
@@ -66,8 +74,8 @@ class HttpRequest:
 
     url: str
     method: str = "GET"
-    params: Mapping[str, ParamValue] = field(default=_EMPTY_PARAMS)
-    headers: Mapping[str, str] = field(default=_EMPTY_HEADERS)
+    params: Mapping[str, ParamValue] = field(default_factory=_empty_params)
+    headers: Mapping[str, str] = field(default_factory=_empty_headers)
     body: bytes | None = None
     timeout_ms: int | None = None
 
@@ -117,7 +125,7 @@ class HttpResponse:
 
     url: str
     status: int
-    headers: Mapping[str, str] = field(default=_EMPTY_HEADERS)
+    headers: Mapping[str, str] = field(default_factory=_empty_headers)
     body: bytes = b""
 
     def __post_init__(self) -> None:
