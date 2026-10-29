@@ -8,6 +8,18 @@
 
 ### Changed
 
+## [0.5.1] - 2026-10-29
+
+0.5.0 was tagged but never published to PyPI (its release gate failed);
+0.5.1 is the first published release of the 0.5 line. It includes every
+0.5.0 change listed below.
+
+### Fixed
+- `silk.http` failed to import on Python 3.11 (a `MappingProxyType` dataclass
+  default), which also broke `BrowserSession.environment` there.
+- The installed-wheel type gate installs the `httpx` and `static` extras its
+  consumer fixtures use.
+
 ## [0.5.0] - 2026-10-29
 
 Built on FP-Ops 0.5 (`loop`, `bracket`, `provide`, `derive`, `on=` filters).
