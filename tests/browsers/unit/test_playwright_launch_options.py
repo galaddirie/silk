@@ -154,3 +154,80 @@ async def test_close_stops_playwright_even_if_browser_close_fails() -> None:
     assert raised.value is cause
     native_browser.close.assert_awaited_once_with()
     playwright.stop.assert_awaited_once_with()
+
+
+CDP_URL = "wss://browser.test/devtools?token=secret"
+
+
+@pytest.mark.asyncio
+async def test_cdp_url_connects_instead_of_launching() -> None:
+    native_browser = MagicMock()
+    starter, playwright = fake_playwright(MagicMock())
+    playwright.chromium.connect_over_cdp = AsyncMock(return_value=native_browser)
+
+    with patch(
+        "silk.browsers.drivers.playwright.async_playwright",
+        return_value=starter,
+    ):
+        browser = await PlaywrightDriver(cdp_url=CDP_URL).launch(
+            BrowserOptions(headless=False, timeout=4_321, args=("--ignored",))
+        )
+
+    playwright.chromium.launch.assert_not_awaited()
+    playwright.chromium.connect_over_cdp.assert_awaited_once_with(
+        CDP_URL, timeout=4_321
+    )
+    assert browser._native is native_browser
+    assert browser._adopt_default_context
+
+
+@pytest.mark.asyncio
+async def test_failed_cdp_connect_stops_playwright_and_raises_the_cause() -> None:
+    cause = RuntimeError("connect failed")
+    starter, playwright = fake_playwright(MagicMock())
+    playwright.chromium.connect_over_cdp = AsyncMock(side_effect=cause)
+
+    with (
+        patch(
+            "silk.browsers.drivers.playwright.async_playwright",
+            return_value=starter,
+        ),
+        pytest.raises(RuntimeError) as raised,
+    ):
+        await PlaywrightDriver(cdp_url=CDP_URL).launch(BrowserOptions())
+
+    assert raised.value is cause
+    playwright.stop.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_cdp_url_rejects_a_launch_proxy_before_starting_playwright() -> None:
+    starter, _ = fake_playwright(MagicMock())
+
+    with (
+        patch(
+            "silk.browsers.drivers.playwright.async_playwright",
+            return_value=starter,
+        ),
+        pytest.raises(ValueError, match="proxy"),
+    ):
+        await PlaywrightDriver(cdp_url=CDP_URL).launch(
+            BrowserOptions(proxy=BrowserProxy(server="http://proxy.test:8080"))
+        )
+
+    starter.start.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"browser_type": "firefox"},
+        {"channel": "chrome"},
+        {"executable_path": Path("/opt/chrome")},
+    ],
+)
+def test_cdp_url_rejects_launch_only_driver_settings(
+    settings: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="cdp_url"):
+        PlaywrightDriver(cdp_url=CDP_URL, **settings)  # type: ignore[arg-type]

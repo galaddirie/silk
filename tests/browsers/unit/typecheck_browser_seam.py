@@ -108,6 +108,9 @@ def session_selects_and_owns_its_adapter() -> None:
     )
     _ = BrowserSession(driver=PlaywrightDriver(package="patchright", channel="chrome"))
     _ = BrowserSession(driver=PlaywrightDriver(browser_type="firefox"))
+    _ = BrowserSession(
+        driver=PlaywrightDriver(package="patchright", cdp_url="ws://127.0.0.1:9222")
+    )
 
 
 class ReusedBrowserDriver(BrowserDriver):

@@ -733,13 +733,76 @@ def _blocking_handler(blocking: RequestBlocking) -> Callable[[Route], Awaitable[
     return handle
 
 
-class PlaywrightBrowser(LaunchedBrowser):
-    """A launched browser process. Owned and closed by a ``BrowserSession``."""
+async def _prepare_context(
+    native: PWBrowserContext,
+    options: BrowserContextOptions,
+) -> Result[None, Exception]:
+    """Apply the options that can be set on any context: timeouts and blocking."""
 
-    def __init__(self, playwright: Playwright, native: PWBrowser) -> None:
+    if options.timeout is not None:
+        native.set_default_timeout(options.timeout)
+    if options.navigation_timeout is not None:
+        native.set_default_navigation_timeout(options.navigation_timeout)
+    if options.blocking is not None:
+        routed = await _attempt(
+            native.route("**/*", _blocking_handler(options.blocking))
+        )
+        if routed.is_error():
+            return Error(routed.error)
+    return Ok(None)
+
+
+_DEFAULT_CONTEXT_OPTIONS = BrowserContextOptions()
+
+
+def _unsupported_on_default_context(options: BrowserContextOptions) -> list[str]:
+    """Options that only apply when a context is created, so an existing
+    (default) context cannot honour them."""
+
+    defaults = _DEFAULT_CONTEXT_OPTIONS
+    return [
+        name
+        for name, value, default in (
+            ("viewport", options.viewport, defaults.viewport),
+            ("user_agent", options.user_agent, defaults.user_agent),
+            ("proxy", options.proxy, defaults.proxy),
+            ("locale", options.locale, defaults.locale),
+            ("timezone_id", options.timezone_id, defaults.timezone_id),
+            (
+                "ignore_https_errors",
+                options.ignore_https_errors,
+                defaults.ignore_https_errors,
+            ),
+            (
+                "java_script_enabled",
+                options.java_script_enabled,
+                defaults.java_script_enabled,
+            ),
+        )
+        if value != default
+    ]
+
+
+class PlaywrightBrowser(LaunchedBrowser):
+    """A launched (or connected) browser. Owned and closed by a ``BrowserSession``.
+
+    With ``adopt_default_context``, the first :meth:`new_context` returns the
+    browser's existing default context instead of creating one. A browser
+    connected over CDP keeps its provider's fingerprint, extensions, and
+    profile in that context.
+    """
+
+    def __init__(
+        self,
+        playwright: Playwright,
+        native: PWBrowser,
+        *,
+        adopt_default_context: bool = False,
+    ) -> None:
         self._playwright = playwright
         self._native = native
         self._closed = False
+        self._adopt_default_context = adopt_default_context
 
     @property
     def native(self) -> PWBrowser:
@@ -754,6 +817,9 @@ class PlaywrightBrowser(LaunchedBrowser):
         if self._closed:
             return Error(RuntimeError("browser is closed"))
         configured = options if options is not None else BrowserContextOptions()
+        if self._adopt_default_context and self._native.contexts:
+            self._adopt_default_context = False
+            return await self._adopt(self._native.contexts[0], configured)
         viewport: ViewportSize | None = None
         if configured.viewport is not None:
             viewport = {
@@ -781,17 +847,40 @@ class PlaywrightBrowser(LaunchedBrowser):
         if created.is_error():
             return Error(created.error)
         native = created.ok
-        if configured.timeout is not None:
-            native.set_default_timeout(configured.timeout)
-        if configured.navigation_timeout is not None:
-            native.set_default_navigation_timeout(configured.navigation_timeout)
-        if configured.blocking is not None:
-            routed = await _attempt(
-                native.route("**/*", _blocking_handler(configured.blocking))
+        prepared = await _prepare_context(native, configured)
+        if prepared.is_error():
+            await _native_attempt(native.close())
+            return Error(prepared.error)
+        return Ok(PlaywrightBrowserContext(native))
+
+    async def _adopt(
+        self,
+        native: PWBrowserContext,
+        options: BrowserContextOptions,
+    ) -> Result[BrowserContext, Exception]:
+        unsupported = _unsupported_on_default_context(options)
+        if unsupported:
+            return Error(
+                ValueError(
+                    "the default context of a connected browser already exists; "
+                    f"configure {', '.join(unsupported)} where it was launched"
+                )
             )
-            if routed.is_error():
-                await _native_attempt(native.close())
-                return Error(routed.error)
+        if options.permissions is not None:
+            granted = await _attempt(
+                native.grant_permissions(list(options.permissions))
+            )
+            if granted.is_error():
+                return Error(granted.error)
+        if options.extra_http_headers is not None:
+            headers = await _attempt(
+                native.set_extra_http_headers(dict(options.extra_http_headers))
+            )
+            if headers.is_error():
+                return Error(headers.error)
+        prepared = await _prepare_context(native, options)
+        if prepared.is_error():
+            return Error(prepared.error)
         return Ok(PlaywrightBrowserContext(native))
 
     async def close(self) -> None:
@@ -817,14 +906,39 @@ class PlaywrightDriver(BrowserDriver):
 
     ``channel`` selects a branded build (``"chrome"``, ``"msedge"``) and
     ``executable_path`` a specific browser binary.
+
+    ``cdp_url`` connects to a Chromium that is already running, such as a
+    cloud browser, over the Chrome DevTools Protocol instead of launching
+    one::
+
+        PlaywrightDriver(package="patchright", cdp_url=session.ws_endpoint)
+
+    The remote browser was configured where it was started, so
+    ``BrowserOptions.headless``, ``args``, and ``proxy`` do not apply, and the
+    session's first context is the browser's existing default context.
+    Closing the session disconnects; stopping the remote browser is up to
+    whoever started it.
     """
 
     package: str = "playwright"
     browser_type: BrowserTypeLiteral = "chromium"
     channel: str | None = None
     executable_path: Path | None = None
+    cdp_url: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.cdp_url is None:
+            return
+        if self.browser_type != "chromium":
+            raise ValueError("cdp_url requires browser_type='chromium'")
+        if self.channel is not None or self.executable_path is not None:
+            raise ValueError(
+                "cdp_url connects to a running browser; omit channel and executable_path"
+            )
 
     async def launch(self, options: BrowserOptions) -> PlaywrightBrowser:
+        if self.cdp_url is not None:
+            return await self._connect(self.cdp_url, options)
         playwright = await self._async_playwright()().start()
         try:
             browser_types = {
@@ -844,6 +958,25 @@ class PlaywrightDriver(BrowserDriver):
             await playwright.stop()
             raise
         return PlaywrightBrowser(playwright, native)
+
+    async def _connect(
+        self, cdp_url: str, options: BrowserOptions
+    ) -> PlaywrightBrowser:
+        if options.proxy is not None:
+            raise ValueError(
+                "a browser connected over CDP is not launched here; "
+                "configure its proxy where it was started, or per context"
+            )
+        playwright = await self._async_playwright()().start()
+        try:
+            native = await playwright.chromium.connect_over_cdp(
+                cdp_url,
+                timeout=options.timeout,
+            )
+        except BaseException:
+            await playwright.stop()
+            raise
+        return PlaywrightBrowser(playwright, native, adopt_default_context=True)
 
     def _async_playwright(self) -> Callable[[], _PlaywrightStarter]:
         if self.package == "playwright":

@@ -105,3 +105,61 @@ def test_context_options_are_frozen_and_copy_headers() -> None:
     with pytest.raises(TypeError):
         options.extra_http_headers["x-silk"] = "changed"  # type: ignore[index]
     assert dict(options.extra_http_headers or {}) == {"x-silk": "original"}
+
+
+def connected_browser(*contexts: MagicMock) -> tuple[PlaywrightBrowser, MagicMock]:
+    browser = MagicMock(spec=Browser)
+    browser.contexts = list(contexts)
+    browser.new_context = AsyncMock(return_value=MagicMock(spec=PWBrowserContext))
+    return PlaywrightBrowser(MagicMock(), browser, adopt_default_context=True), browser
+
+
+@pytest.mark.asyncio
+async def test_connected_browser_adopts_its_default_context_once() -> None:
+    default = MagicMock(spec=PWBrowserContext)
+    driver, browser = connected_browser(default)
+    options = BrowserContextOptions(
+        permissions=("geolocation",),
+        extra_http_headers={"x-silk": "1"},
+        timeout=321,
+        navigation_timeout=654,
+    )
+
+    first = await driver.new_context(options)
+    second = await driver.new_context(options)
+
+    assert first.is_ok() and second.is_ok()
+    assert first.ok.native is default  # type: ignore[attr-defined]
+    default.grant_permissions.assert_awaited_once_with(["geolocation"])
+    default.set_extra_http_headers.assert_awaited_once_with({"x-silk": "1"})
+    default.set_default_timeout.assert_called_once_with(321)
+    default.set_default_navigation_timeout.assert_called_once_with(654)
+    browser.new_context.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_connected_browser_without_contexts_creates_one() -> None:
+    driver, browser = connected_browser()
+
+    outcome = await driver.new_context()
+
+    assert outcome.is_ok()
+    browser.new_context.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_default_context_rejects_creation_only_options() -> None:
+    default = MagicMock(spec=PWBrowserContext)
+    driver, browser = connected_browser(default)
+
+    outcome = await driver.new_context(
+        BrowserContextOptions(
+            viewport=BrowserViewport(width=800, height=600), locale="fr-CA"
+        )
+    )
+
+    assert outcome.is_error()
+    assert isinstance(outcome.error, ValueError)
+    assert "viewport, locale" in str(outcome.error)
+    default.close.assert_not_called()
+    browser.new_context.assert_not_called()
