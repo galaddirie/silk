@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## [0.5.2] - 2026-10-29
+
+### Added
 - `PlaywrightDriver(cdp_url=...)` connects to a Chromium that is already
   running (a cloud browser such as Hyperbrowser or Browserless, or a local
   `--remote-debugging-port`) over the DevTools Protocol instead of launching
@@ -12,10 +20,6 @@
   rejected there, while timeouts, request blocking, permissions, and extra
   headers still apply. Closing the session disconnects without stopping the
   remote browser.
-
-### Fixed
-
-### Changed
 
 ## [0.5.1] - 2026-10-29
 

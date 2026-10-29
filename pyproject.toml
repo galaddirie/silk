@@ -1,6 +1,6 @@
 [project]
 name = "silk-scraper"
-version = "0.5.1"
+version = "0.5.2"
 description = "Typed Playwright browser automation built on FP-Ops unary pipelines"
 authors = [
     {name = "Galad Dirie", email = "hello@galad.ca"}
