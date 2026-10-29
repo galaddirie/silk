@@ -139,6 +139,7 @@ async def test_public_click_and_double_click_map_every_native_option() -> None:
         timeout=321,
         force=True,
         modifiers=["Alt", "Meta"],
+        position=None,
     )
     native.dblclick.assert_awaited_once_with(
         button="middle",

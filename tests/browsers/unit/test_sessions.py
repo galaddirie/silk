@@ -7,6 +7,7 @@ from fp_ops import Error, Ok, operation
 
 from silk.browsers import (
     BROWSER,
+    CONTEXT,
     BrowserContext,
     BrowserContextOptions,
     BrowserDriver,
@@ -14,6 +15,7 @@ from silk.browsers import (
     BrowserSession,
     LaunchedBrowser,
     Page,
+    SessionBrowser,
 )
 from silk.browsers.drivers import PlaywrightDriver
 
@@ -50,7 +52,8 @@ async def test_session_launches_through_a_custom_driver(browser_harness):
     async with BrowserSession(options, driver=driver) as session:
         assert session.page is page
         assert session.context is context
-        assert session.environment.require(BROWSER) is browser
+        assert session.environment.require(BROWSER) is session.browser
+        assert session.environment.require(CONTEXT) is context
 
     assert driver.launched_with == [options]
     default_launch.assert_not_awaited()
@@ -79,8 +82,9 @@ async def test_started_session_exposes_page_context_and_environment(
     assert session.is_started
     assert session.page is page
     assert session.context is context
-    assert session.browser is browser
-    assert session.environment.require(BROWSER) is browser
+    assert isinstance(session.browser, SessionBrowser)
+    assert session.environment.require(BROWSER) is session.browser
+    assert session.environment.require(CONTEXT) is context
     launch.assert_awaited_once()
     assert launch.await_args.args[-1] is options
     browser.new_context.assert_awaited_once_with(context_options)

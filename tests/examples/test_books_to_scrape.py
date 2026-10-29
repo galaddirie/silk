@@ -88,3 +88,13 @@ async def test_browser_error_survives_traversal_and_book_construction() -> None:
     assert build_error.cause is browser_error
     assert build_error.__cause__ is browser_error
     element.text.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_catalogue_crawl_follows_next_links_across_pages() -> None:
+    books = await books_example.scrape_catalogue(max_pages=3)
+
+    assert len(books) == 60
+    assert books[0].title == "A Light in the Attic"
+    assert books[20].title == "In Her Wake"
+    assert len({book.title for book in books}) == 60

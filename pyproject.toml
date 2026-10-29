@@ -20,10 +20,14 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: Browsers",
 ]
 dependencies = [
-    "fp-ops (>=0.4.0,<0.5.0)",
+    "fp-ops (>=0.5.0,<0.6.0)",
     "playwright (>=1.61.0,<2.0.0)",
     "typing-extensions (>=4.12.0,<5.0.0)",
 ]
+
+[project.optional-dependencies]
+httpx = ["httpx (>=0.27,<1.0)"]
+static = ["lxml (>=5.2,<7.0)", "cssselect (>=1.2,<2.0)"]
 
 [project.urls]
 "Homepage" = "https://github.com/galaddirie/silk"
@@ -36,6 +40,11 @@ mypy = "^1.15.0"
 pyright = "1.1.411"
 black = "25.1.0"
 pre-commit = "4.2.0"
+httpx = ">=0.27,<1.0"
+isort = ">=6.0.1"
+lxml = ">=5.2"
+cssselect = ">=1.2"
+types-lxml = ">=2025.3"
 
 [tool.poetry]
 packages = [

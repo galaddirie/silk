@@ -9,18 +9,18 @@ from typing import TypeAlias
 
 from fp_ops import Error, Ok, Result
 
-from silk.browsers.models import ElementHandle, Page
+from silk.browsers.models import ElementHandle, Frame, Page
 from silk.errors import ElementNotFoundError, SelectorReference
 from silk.selectors.selector import Selector, SelectorGroup, SelectorType
 
 Element: TypeAlias = ElementHandle
 SelectorInput: TypeAlias = str | Selector | SelectorGroup
-WaitSelectorInput: TypeAlias = str | Selector
+WaitSelectorInput: TypeAlias = str | Selector | SelectorGroup
 ElementTarget: TypeAlias = SelectorInput | Element
 
 
-ElementScope: TypeAlias = Page | Element
-WaitPage: TypeAlias = Page
+ElementScope: TypeAlias = Page | Frame | Element
+WaitPage: TypeAlias = Page | Frame
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +67,8 @@ def _compile_selector(selector_type: SelectorType, value: str) -> str:
         return value
     if selector_type is SelectorType.LINK_TEXT:
         return f"a:text-is({_quoted_css_value(value)})"
+    if selector_type is SelectorType.SELF:
+        return ":scope"
     raise ValueError(f"unsupported selector type: {selector_type!r}")
 
 
@@ -100,16 +102,12 @@ def snapshot_selector(selector: SelectorInput) -> SelectorPlan:
     )
 
 
-def snapshot_wait_selector(selector: WaitSelectorInput) -> SelectorStep:
-    """Compile one wait selector; selector groups have no coherent wait policy."""
-
-    if isinstance(selector, str):
-        return SelectorStep(
-            type=SelectorType.CSS,
-            value=selector,
-            query=selector,
-        )
-    return _snapshot_step(selector)
+def _self_scope(scope: ElementScope) -> Result[Element, Exception]:
+    if isinstance(scope, ElementHandle):
+        return Ok(scope)
+    return Error(
+        TypeError("SELF selects the scope element; the scope is not an element")
+    )
 
 
 async def query_one(
@@ -119,6 +117,8 @@ async def query_one(
     """Resolve the first present selector without treating errors as absence."""
 
     for selector in plan.selectors:
+        if selector.type is SelectorType.SELF:
+            return _self_scope(scope).map(lambda element: element)
         result = await scope.query_selector(selector.query)
         if result.is_error():
             return Error(result.error)
@@ -170,6 +170,8 @@ async def query_many(
     """Resolve the first non-empty selector into an explicit focus list."""
 
     for selector in plan.selectors:
+        if selector.type is SelectorType.SELF:
+            return _self_scope(scope).map(lambda element: [element])
         result = await scope.query_selector_all(selector.query)
         if result.is_error():
             return Error(result.error)
@@ -193,6 +195,5 @@ __all__ = [
     "require_one",
     "require_target",
     "snapshot_selector",
-    "snapshot_wait_selector",
     "target_reference",
 ]

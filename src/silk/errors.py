@@ -11,7 +11,15 @@ def _describe_selector(selector: SelectorReference) -> str:
     return "(" + ", ".join(repr(value) for value in selector) + ")"
 
 
-class ElementNotFoundError(LookupError):
+class NotFoundError(LookupError):
+    """A lookup succeeded and found nothing.
+
+    Raised only after the browser answered, so ``optional`` can turn exactly
+    these into ``None`` while real browser failures stay errors.
+    """
+
+
+class ElementNotFoundError(NotFoundError):
     """No element matched a configured selector or selector fallback group."""
 
     def __init__(self, selector: SelectorReference) -> None:
@@ -22,7 +30,7 @@ class ElementNotFoundError(LookupError):
         return f"element not found for selector {_describe_selector(self.selector)}"
 
 
-class AttributeNotFoundError(LookupError):
+class AttributeNotFoundError(NotFoundError):
     """A required attribute was absent from the selected element."""
 
     def __init__(self, selector: SelectorReference, attribute: str) -> None:
@@ -35,6 +43,38 @@ class AttributeNotFoundError(LookupError):
             f"attribute {self.attribute!r} not found on selector "
             f"{_describe_selector(self.selector)}"
         )
+
+
+class BrowserError(Exception):
+    """A failure reported by the browser backend; the native error is ``__cause__``."""
+
+
+class BrowserTimeoutError(BrowserError, TimeoutError):
+    """A browser operation timed out."""
+
+
+class NavigationError(BrowserError):
+    """Navigation failed for a reason other than a timeout."""
+
+    def __init__(self, message: str, url: str | None = None) -> None:
+        self.message = message
+        self.url = url
+        super().__init__(message, url)
+
+    def __str__(self) -> str:
+        return self.message
+
+
+class TargetClosedError(BrowserError):
+    """The page, context, or browser was closed while being used."""
+
+
+class UnsupportedOperationError(BrowserError):
+    """The backend cannot perform this operation (e.g. clicking a static page)."""
+
+
+class ChangeTimeoutError(BrowserTimeoutError):
+    """An action did not change what ``await_change`` was watching in time."""
 
 
 class DragElementMismatchError(ValueError):
@@ -52,7 +92,7 @@ class DragElementMismatchError(ValueError):
         )
 
 
-class PageNotFoundError(LookupError):
+class PageNotFoundError(NotFoundError):
     """A successfully inspected browser context lacks a requested page."""
 
     def __init__(self, page_id: str, context_id: str) -> None:
@@ -69,8 +109,15 @@ class PageNotFoundError(LookupError):
 
 __all__ = [
     "AttributeNotFoundError",
+    "BrowserError",
+    "BrowserTimeoutError",
+    "ChangeTimeoutError",
     "DragElementMismatchError",
     "ElementNotFoundError",
+    "NavigationError",
+    "NotFoundError",
     "PageNotFoundError",
     "SelectorReference",
+    "TargetClosedError",
+    "UnsupportedOperationError",
 ]

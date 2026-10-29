@@ -9,6 +9,8 @@ returns it directly.
 
 from __future__ import annotations
 
+import asyncio
+
 from fp_ops import (
     Error,
     Ok,
@@ -17,8 +19,10 @@ from fp_ops import (
     result_operation_template,
 )
 
+from silk.actions.navigation import NavigateOptions
 from silk.browsers.models import (
     BROWSER,
+    CONTEXT,
     Browser,
     BrowserContext,
     BrowserContextOptions,
@@ -29,12 +33,82 @@ from silk.errors import PageNotFoundError
 
 @environment_result_operation_template(BROWSER)
 async def CreateContext(
-    options: BrowserContextOptions,
+    options: BrowserContextOptions | None,
     browser: Browser,
 ) -> Result[BrowserContext, Exception]:
-    """Create a context in the environment's browser."""
+    """Create a context in the environment's browser.
+
+    ``None`` uses the session's context options.
+    """
 
     return await browser.new_context(options)
+
+
+async def _settle(
+    task: asyncio.Future[Result[Page, Exception]],
+) -> Result[Page, Exception] | None:
+    """Wait for ``task`` to finish even while being cancelled; ``None`` if it was."""
+
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            continue
+    if task.cancelled():
+        return None
+    return task.result()
+
+
+async def _close_shielded(page: Page) -> None:
+    closing = asyncio.ensure_future(page.close())
+    while not closing.done():
+        try:
+            await asyncio.shield(closing)
+        except asyncio.CancelledError:
+            continue
+
+
+@environment_result_operation_template(CONTEXT)
+async def OpenPage(
+    url: str,
+    context: BrowserContext,
+    *,
+    options: NavigateOptions | None = None,
+) -> Result[Page, Exception]:
+    """Open a new page in the environment's context and navigate it to ``url``.
+
+    If navigation fails the page is closed before the error is returned, so
+    this is a safe ``bracket`` acquire step (see :func:`silk.scraping.in_new_page`).
+    """
+
+    # Acquire atomically, also under cancellation: a page created or navigating
+    # when the caller is cancelled is closed before the cancellation propagates.
+    creating = asyncio.ensure_future(context.new_page())
+    try:
+        created = await asyncio.shield(creating)
+    except asyncio.CancelledError:
+        orphan = await _settle(creating)
+        if orphan is not None and orphan.is_ok():
+            await _close_shielded(orphan.ok)
+        raise
+    if created.is_error():
+        return Error(created.error)
+    page = created.ok
+    configured = options if options is not None else NavigateOptions()
+    try:
+        navigated = await page.navigate(
+            url,
+            timeout_ms=configured.timeout,
+            wait_until=configured.wait_until,
+            referer=configured.referer,
+        )
+    except BaseException:
+        await _close_shielded(page)
+        raise
+    if navigated.is_error():
+        await page.close()
+        return Error(navigated.error)
+    return Ok(page)
 
 
 @result_operation_template
@@ -97,6 +171,7 @@ __all__ = [
     "ClosePage",
     "CreateContext",
     "NewPage",
+    "OpenPage",
     "PageById",
     "Pages",
 ]

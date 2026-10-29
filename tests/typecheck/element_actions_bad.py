@@ -16,7 +16,6 @@ from silk.actions.elements import (
     WaitForElement as wait_for_element,
     WaitOptions,
 )
-from silk.selectors.selector import SelectorGroup
 
 
 class StructuralLookalikeScope:
@@ -61,8 +60,6 @@ def invalid_template_calls(
     wait_for_element(".ready", scope)
     # typecheck-case: element_actions.010
     wait_for_element(_, _)
-    # typecheck-case: element_actions.011
-    wait_for_element(SelectorGroup("fallback", ".a", ".b"), _)
 
 
 def structural_lookalike_scopes_are_rejected(scope: StructuralLookalikeScope) -> None:

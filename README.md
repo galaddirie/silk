@@ -395,6 +395,131 @@ bargains = prices >> filter_each(under_20)                              # list[f
 `build` constructs any class (dataclasses, Pydantic models, …) or, without
 one, a plain `dict`. Collection results always preserve input order.
 
+## Real-World Scraping
+
+### Optional fields, the element itself, and links
+
+Real pages leave fields out. `optional` turns "nothing matched" into `None`
+while a browser failure stays an error; `SELF` reads the focused element itself;
+`GetUrl` resolves links the way the browser does:
+
+```python
+from silk.actions.elements import GetAttribute, GetText, GetUrl, optional
+from silk.selectors import SELF
+
+extract_review = build(
+    Review,                                         # keyword form: fields type-check one by one
+    review_id=GetAttribute(SELF, _, attribute="data-review-id"),
+    title=GetText("h3", _),
+    location=optional(GetText(".location", _)),     # None when absent
+    permalink=GetUrl("a.permalink", _),             # absolute, honours <base href>
+)
+```
+
+### Crawling pages
+
+FP-Ops' `loop` repeats a step until it returns `Stop`, in constant stack
+space. `derive` passes a value read from the page (here, the next link) to the
+action that navigates it:
+
+```python
+from fp_ops import continue_if, derive, loop, passthrough, retry
+from silk.errors import BrowserTimeoutError, NavigationError
+
+NEXT = SelectorGroup("next", css("a[rel=next]"), xpath("//a[normalize-space()='Next']"))
+
+follow_next = retry(
+    Navigate(_, derive(GetUrl(NEXT, _))),
+    attempts=3,
+    on=(BrowserTimeoutError, NavigationError),     # only browser hiccups are retried
+)
+crawl = Navigate(_, START) >> loop(
+    passthrough(reviews_on_page >> save(_)) >> continue_if(ElementExists(NEXT, _), follow_next),
+    max_steps=200,
+)
+```
+
+A failed page returns `LoopStepError(step, state, cause)`. Pages saved before
+it stay saved.
+
+For "click Next" or "Load more" on the same tab, wait for the click to take
+effect instead of sleeping:
+
+```python
+from silk.scraping import await_change
+
+next_page = await_change(
+    passthrough(Click(NEXT, _)),
+    probe=GetAttribute(".review", _, attribute="data-id"),  # the first card changes
+    attempts=2,                    # re-checks before clicking again: never double-advances
+)
+```
+
+### Isolated pages, request blocking, frames
+
+```python
+from silk.scraping import in_new_page
+
+# Every thread in its own page (or isolated=True: its own context), always closed.
+threads = traverse_all_settled(in_new_page(crawl_thread), limit=4).map(partition)
+
+options = BrowserContextOptions(
+    blocking=RequestBlocking(resource_types=frozenset({"image", "font", "media"})),
+)
+
+checkbox = ContentFrame("iframe#challenge", _) >> Click("input", _, options=ClickOptions(position=(10, 10)))
+```
+
+### Errors you can act on
+
+Playwright and Patchright failures arrive as `BrowserTimeoutError`,
+`NavigationError`, `TargetClosedError` or `BrowserError`, with the native error
+as `__cause__`. Lookups that find nothing are `NotFoundError`s. Policies can
+therefore target exactly what they mean: `retry(..., on=BrowserTimeoutError)`,
+`default_on_error(..., on=NotFoundError)`.
+
+### HTTP without (or through) the browser
+
+`silk.http` makes the transport an environment dependency, so one pipeline can
+fetch through httpx, through the browser context (sharing its cookies), or
+with an in-page `fetch()` for bot-protected APIs:
+
+```python
+from silk.http import HTTP, FetchJson, HttpRequest, HttpxClient, PageFetchClient
+
+reviews_page = FetchJson(_).map(ReviewsPage.model_validate)       # Operation[HttpRequest | str, ReviewsPage]
+
+environment = session.environment                                  # HTTP = the context's request API
+environment = environment.with_value(HTTP, PageFetchClient(session.page))  # or browser fetch()
+```
+
+### Static HTML: one pipeline, two transports
+
+`silk.static` (`pip install "silk-scraper[static]"`) implements `Page` and
+`ElementHandle` over parsed HTML, so the same extraction runs without a
+browser, and in fast offline tests:
+
+```python
+from silk.static import ParseHtml, SnapshotPage, StaticPage
+
+page_reviews = QueryAll(".review", _) >> traverse(extract_review)
+
+# HTML fetched over HTTP, no browser at all:
+from_http = Fetch(_) >> ParseHtml(_) >> page_reviews
+
+# A live page read in one round trip, then extracted in-process:
+from_browser = Navigate(_, url) >> SnapshotPage(_) >> page_reviews
+
+# Tests:
+await page_reviews.run(StaticPage.from_html(FIXTURE, url="https://example.com/p/1"))
+```
+
+CSS (via cssselect) and XPath behave as in Chromium (XPath starting with `/`
+is relative to the element, like Playwright). Interactions, navigation and
+Playwright-only selector engines (`text=`, `:has-text`, …) return
+`UnsupportedOperationError`. `inner_text` approximates layout from tag names,
+not stylesheets.
+
 ## Creating Custom Actions
 
 Turn any function into an action with a configurable template. The `_` marks
@@ -569,8 +694,11 @@ silk/
 │   ├── models.py       # Browser/Page/ElementHandle interfaces, BROWSER key, options
 │   ├── sessions.py     # BrowserSession, the browser lifecycle owner
 │   └── drivers/        # PlaywrightDriver and helpers for custom drivers
-├── selectors/          # Selector, SelectorGroup, css, xpath, text
-└── errors.py           # ElementNotFoundError, AttributeNotFoundError, …
+├── selectors/          # Selector, SelectorGroup, SELF, css, xpath, text
+├── scraping.py         # await_change, in_new_page
+├── http.py             # HTTP capability: Fetch, FetchJson, HTTP clients
+├── static.py           # StaticPage, ParseHtml, SnapshotPage ([static] extra)
+└── errors.py           # NotFoundError family, BrowserError family, …
 ```
 
 Composition (`>>`, `&`, `|`), `Result`, `_`, and the collection, object, and
@@ -580,9 +708,9 @@ policy combinators come from [FP-Ops](https://github.com/galaddirie/fp-ops).
 
 | Area | Actions |
 |---|---|
-| Browser | `CreateContext`, `NewPage`, `Pages`, `PageById`, `ClosePage`, `CloseContext` |
+| Browser | `CreateContext`, `NewPage`, `OpenPage`, `Pages`, `PageById`, `ClosePage`, `CloseContext` |
 | Navigation and page data | `Navigate`, `GoBack`, `GoForward`, `Reload`, `WaitForNavigation`, `CurrentUrl`, `Title`, `Content`, `Screenshot`, `ScreenshotTo`, `Evaluate`, `EvaluateWith` |
-| Elements and extraction | `Query`, `RequireElement`, `QueryAll`, `GetText`, `GetInnerText`, `GetAttribute`, `RequireAttribute`, `GetHtml`, `ElementExists`, `WaitForElement`, `ExtractTable` |
+| Elements and extraction | `Query`, `RequireElement`, `QueryAll`, `GetText`, `GetInnerText`, `GetAttribute`, `RequireAttribute`, `GetUrl`, `GetHtml`, `ElementExists`, `WaitForElement`, `ExtractTable`, `ContentFrame`, `OwnerPage`, `optional` |
 | Pointer, keyboard, and forms | `Click`, `DoubleClick`, `Fill`, `TypeText`, `SelectValue`, `SelectText`, `ScrollIntoView`, `ScrollTo`, `MouseMove`, `MouseMoveTo`, `MouseDown`, `MouseUp`, `KeyPress`, `KeyDown`, `KeyUp`, `Drag` |
 
 - `Query` returns `None` when nothing matches; `RequireElement` returns `ElementNotFoundError`.
@@ -621,6 +749,7 @@ tasks run at once, but it does not isolate them.
 - [ ] Support computer-using agents (browser-use, OpenAI CUA, Claude computer use)
 - [ ] Enhanced caching
 - [ ] Distributed scraping
+- [x] Crawling building blocks (`loop`, `await_change`, `in_new_page`, request blocking)
 - [ ] Rate limiting and polite scraping utilities
 - [ ] Integrations with data and scraping libraries (Pandas, Scrapy, …)
 

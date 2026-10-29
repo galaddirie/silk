@@ -283,6 +283,7 @@ def test_public_surface_contains_pascal_case_lifecycle_templates() -> None:
         "ClosePage",
         "CreateContext",
         "NewPage",
+        "OpenPage",
         "PageById",
         "Pages",
     }

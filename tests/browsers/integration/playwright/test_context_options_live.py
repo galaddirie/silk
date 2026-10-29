@@ -21,6 +21,7 @@ from silk.browsers.models import (
     BrowserViewport,
 )
 from silk.browsers.sessions import BrowserSession
+from silk.errors import BrowserTimeoutError
 
 
 @dataclass
@@ -186,7 +187,8 @@ async def test_chromium_honors_non_proxy_context_options() -> None:
 
             timed_out = await page.wait_for_selector("#never-present")
             assert timed_out.is_error()
-            assert isinstance(timed_out.error, PlaywrightTimeoutError)
+            assert isinstance(timed_out.error, BrowserTimeoutError)
+            assert isinstance(timed_out.error.__cause__, PlaywrightTimeoutError)
             assert "180ms" in str(timed_out.error)
 
 
@@ -205,7 +207,8 @@ async def test_chromium_honors_the_context_navigation_timeout() -> None:
         ) as session:
             timed_out = await session.page.navigate(server.url)
             assert timed_out.is_error(), timed_out
-            assert isinstance(timed_out.error, PlaywrightTimeoutError)
+            assert isinstance(timed_out.error, BrowserTimeoutError)
+            assert isinstance(timed_out.error.__cause__, PlaywrightTimeoutError)
             assert "Timeout 80ms exceeded" in str(timed_out.error)
 
 

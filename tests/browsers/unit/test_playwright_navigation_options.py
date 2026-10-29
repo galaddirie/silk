@@ -22,6 +22,7 @@ from silk.actions.navigation import (
 )
 from silk.browsers.drivers.playwright import PlaywrightBrowser
 from silk.browsers.models import Page
+from silk.errors import BrowserTimeoutError
 
 
 async def public_page() -> tuple[Page, MagicMock, MagicMock]:
@@ -101,7 +102,7 @@ async def test_native_navigation_exception_survives_action_unchanged() -> None:
 
 
 @pytest.mark.asyncio
-async def test_navigation_wait_preserves_native_timeout_unchanged() -> None:
+async def test_navigation_wait_translates_native_timeout_keeping_the_cause() -> None:
     page, _native_page, navigation_waiter = await public_page()
     native_timeout = PlaywrightTimeoutError("future navigation timed out")
     navigation_waiter.__aexit__.side_effect = native_timeout
@@ -109,4 +110,6 @@ async def test_navigation_wait_preserves_native_timeout_unchanged() -> None:
     result = await wait_for_navigation(_).run(page)
 
     assert result.is_error()
-    assert result.error is native_timeout
+    assert isinstance(result.error, BrowserTimeoutError)
+    assert isinstance(result.error, TimeoutError)
+    assert result.error.__cause__ is native_timeout

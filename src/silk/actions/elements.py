@@ -2,15 +2,26 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+from typing import TypeVar
+from urllib.parse import urljoin
 
-from fp_ops import Error, Ok, Result, result_operation_template
+from fp_ops import (
+    Error,
+    Ok,
+    Operation,
+    Result,
+    default_on_error,
+    result_operation_template,
+)
 
 from silk.actions._scope import (
     Element,
     ElementScope,
     ElementTarget,
     SelectorInput,
+    SelectorPlan,
     WaitPage,
     WaitSelectorInput,
     query_many,
@@ -18,11 +29,14 @@ from silk.actions._scope import (
     require_one,
     require_target,
     snapshot_selector,
-    snapshot_wait_selector,
     target_reference,
 )
-from silk.browsers.models import WaitStateLiteral
-from silk.errors import AttributeNotFoundError
+from silk.browsers.models import Frame, Page, WaitStateLiteral
+from silk.errors import AttributeNotFoundError, ElementNotFoundError, NotFoundError
+from silk.selectors.selector import SelectorType
+
+A = TypeVar("A")
+B = TypeVar("B")
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +172,71 @@ async def ElementExists(
     return Ok(element_result.ok is not None)
 
 
+async def _wait_any(
+    page: WaitPage,
+    plan: SelectorPlan,
+    *,
+    timeout_ms: int | None,
+    state: WaitStateLiteral,
+) -> Result[Element | None, Exception]:
+    """Resolve when the first selector reaches ``state``; cancel the others."""
+
+    if all(step.type is SelectorType.CSS for step in plan.selectors):
+        # One native wait over a CSS selector list.
+        query = ", ".join(step.query for step in plan.selectors)
+        return await page.wait_for_selector(query, timeout_ms=timeout_ms, state=state)
+
+    tasks = [
+        asyncio.ensure_future(
+            page.wait_for_selector(step.query, timeout_ms=timeout_ms, state=state)
+        )
+        for step in plan.selectors
+    ]
+    first_error: Exception | None = None
+    pending: set[asyncio.Future[Result[Element | None, Exception]]] = set(tasks)
+    try:
+        while pending:
+            done, pending = await asyncio.wait(
+                pending, return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in tasks:
+                if task not in done:
+                    continue
+                outcome = task.result()
+                if outcome.is_ok():
+                    return outcome
+                first_error = first_error or outcome.error
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+    assert first_error is not None
+    return Error(first_error)
+
+
+async def _wait_all(
+    page: WaitPage,
+    plan: SelectorPlan,
+    *,
+    timeout_ms: int | None,
+    state: WaitStateLiteral,
+) -> Result[Element | None, Exception]:
+    """Resolve once every selector reaches a hidden or detached ``state``."""
+
+    loop = asyncio.get_running_loop()
+    deadline = None if timeout_ms is None else loop.time() + timeout_ms / 1000
+    for step in plan.selectors:
+        remaining = (
+            None if deadline is None else max(0, int((deadline - loop.time()) * 1000))
+        )
+        waited = await page.wait_for_selector(
+            step.query, timeout_ms=remaining, state=state
+        )
+        if waited.is_error():
+            return waited
+    return Ok(None)
+
+
 @result_operation_template
 async def WaitForElement(
     selector: WaitSelectorInput,
@@ -165,15 +244,96 @@ async def WaitForElement(
     *,
     options: WaitOptions | None = None,
 ) -> Result[Element | None, Exception]:
-    """Wait for one selector using the page's explicit wait-state policy."""
+    """Wait for a selector to reach a state, on a page or a frame.
 
-    compiled = snapshot_wait_selector(selector)
+    With a :class:`SelectorGroup`, ``visible``/``attached`` resolve when *any*
+    selector does (returning that element); ``hidden``/``detached`` resolve when
+    *all* of them do.
+    """
+
     configured = options if options is not None else WaitOptions()
-    return await page.wait_for_selector(
-        compiled.query,
-        timeout_ms=configured.timeout,
-        state=configured.state,
+    plan = snapshot_selector(selector)
+    if any(step.type is SelectorType.SELF for step in plan.selectors):
+        return Error(TypeError("WaitForElement cannot wait for SELF"))
+    if len(plan.selectors) == 1:
+        return await page.wait_for_selector(
+            plan.selectors[0].query,
+            timeout_ms=configured.timeout,
+            state=configured.state,
+        )
+    if configured.state in ("visible", "attached"):
+        return await _wait_any(
+            page, plan, timeout_ms=configured.timeout, state=configured.state
+        )
+    return await _wait_all(
+        page, plan, timeout_ms=configured.timeout, state=configured.state
     )
+
+
+@result_operation_template
+async def GetUrl(
+    target: ElementTarget,
+    scope: ElementScope,
+    *,
+    attribute: str = "href",
+) -> Result[str, Exception]:
+    """Read a URL attribute resolved against the document's base URL.
+
+    A missing element or attribute is a ``NotFoundError``; relative links,
+    ``<base href>`` and protocol-relative URLs resolve like the browser does.
+    """
+
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    element = element_result.ok
+    value = await element.attribute(attribute)
+    if value.is_error():
+        return Error(value.error)
+    if value.ok is None:
+        return Error(AttributeNotFoundError(target_reference(target), attribute))
+    base = await element.page.base_url()
+    if base.is_error():
+        return Error(base.error)
+    return Ok(urljoin(base.ok, value.ok.strip()))
+
+
+@result_operation_template
+async def OwnerPage(element: Element) -> Result[Page, Exception]:
+    """The page an element belongs to: ``Click(NEXT, _) >> OwnerPage(_)``."""
+
+    return Ok(element.page)
+
+
+@result_operation_template
+async def ContentFrame(
+    target: ElementTarget,
+    scope: ElementScope,
+) -> Result[Frame, Exception]:
+    """The frame hosted by an ``<iframe>`` target; a scope for further lookups.
+
+    Fails with ``ElementNotFoundError`` when the target hosts no frame.
+    """
+
+    element_result = await require_target(target, scope)
+    if element_result.is_error():
+        return Error(element_result.error)
+    frame = await element_result.ok.content_frame()
+    if frame.is_error():
+        return Error(frame.error)
+    if frame.ok is None:
+        return Error(ElementNotFoundError(target_reference(target)))
+    return Ok(frame.ok)
+
+
+def optional(op: Operation[A, B]) -> Operation[A, B | None]:
+    """``None`` when ``op`` finds nothing (``NotFoundError``); other errors stay errors.
+
+    ``optional(GetText(".location", _))`` reads an optional field without hiding
+    a browser failure.
+    """
+
+    return default_on_error(op, None, on=NotFoundError)
 
 
 async def _read_table_text(element: Element) -> Result[str, Exception]:
@@ -258,6 +418,7 @@ async def ExtractTable(
 
 
 __all__ = [
+    "ContentFrame",
     "Element",
     "ElementScope",
     "ElementTarget",
@@ -267,6 +428,8 @@ __all__ = [
     "GetHtml",
     "GetInnerText",
     "GetText",
+    "GetUrl",
+    "OwnerPage",
     "Query",
     "QueryAll",
     "RequireAttribute",
@@ -276,4 +439,5 @@ __all__ = [
     "WaitOptions",
     "WaitForElement",
     "WaitSelectorInput",
+    "optional",
 ]

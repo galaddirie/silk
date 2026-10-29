@@ -32,7 +32,7 @@ def every_supported_placeholder_position(
 ) -> None:
     assert_type(
         create_context(_),
-        Operation[BrowserContextOptions, BrowserContext],
+        Operation[BrowserContextOptions | None, BrowserContext],
     )
     assert_type(
         new_page(_),

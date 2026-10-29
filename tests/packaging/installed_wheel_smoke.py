@@ -23,7 +23,7 @@ BOOKS_URL = "https://books.toscrape.com/"
 EXPECTED_DISTRIBUTION_NAME = "silk-scraper"
 EXPECTED_SILK_VERSION = "0.4.1"
 EXPECTED_DIRECT_REQUIREMENTS = {
-    "fp-ops>=0.4.0,<0.5.0",
+    "fp-ops>=0.5.0,<0.6.0",
     "playwright>=1.61.0,<2.0.0",
     "typing-extensions>=4.12.0,<5.0.0",
 }
@@ -87,9 +87,11 @@ def verify_distribution() -> None:
     assert silk.__version__ == EXPECTED_SILK_VERSION
     assert distribution_version == silk.__version__
 
-    assert fp_ops_version == "0.4.0"
+    assert fp_ops_version == "0.5.0"
     requirements = metadata.requires(EXPECTED_DISTRIBUTION_NAME) or []
-    normalized = {normalized_requirement(item) for item in requirements}
+    # Extras (``; extra == "static"``) are optional, not direct requirements.
+    direct = [item for item in requirements if "extra ==" not in item]
+    normalized = {normalized_requirement(item) for item in direct}
     assert normalized == EXPECTED_DIRECT_REQUIREMENTS, requirements
     for forbidden in FORBIDDEN_DIRECT_REQUIREMENTS:
         assert not any(
@@ -99,10 +101,10 @@ def verify_distribution() -> None:
             or requirement.startswith(forbidden + "=")
             for requirement in normalized
         ), requirements
-    assert distribution.metadata.get_all("Provides-Extra") in (
-        None,
-        [],
-    ), distribution.metadata.get_all("Provides-Extra")
+    assert sorted(distribution.metadata.get_all("Provides-Extra") or []) == [
+        "httpx",
+        "static",
+    ], distribution.metadata.get_all("Provides-Extra")
 
     imported = Path(silk.__file__).resolve()
     assert any(

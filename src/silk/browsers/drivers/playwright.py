@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
-from typing import Literal, Protocol, cast, overload
+from typing import Literal, Protocol, TypeVar, cast, overload
 from uuid import uuid4
 
 from fp_ops import Error, Ok, Result
@@ -16,14 +16,16 @@ from playwright.async_api import (
     BrowserContext as PWBrowserContext,
     ElementHandle as PWElementHandle,
     FloatRect,
+    Frame as PWFrame,
     Page as PWPage,
     Playwright,
     ProxySettings,
+    Route,
     ViewportSize,
     async_playwright,
 )
 
-from silk.browsers.drivers.support import attempt as _attempt
+from silk.browsers.drivers.support import attempt as _native_attempt
 from silk.browsers.models import (
     BrowserContext,
     BrowserContextOptions,
@@ -32,14 +34,24 @@ from silk.browsers.models import (
     BrowserProxy,
     CoordinateType,
     ElementHandle,
+    Frame,
     KeyModifier,
     LaunchedBrowser,
     MouseButtonLiteral,
     NavigationWaitLiteral,
     Page,
+    RequestBlocking,
     WaitStateLiteral,
 )
-from silk.errors import DragElementMismatchError
+from silk.errors import (
+    BrowserError,
+    BrowserTimeoutError,
+    DragElementMismatchError,
+    NavigationError,
+    TargetClosedError,
+)
+
+T = TypeVar("T")
 
 BrowserTypeLiteral = Literal["chromium", "firefox", "webkit"]
 
@@ -50,6 +62,55 @@ _MODIFIERS: dict[KeyModifier, Literal["Alt", "Control", "Meta", "Shift"]] = {
     KeyModifier.COMMAND: "Meta",
     KeyModifier.SHIFT: "Shift",
 }
+
+
+_NATIVE_PACKAGES = ("playwright", "patchright")
+
+
+def _native_class_names(error: Exception) -> set[str] | None:
+    """Class names in the MRO if ``error`` comes from Playwright or a fork."""
+
+    module = type(error).__module__
+    if not module.startswith(_NATIVE_PACKAGES):
+        return None
+    return {cls.__name__ for cls in type(error).__mro__}
+
+
+def translate_error(
+    error: Exception, *, navigation_url: str | None = None
+) -> Exception:
+    """Map a native Playwright/Patchright error onto Silk's ``BrowserError`` types.
+
+    Matching is by exception class (forks ship their own classes with the same
+    names), never by message. The native error is kept as ``__cause__``; errors
+    from anywhere else are returned unchanged.
+    """
+
+    names = _native_class_names(error)
+    if names is None:
+        return error
+    translated: BrowserError
+    if "TimeoutError" in names:
+        translated = BrowserTimeoutError(str(error))
+    elif "TargetClosedError" in names:
+        translated = TargetClosedError(str(error))
+    elif navigation_url is not None:
+        translated = NavigationError(str(error), url=navigation_url)
+    else:
+        translated = BrowserError(str(error))
+    translated.__cause__ = error
+    return translated
+
+
+async def _attempt(
+    awaitable: Awaitable[T],
+    *,
+    navigation_url: str | None = None,
+) -> Result[T, Exception]:
+    outcome = await _native_attempt(awaitable)
+    if outcome.is_error():
+        return Error(translate_error(outcome.error, navigation_url=navigation_url))
+    return outcome
 
 
 class _PlaywrightStarter(Protocol):
@@ -105,6 +166,16 @@ class PlaywrightElementHandle(ElementHandle):
         self._selector = selector
 
     @property
+    def native(self) -> PWElementHandle:
+        """The underlying Playwright element handle (an escape hatch)."""
+
+        return self._native
+
+    @property
+    def page(self) -> PlaywrightPage:
+        return self._page
+
+    @property
     def page_id(self) -> str:
         return self._page.page_id
 
@@ -144,6 +215,7 @@ class PlaywrightElementHandle(ElementHandle):
         delay_ms: int | None = None,
         click_count: int = 1,
         force: bool = False,
+        position: tuple[float, float] | None = None,
     ) -> Result[None, Exception]:
         return await _attempt(
             self._native.click(
@@ -153,6 +225,17 @@ class PlaywrightElementHandle(ElementHandle):
                 timeout=timeout_ms,
                 force=force,
                 modifiers=_modifiers(modifiers),
+                position=(
+                    None if position is None else {"x": position[0], "y": position[1]}
+                ),
+            )
+        )
+
+    async def content_frame(self) -> Result[Frame | None, Exception]:
+        found = await _attempt(self._native.content_frame())
+        return found.map(
+            lambda native: (
+                None if native is None else PlaywrightFrame(native, self._page)
             )
         )
 
@@ -314,6 +397,59 @@ class PlaywrightElementHandle(ElementHandle):
             await mouse.up()
 
 
+class PlaywrightFrame(Frame):
+    """A frame inside a page; elements found here belong to that page."""
+
+    def __init__(self, native: PWFrame, page: PlaywrightPage) -> None:
+        self._native = native
+        self._page = page
+
+    @property
+    def native(self) -> PWFrame:
+        return self._native
+
+    @property
+    def page(self) -> PlaywrightPage:
+        return self._page
+
+    async def url(self) -> Result[str, Exception]:
+        return Ok(self._native.url)
+
+    async def query_selector(
+        self,
+        selector: str,
+    ) -> Result[ElementHandle | None, Exception]:
+        found = await _attempt(self._native.query_selector(selector))
+        return found.map(lambda native: self._page.wrap_element(native, selector))
+
+    async def query_selector_all(
+        self,
+        selector: str,
+    ) -> Result[list[ElementHandle], Exception]:
+        found = await _attempt(self._native.query_selector_all(selector))
+        return found.map(
+            lambda natives: [
+                PlaywrightElementHandle(native, self._page, selector)
+                for native in natives
+            ]
+        )
+
+    async def wait_for_selector(
+        self,
+        selector: str,
+        *,
+        timeout_ms: int | None = None,
+        state: WaitStateLiteral = "visible",
+    ) -> Result[ElementHandle | None, Exception]:
+        found = await _attempt(
+            self._native.wait_for_selector(selector, timeout=timeout_ms, state=state)
+        )
+        return found.map(lambda native: self._page.wrap_element(native, selector))
+
+    async def evaluate(self, script: str) -> Result[object, Exception]:
+        return await _attempt(self._native.evaluate(script))
+
+
 class PlaywrightPage(Page):
     def __init__(self, native: PWPage, context: PlaywrightBrowserContext) -> None:
         self.native = native
@@ -351,12 +487,19 @@ class PlaywrightPage(Page):
                 wait_until=wait_until,
                 timeout=timeout_ms,
                 referer=referer,
-            )
+            ),
+            navigation_url=url,
         )
         return navigated.map(lambda _response: None)
 
     async def url(self) -> Result[str, Exception]:
         return Ok(self.native.url)
+
+    async def base_url(self) -> Result[str, Exception]:
+        found = await _attempt(self.native.evaluate("document.baseURI"))
+        return found.map(
+            lambda value: value if isinstance(value, str) else self.native.url
+        )
 
     async def title(self) -> Result[str, Exception]:
         return await _attempt(self.native.title())
@@ -371,7 +514,8 @@ class PlaywrightPage(Page):
         wait_until: NavigationWaitLiteral = "load",
     ) -> Result[None, Exception]:
         reloaded = await _attempt(
-            self.native.reload(wait_until=wait_until, timeout=timeout_ms)
+            self.native.reload(wait_until=wait_until, timeout=timeout_ms),
+            navigation_url=self.native.url,
         )
         return reloaded.map(lambda _response: None)
 
@@ -382,7 +526,8 @@ class PlaywrightPage(Page):
         wait_until: NavigationWaitLiteral = "load",
     ) -> Result[None, Exception]:
         moved = await _attempt(
-            self.native.go_back(wait_until=wait_until, timeout=timeout_ms)
+            self.native.go_back(wait_until=wait_until, timeout=timeout_ms),
+            navigation_url=self.native.url,
         )
         return moved.map(lambda _response: None)
 
@@ -393,7 +538,8 @@ class PlaywrightPage(Page):
         wait_until: NavigationWaitLiteral = "load",
     ) -> Result[None, Exception]:
         moved = await _attempt(
-            self.native.go_forward(wait_until=wait_until, timeout=timeout_ms)
+            self.native.go_forward(wait_until=wait_until, timeout=timeout_ms),
+            navigation_url=self.native.url,
         )
         return moved.map(lambda _response: None)
 
@@ -410,7 +556,7 @@ class PlaywrightPage(Page):
             ):
                 pass
 
-        return await _attempt(wait())
+        return await _attempt(wait(), navigation_url=self.native.url)
 
     async def query_selector(
         self,
@@ -537,6 +683,12 @@ class PlaywrightBrowserContext(BrowserContext):
         self._pages: dict[int, PlaywrightPage] = {}
 
     @property
+    def native(self) -> PWBrowserContext:
+        """The underlying Playwright context (an escape hatch)."""
+
+        return self._native
+
+    @property
     def context_id(self) -> str:
         return self._context_id
 
@@ -566,6 +718,21 @@ class PlaywrightBrowserContext(BrowserContext):
         return closed
 
 
+def _blocking_handler(blocking: RequestBlocking) -> Callable[[Route], Awaitable[None]]:
+    """A plain closure: Playwright and Patchright annotate a bound handler's
+    ``__self__``, which frozen, slotted objects such as ``RequestBlocking``
+    cannot accept."""
+
+    async def handle(route: Route) -> None:
+        request = route.request
+        if blocking.blocks(request.resource_type, request.url):
+            await route.abort()
+        else:
+            await route.continue_()
+
+    return handle
+
+
 class PlaywrightBrowser(LaunchedBrowser):
     """A launched browser process. Owned and closed by a ``BrowserSession``."""
 
@@ -573,6 +740,12 @@ class PlaywrightBrowser(LaunchedBrowser):
         self._playwright = playwright
         self._native = native
         self._closed = False
+
+    @property
+    def native(self) -> PWBrowser:
+        """The underlying Playwright browser (an escape hatch)."""
+
+        return self._native
 
     async def new_context(
         self,
@@ -612,6 +785,13 @@ class PlaywrightBrowser(LaunchedBrowser):
             native.set_default_timeout(configured.timeout)
         if configured.navigation_timeout is not None:
             native.set_default_navigation_timeout(configured.navigation_timeout)
+        if configured.blocking is not None:
+            routed = await _attempt(
+                native.route("**/*", _blocking_handler(configured.blocking))
+            )
+            if routed.is_error():
+                await _native_attempt(native.close())
+                return Error(routed.error)
         return Ok(PlaywrightBrowserContext(native))
 
     async def close(self) -> None:
@@ -679,5 +859,7 @@ __all__ = [
     "PlaywrightBrowserContext",
     "PlaywrightDriver",
     "PlaywrightElementHandle",
+    "PlaywrightFrame",
     "PlaywrightPage",
+    "translate_error",
 ]

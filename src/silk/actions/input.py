@@ -54,12 +54,17 @@ class ClickOptions:
     delay_ms: int | None = None
     click_count: int = 1
     force: bool = False
+    position: tuple[float, float] | None = None
+    """Click at this offset from the element's top-left corner (a native click,
+    e.g. for a checkbox inside a closed shadow root of an iframe)."""
 
     def __post_init__(self) -> None:
         _require_non_negative(timeout_ms=self.timeout_ms, delay_ms=self.delay_ms)
         _require_distinct_active_modifiers(self.modifiers)
         if self.click_count < 1:
             raise ValueError("click_count must be positive")
+        if self.position is not None and (self.position[0] < 0 or self.position[1] < 0):
+            raise ValueError("position offsets must be non-negative")
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +160,7 @@ async def Click(
             delay_ms=configured.delay_ms,
             click_count=configured.click_count,
             force=configured.force,
+            position=configured.position,
         ),
     )
 

@@ -7,11 +7,12 @@ from __future__ import annotations
 from types import TracebackType
 from typing import Self, TypeVar
 
-from fp_ops import Environment
+from fp_ops import Environment, Result
 
 from silk.browsers.drivers.playwright import PlaywrightDriver
 from silk.browsers.models import (
     BROWSER,
+    CONTEXT,
     Browser,
     BrowserContext,
     BrowserContextOptions,
@@ -22,6 +23,32 @@ from silk.browsers.models import (
 )
 
 T = TypeVar("T")
+
+
+class SessionBrowser(Browser):
+    """The session's browser as pipelines see it: ``new_context()`` without
+    options uses the session's ``context_options``, so contexts opened inside a
+    pipeline match the session's first one."""
+
+    def __init__(
+        self,
+        browser: Browser,
+        defaults: BrowserContextOptions | None,
+    ) -> None:
+        self._browser = browser
+        self._defaults = defaults
+
+    @property
+    def defaults(self) -> BrowserContextOptions | None:
+        return self._defaults
+
+    async def new_context(
+        self,
+        options: BrowserContextOptions | None = None,
+    ) -> Result[BrowserContext, Exception]:
+        return await self._browser.new_context(
+            options if options is not None else self._defaults
+        )
 
 
 class BrowserSession:
@@ -55,6 +82,7 @@ class BrowserSession:
         self._context_options = context_options
         self._driver = driver if driver is not None else PlaywrightDriver()
         self._browser: LaunchedBrowser | None = None
+        self._session_browser: SessionBrowser | None = None
         self._context: BrowserContext | None = None
         self._page: Page | None = None
 
@@ -64,7 +92,9 @@ class BrowserSession:
 
     @property
     def browser(self) -> Browser:
-        return self._require(self._browser)
+        """The running browser; new contexts default to the session's options."""
+
+        return self._require(self._session_browser)
 
     @property
     def context(self) -> BrowserContext:
@@ -76,7 +106,17 @@ class BrowserSession:
 
     @property
     def environment(self) -> Environment:
-        return Environment().with_value(BROWSER, self.browser)
+        """``BROWSER``, ``CONTEXT`` (the session's first context) and ``HTTP``
+        (its request API, sharing the context's cookies) for pipelines."""
+
+        from silk.http import HTTP, ContextHttpClient
+
+        return (
+            Environment()
+            .with_value(BROWSER, self.browser)
+            .with_value(CONTEXT, self.context)
+            .with_value(HTTP, ContextHttpClient(self.context))
+        )
 
     async def start(self) -> Self:
         """Launch the browser and open the initial context and page."""
@@ -95,6 +135,7 @@ class BrowserSession:
             await browser.close()
             raise
         self._browser, self._context, self._page = browser, context.ok, page.ok
+        self._session_browser = SessionBrowser(browser, self._context_options)
         return self
 
     async def close(self) -> None:
@@ -102,6 +143,7 @@ class BrowserSession:
 
         browser = self._browser
         self._browser = self._context = self._page = None
+        self._session_browser = None
         if browser is not None:
             await browser.close()
 
@@ -123,4 +165,4 @@ class BrowserSession:
         return value
 
 
-__all__ = ["BrowserSession"]
+__all__ = ["BrowserSession", "SessionBrowser"]

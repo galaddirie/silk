@@ -9,7 +9,7 @@
     "3.13"
   ],
   "message_normalization": "Trim and collapse every Unicode whitespace run to one ASCII space; the selected primary rule and full normalized message must match exactly.",
-  "case_count": 230,
+  "case_count": 235,
   "cases": [
     {
       "id": "browser_actions.004",
@@ -129,11 +129,11 @@
       "expectations": {
         "mypy": {
           "rule": "arg-type",
-          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"BrowserContextOptions\""
+          "message": "Argument 1 to \"run\" of \"Operation\" has incompatible type \"str\"; expected \"BrowserContextOptions | None\""
         },
         "pyright": {
           "rule": "reportArgumentType",
-          "message": "Argument of type \"Literal['not options']\" cannot be assigned to parameter \"value\" of type \"BrowserContextOptions\" in function \"run\" \"Literal['not options']\" is not assignable to \"BrowserContextOptions\""
+          "message": "Argument of type \"Literal['not options']\" cannot be assigned to parameter \"value\" of type \"BrowserContextOptions | None\" in function \"run\" Type \"Literal['not options']\" is not assignable to type \"BrowserContextOptions | None\" \"Literal['not options']\" is not assignable to \"BrowserContextOptions\" \"Literal['not options']\" is not assignable to \"None\""
         }
       }
     },
@@ -1375,7 +1375,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1459,7 +1459,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1474,20 +1474,6 @@
         "mypy": {
           "rule": "call-overload",
           "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"Placeholder\", \"Placeholder\""
-        },
-        "pyright": {
-          "rule": "reportCallIssue",
-          "message": "No overloads for \"__call__\" match the provided arguments"
-        }
-      }
-    },
-    {
-      "id": "element_actions.011",
-      "fixture": "tests/typecheck/element_actions_bad.py",
-      "expectations": {
-        "mypy": {
-          "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"SelectorGroup\", \"Placeholder\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1543,7 +1529,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1557,7 +1543,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1571,7 +1557,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1585,7 +1571,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1599,7 +1585,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1613,7 +1599,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"str\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1627,7 +1613,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1655,7 +1641,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str | Selector | SelectorGroup | ElementHandle\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1795,7 +1781,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1809,7 +1795,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1823,7 +1809,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -1837,7 +1823,7 @@
       "expectations": {
         "mypy": {
           "rule": "call-overload",
-          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | ElementHandle\""
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate3\" matches argument types \"Placeholder\", \"Placeholder\", \"Page | Frame | ElementHandle\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -2173,7 +2159,7 @@
       "expectations": {
         "mypy": {
           "rule": "arg-type",
-          "message": "Argument 1 to \"__call__\" of \"OperationTemplate2\" has incompatible type \"tuple[float, float]\"; expected \"tuple[int, int]\""
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate2\" has incompatible type \"tuple[float, float]\"; expected \"tuple[int, int] | Derived[Page, tuple[int, int]]\""
         },
         "pyright": {
           "rule": "reportCallIssue",
@@ -3228,6 +3214,90 @@
         "pyright": {
           "rule": "reportArgumentType",
           "message": "Argument of type \"Operation[Page, None]\" cannot be assigned to parameter \"next\" of type \"Operation[None, C@then]\" in function \"then\" \"Operation[Page, None]\" is not assignable to \"Operation[None, None]\" Type parameter \"A_contra@Operation\" is contravariant, but \"Page\" is not a supertype of \"None\" \"None\" is not assignable to \"Page\""
+        }
+      }
+    },
+    {
+      "id": "scraping_flows.001",
+      "fixture": "tests/typecheck/scraping_flows_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "call-overload",
+          "message": "No overload variant of \"__call__\" of \"OperationTemplate2\" matches argument types \"str\", \"Placeholder\", \"int\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "scraping_flows.002",
+      "fixture": "tests/typecheck/scraping_flows_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"derive\" has incompatible type \"Operation[Page, int]\"; expected \"Operation[Page, str]\""
+        },
+        "pyright": {
+          "rule": "reportCallIssue",
+          "message": "No overloads for \"__call__\" match the provided arguments"
+        }
+      }
+    },
+    {
+      "id": "scraping_flows.003",
+      "fixture": "tests/typecheck/scraping_flows_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"in_new_page\" has incompatible type \"Operation[str, str]\"; expected \"Operation[Page, str]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Operation[str, str]\" cannot be assigned to parameter \"body\" of type \"Operation[Page, B@in_new_page]\" in function \"in_new_page\" \"Operation[str, str]\" is not assignable to \"Operation[Page, str]\" Type parameter \"A_contra@Operation\" is contravariant, but \"str\" is not a supertype of \"Page\" \"Page\" is not assignable to \"str\""
+        }
+      }
+    },
+    {
+      "id": "scraping_flows.004",
+      "fixture": "tests/typecheck/scraping_flows_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument \"probe\" to \"await_change\" has incompatible type \"Operation[Page, list[str]]\"; expected \"Operation[Page, Hashable]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Operation[Page, list[str]]\" cannot be assigned to parameter \"probe\" of type \"Operation[S@await_change, Hashable]\" in function \"await_change\" \"Operation[Page, list[str]]\" is not assignable to \"Operation[Page, Hashable]\" Type parameter \"B_co@Operation\" is covariant, but \"list[str]\" is not a subtype of \"Hashable\" \"list[str]\" is incompatible with protocol \"Hashable\" \"__hash__\" is an incompatible type \"__hash__\" is not defined as a ClassVar in protocol Type \"None\" is not assignable to type \"() -> int\""
+        }
+      }
+    },
+    {
+      "id": "scraping_flows.005",
+      "fixture": "tests/typecheck/scraping_flows_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"__call__\" of \"OperationTemplate1\" has incompatible type \"Page\"; expected \"Placeholder\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"first\" of type \"Placeholder\" in function \"__call__\" \"Page\" is not assignable to \"Placeholder\""
+        }
+      }
+    },
+    {
+      "id": "scraping_flows.006",
+      "fixture": "tests/typecheck/scraping_flows_bad.py",
+      "expectations": {
+        "mypy": {
+          "rule": "arg-type",
+          "message": "Argument 1 to \"optional\" has incompatible type \"Page\"; expected \"Operation[Never, Never]\""
+        },
+        "pyright": {
+          "rule": "reportArgumentType",
+          "message": "Argument of type \"Page\" cannot be assigned to parameter \"op\" of type \"Operation[A@optional, B@optional]\" in function \"optional\" \"Page\" is not assignable to \"Operation[A@optional, B@optional]\""
         }
       }
     }

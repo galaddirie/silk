@@ -2,6 +2,7 @@
 
 from silk.browsers.models import (
     BROWSER,
+    CONTEXT,
     Browser,
     BrowserContext,
     BrowserContextOptions,
@@ -10,14 +11,17 @@ from silk.browsers.models import (
     BrowserProxy,
     BrowserViewport,
     ElementHandle,
+    Frame,
     KeyModifier,
     LaunchedBrowser,
     Page,
+    RequestBlocking,
 )
-from silk.browsers.sessions import BrowserSession
+from silk.browsers.sessions import BrowserSession, SessionBrowser
 
 __all__ = [
     "BROWSER",
+    "CONTEXT",
     "Browser",
     "BrowserContext",
     "BrowserContextOptions",
@@ -27,7 +31,10 @@ __all__ = [
     "BrowserSession",
     "BrowserViewport",
     "ElementHandle",
+    "Frame",
     "KeyModifier",
     "LaunchedBrowser",
     "Page",
+    "RequestBlocking",
+    "SessionBrowser",
 ]

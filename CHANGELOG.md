@@ -2,11 +2,58 @@
 
 ## [Unreleased]
 
-### Added
+Built on FP-Ops 0.5 (`loop`, `bracket`, `provide`, `derive`, `on=` filters).
 
-### Fixed
+### Added
+- `optional(op)`: `None` when a lookup finds nothing (`NotFoundError`), while
+  browser failures stay errors. `NotFoundError` is the new base of
+  `ElementNotFoundError`, `AttributeNotFoundError` and `PageNotFoundError`.
+- `SELF` selector: the scope element itself, e.g.
+  `GetAttribute(SELF, _, attribute="id")` on a card.
+- `GetUrl(target, _, attribute="href")`: a link resolved like the browser
+  resolves it (`<base href>`, relative and protocol-relative URLs), using the
+  new `Page.base_url()`.
+- `WaitForElement` accepts a `SelectorGroup`: `visible`/`attached` resolve on
+  any selector (CSS and XPath race), `hidden`/`detached` on all of them.
+- `silk.scraping.await_change(action, probe=...)`: run an action and wait until a
+  probe changes (the stale-DOM guard for "click Next, then read"), with
+  attempts that never repeat the action once the change is visible.
+- `silk.scraping.in_new_page(body, isolated=False)`: open a URL in a new page (or
+  a new context), run `body`, and always close it, also when cancelled.
+- `OpenPage(_)`, `OwnerPage(_)`, `ContentFrame(target, _)` and the `Frame`
+  interface (iframes as lookup scopes), and `ClickOptions.position` for native
+  offset clicks.
+- `RequestBlocking` in `BrowserContextOptions(blocking=...)`: abort requests
+  by resource type or URL glob.
+- Browser error taxonomy: `BrowserError`, `BrowserTimeoutError` (also a
+  `TimeoutError`), `NavigationError`, `TargetClosedError`,
+  `UnsupportedOperationError`, `ChangeTimeoutError`. Playwright and Patchright
+  errors are translated by class (never by message), keeping the native error
+  as `__cause__`, so `retry(..., on=BrowserTimeoutError)` works for both.
+- `silk.http`: HTTP as an environment capability (`HTTP`, `HttpClient`,
+  `HttpRequest`, `HttpResponse`, `Fetch`, `FetchJson`, `HttpStatusError`) with
+  `ContextHttpClient` (shares the context's cookies), `PageFetchClient`
+  (in-page `fetch`, for bot-protected APIs) and `HttpxClient` (`[httpx]` extra).
+- `silk.static` (`[static]` extra: lxml + cssselect): `StaticPage` /
+  `StaticElement` over parsed HTML, `ParseHtml` (a string, `HtmlDocument`, or
+  any HTTP response), `SnapshotPage` / `SnapshotElement` (one round trip, then
+  in-process reads). Live-Chromium parity tests cover the extraction actions.
+- `.native` on every Playwright wrapper (browser, context, page, frame,
+  element) as a documented escape hatch.
+- The Books to Scrape example crawls the catalogue with `loop` and `derive`.
 
 ### Changed
+- `BrowserSession.environment` also provides `CONTEXT` (the first context) and
+  `HTTP` (a `ContextHttpClient`). Its `BROWSER` (and `session.browser`) is a
+  `SessionBrowser`: `new_context()` without options uses the session's context
+  options, so contexts opened in a pipeline match the first one.
+- `CreateContext` accepts `None` for the session's context options.
+- Native Playwright/Patchright errors are no longer returned unchanged; see
+  the error taxonomy above. Errors from other code still pass through as-is.
+- Custom drivers implement new interface members: `ElementHandle.page`,
+  `ElementHandle.content_frame()`, a `position` argument to
+  `ElementHandle.click`, and `Page.base_url()`.
+- Requires FP-Ops 0.5.
 
 ## [0.4.1] - 2026-10-28
 
@@ -165,7 +212,7 @@ the redesigned package begins at 0.4.0.
 - Complete refactor using [fp-ops](https://github.com/galaddirie/fp-ops/)
 - Module restructuring:
   - Moved extraction actions from `silk.actions.extraction` to `silk.actions.elements`
-  - Moved flow control functions from `silk.actions.flow` to `silk.flow`
+  - Moved flow control functions from `silk.actions.flow` to `silk.scraping`
   - Moved composition functions from `silk.actions.composition` to `silk.composition`
   - Moved browser options from `silk.models.browser` to `silk.browsers.types`
 - Changed execution model to explicitly use contexts: `action(context)` instead of `action(manager)`

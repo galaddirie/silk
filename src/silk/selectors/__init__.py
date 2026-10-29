@@ -2,6 +2,7 @@
 """Immutable selector configuration."""
 
 from .selector import (
+    SELF,
     Selector,
     SelectorGroup,
     SelectorSpec,
@@ -12,6 +13,7 @@ from .selector import (
 )
 
 __all__ = [
+    "SELF",
     "Selector",
     "SelectorGroup",
     "SelectorSpec",

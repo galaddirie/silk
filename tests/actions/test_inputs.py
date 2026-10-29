@@ -32,7 +32,13 @@ from silk.actions.input import (
     TypeText as type_text,
     TypeTextOptions,
 )
-from silk.browsers.models import ElementHandle, KeyModifier, MouseButtonLiteral, Page
+from silk.browsers.models import (
+    ElementHandle,
+    Frame,
+    KeyModifier,
+    MouseButtonLiteral,
+    Page,
+)
 
 
 class ProbeElement(ElementHandle):
@@ -47,6 +53,10 @@ class ProbeElement(ElementHandle):
         self._selector: str | None = selector
         self.effects: dict[str, Result[None, Exception]] = {}
         self.calls: list[tuple[str, object]] = []
+
+    @property
+    def page(self) -> Page:
+        raise NotImplementedError("probe elements are not attached to a page")
 
     @property
     def page_id(self) -> str:
@@ -83,6 +93,7 @@ class ProbeElement(ElementHandle):
         delay_ms: int | None = None,
         click_count: int = 1,
         force: bool = False,
+        position: tuple[float, float] | None = None,
     ) -> Result[None, Exception]:
         self.calls.append(
             (
@@ -91,6 +102,9 @@ class ProbeElement(ElementHandle):
             )
         )
         return self.effects.get("click", Ok(None))
+
+    async def content_frame(self) -> Result[Frame | None, Exception]:
+        return Ok(None)
 
     async def double_click(
         self,

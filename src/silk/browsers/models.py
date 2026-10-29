@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
+from fnmatch import fnmatchcase
 from pathlib import Path
 from types import MappingProxyType
 from typing import Literal, overload
@@ -32,6 +33,13 @@ class KeyModifier(Enum):
 
 class ElementHandle(ABC):
     """A live element on a page."""
+
+    @property
+    @abstractmethod
+    def page(self) -> Page:
+        """The page that owns this element (also for elements inside frames)."""
+
+        ...
 
     @property
     @abstractmethod
@@ -67,7 +75,14 @@ class ElementHandle(ABC):
         delay_ms: int | None = None,
         click_count: int = 1,
         force: bool = False,
+        position: tuple[float, float] | None = None,
     ) -> Result[None, Exception]: ...
+
+    @abstractmethod
+    async def content_frame(self) -> Result[Frame | None, Exception]:
+        """The frame an ``<iframe>`` element hosts, or ``None`` for other elements."""
+
+        ...
 
     @abstractmethod
     async def double_click(
@@ -146,6 +161,41 @@ class ElementHandle(ABC):
     ) -> Result[None, Exception]: ...
 
 
+class Frame(ABC):
+    """A document inside an ``<iframe>``; a scope for element lookups."""
+
+    @property
+    @abstractmethod
+    def page(self) -> Page: ...
+
+    @abstractmethod
+    async def url(self) -> Result[str, Exception]: ...
+
+    @abstractmethod
+    async def query_selector(
+        self,
+        selector: str,
+    ) -> Result[ElementHandle | None, Exception]: ...
+
+    @abstractmethod
+    async def query_selector_all(
+        self,
+        selector: str,
+    ) -> Result[list[ElementHandle], Exception]: ...
+
+    @abstractmethod
+    async def wait_for_selector(
+        self,
+        selector: str,
+        *,
+        timeout_ms: int | None = None,
+        state: WaitStateLiteral = "visible",
+    ) -> Result[ElementHandle | None, Exception]: ...
+
+    @abstractmethod
+    async def evaluate(self, script: str) -> Result[object, Exception]: ...
+
+
 class Page(ABC):
     """A live browser page."""
 
@@ -169,6 +219,12 @@ class Page(ABC):
 
     @abstractmethod
     async def url(self) -> Result[str, Exception]: ...
+
+    @abstractmethod
+    async def base_url(self) -> Result[str, Exception]:
+        """The URL relative links resolve against (honours ``<base href>``)."""
+
+        ...
 
     @abstractmethod
     async def title(self) -> Result[str, Exception]: ...
@@ -383,6 +439,9 @@ class BrowserDriver(ABC):
 BROWSER = EnvKey("browser", Browser)  # type: ignore[type-abstract]
 """Environment key under which a session provides its :class:`Browser`."""
 
+CONTEXT = EnvKey("browser_context", BrowserContext)  # type: ignore[type-abstract]
+"""Environment key under which a session provides its primary :class:`BrowserContext`."""
+
 
 @dataclass(frozen=True, slots=True)
 class BrowserViewport:
@@ -420,6 +479,42 @@ class BrowserOptions:
             raise ValueError("timeout must be non-negative")
 
 
+ResourceTypeLiteral = Literal[
+    "document",
+    "stylesheet",
+    "image",
+    "media",
+    "font",
+    "script",
+    "texttrack",
+    "xhr",
+    "fetch",
+    "eventsource",
+    "websocket",
+    "manifest",
+    "other",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class RequestBlocking:
+    """Requests a context aborts: by resource type, or by URL glob pattern."""
+
+    resource_types: frozenset[ResourceTypeLiteral] = frozenset()
+    url_patterns: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "resource_types", frozenset(self.resource_types))
+        object.__setattr__(self, "url_patterns", tuple(self.url_patterns))
+        if "document" in self.resource_types:
+            raise ValueError("blocking 'document' requests would block navigation")
+
+    def blocks(self, resource_type: str, url: str) -> bool:
+        return resource_type in self.resource_types or any(
+            fnmatchcase(url, pattern) for pattern in self.url_patterns
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class BrowserContextOptions:
     """Configuration for one browser context.
@@ -438,6 +533,7 @@ class BrowserContextOptions:
     navigation_timeout: int | None = None
     ignore_https_errors: bool = False
     java_script_enabled: bool = True
+    blocking: RequestBlocking | None = None
 
     def __post_init__(self) -> None:
         if self.extra_http_headers is not None:
@@ -454,6 +550,7 @@ class BrowserContextOptions:
 
 __all__ = [
     "BROWSER",
+    "CONTEXT",
     "Browser",
     "BrowserContext",
     "BrowserContextOptions",
@@ -463,10 +560,13 @@ __all__ = [
     "BrowserViewport",
     "CoordinateType",
     "ElementHandle",
+    "Frame",
     "KeyModifier",
     "LaunchedBrowser",
     "MouseButtonLiteral",
     "NavigationWaitLiteral",
     "Page",
+    "RequestBlocking",
+    "ResourceTypeLiteral",
     "WaitStateLiteral",
 ]

@@ -19,6 +19,7 @@ class SelectorType(str, Enum):
     NAME = "name"
     TAG = "tag"
     LINK_TEXT = "link_text"
+    SELF = "self"
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,12 +62,11 @@ class SelectorGroup:
     selectors: tuple[Selector, ...]
 
     def __init__(self, name: str, *selectors: SelectorSpec) -> None:
+        normalized = tuple(_normalize_selector(selector) for selector in selectors)
+        if any(selector.type is SelectorType.SELF for selector in normalized):
+            raise ValueError("SELF cannot be a fallback inside a SelectorGroup")
         object.__setattr__(self, "name", name)
-        object.__setattr__(
-            self,
-            "selectors",
-            tuple(_normalize_selector(selector) for selector in selectors),
-        )
+        object.__setattr__(self, "selectors", normalized)
 
     def __iter__(self) -> Iterator[Selector]:
         return iter(self.selectors)
@@ -85,6 +85,11 @@ class SelectorGroup:
 
     def __str__(self) -> str:
         return f"SelectorGroup(name={self.name}, selectors={self.selectors})"
+
+
+SELF = Selector(type=SelectorType.SELF, value=":self")
+"""The scope element itself: ``GetAttribute(SELF, _, attribute="id")`` reads the
+focused element's own attribute. Requires an element scope."""
 
 
 def css(value: str) -> Selector:
@@ -106,6 +111,7 @@ def text(value: str) -> Selector:
 
 
 __all__ = [
+    "SELF",
     "Selector",
     "SelectorGroup",
     "SelectorSpec",
