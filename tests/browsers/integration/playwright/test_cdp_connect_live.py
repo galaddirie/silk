@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import socket
 import subprocess
 import threading
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.request import urlopen
 
 import pytest
 from fp_ops import _
@@ -22,23 +19,20 @@ from silk.browsers.models import BrowserContextOptions, RequestBlocking
 from silk.browsers.sessions import BrowserSession
 
 
-def _free_port() -> int:
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        port: int = probe.getsockname()[1]
-        return port
+async def _websocket_url(
+    process: subprocess.Popen[bytes], profile: Path, log: Path
+) -> str:
+    """Chromium writes its DevTools port and browser path once it listens."""
 
-
-async def _websocket_url(port: int) -> str:
-    for _attempt in range(100):
-        try:
-            with urlopen(
-                f"http://127.0.0.1:{port}/json/version", timeout=1
-            ) as response:
-                url: str = json.load(response)["webSocketDebuggerUrl"]
-                return url
-        except OSError:
-            await asyncio.sleep(0.1)
+    active_port = profile / "DevToolsActivePort"
+    for _attempt in range(300):
+        if process.poll() is not None:
+            stderr = log.read_text(errors="replace")[-2000:]
+            raise RuntimeError(f"Chromium exited ({process.returncode}): {stderr}")
+        lines = active_port.read_text().splitlines() if active_port.exists() else []
+        if len(lines) >= 2:
+            return f"ws://127.0.0.1:{lines[0]}{lines[1]}"
+        await asyncio.sleep(0.1)
     raise RuntimeError("Chromium never exposed its DevTools endpoint")
 
 
@@ -71,27 +65,31 @@ async def remote_chromium(tmp_path: Path) -> AsyncIterator[str]:
 
     async with async_playwright() as playwright:
         executable = playwright.chromium.executable_path
-    port = _free_port()
-    process = subprocess.Popen(  # noqa: S603 - the trusted Playwright Chromium binary
-        [
-            executable,
-            "--headless=new",
-            f"--remote-debugging-port={port}",
-            f"--user-data-dir={tmp_path / 'profile'}",
-            "--no-first-run",
-            # Playwright's own launch flags: never touch the OS keychain.
-            "--use-mock-keychain",
-            "--password-store=basic",
-            "about:blank",
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        yield await _websocket_url(port)
-    finally:
-        process.terminate()
-        process.wait(timeout=10)
+    profile = tmp_path / "profile"
+    log = tmp_path / "chromium.log"
+    with log.open("wb") as stderr:
+        process = subprocess.Popen(  # noqa: S603 - the trusted Playwright Chromium
+            [
+                executable,
+                "--headless=new",
+                "--remote-debugging-port=0",
+                f"--user-data-dir={profile}",
+                # The flags Playwright itself launches Chromium with: no sandbox
+                # (CI runners disallow it), and never touch the OS keychain.
+                "--no-sandbox",
+                "--no-first-run",
+                "--use-mock-keychain",
+                "--password-store=basic",
+                "about:blank",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=stderr,
+        )
+        try:
+            yield await _websocket_url(process, profile, log)
+        finally:
+            process.terminate()
+            process.wait(timeout=10)
 
 
 FETCH = "((path) => fetch(path).then(() => 'loaded', () => 'blocked'))"
