@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+### Fixed
+
+### Changed
+
+## [0.5.0] - 2026-10-29
+
 Built on FP-Ops 0.5 (`loop`, `bracket`, `provide`, `derive`, `on=` filters).
 
 ### Added

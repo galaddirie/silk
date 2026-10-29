@@ -6,7 +6,7 @@
 </p>
 
 ---
-[![PyPI version](https://img.shields.io/badge/pypi-v0.4.1-blue.svg)](https://pypi.org/project/silk-scraper/)
+[![PyPI version](https://img.shields.io/badge/pypi-v0.5.0-blue.svg)](https://pypi.org/project/silk-scraper/)
 [![Python versions](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/silk-scraper/)
 [![PyPI Downloads](https://static.pepy.tech/badge/silk-scraper)](https://pepy.tech/projects/silk-scraper)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
